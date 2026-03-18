@@ -1,0 +1,364 @@
+domains:
+  behavioral:
+    dataset: data/processed/behavioral_final.csv
+    description: Predicts behavioral outcome probability
+    model_path: models/behavioral_stacking_v5.joblib
+    name: Behavioral Choice
+    parameters:
+    - name: text_input
+      type: text
+      weight: high
+    - name: context
+      type: text
+      weight: medium
+    - name: past_behavior
+      options:
+      - consistent
+      - inconsistent
+      - unknown
+      type: categorical
+      weight: medium
+    prediction_label: Deceptive probability
+    target_column: deceptive
+  claim:
+    dataset: data/processed/claim_final.csv
+    description: Predicts probability a claim is credible
+    model_path: models/claim_stacking_v5.joblib
+    name: Claim Credibility
+    parameters:
+    - name: claim_text
+      type: text
+      weight: high
+    - name: source_type
+      options:
+      - news
+      - social_media
+      - official
+      - blog
+      - unknown
+      type: categorical
+      weight: high
+    - name: has_citations
+      options:
+      - true
+      - false
+      type: categorical
+      weight: medium
+    prediction_label: Credibility probability
+    target_column: credible
+  disease:
+    dataset: data/raw/medical/heart.csv
+    description: Predicts risk of heart disease or diabetes
+    model_path: models/disease_stacking_v2.joblib
+    name: Disease Risk
+    parameters:
+    - name: age
+      range:
+      - 18
+      - 80
+      type: numeric
+      weight: high
+    - name: cholesterol
+      range:
+      - 0
+      - 600
+      type: numeric
+      weight: high
+    - name: blood_pressure
+      range:
+      - 60
+      - 200
+      type: numeric
+      weight: high
+    - name: bmi
+      range:
+      - 10
+      - 60
+      type: numeric
+      weight: high
+    - name: smoking
+      options:
+      - true
+      - false
+      type: categorical
+      weight: medium
+    - name: exercise
+      options:
+      - none
+      - light
+      - moderate
+      - heavy
+      type: categorical
+      weight: medium
+    prediction_label: Disease risk probability
+    target_column: disease
+  fitness:
+    dataset: data/raw/fitness/bodyPerformance.csv
+    description: Predicts fitness level achievement probability
+    model_path: models/fitness_stacking_v2.joblib
+    name: Fitness and Body Performance
+    parameters:
+    - name: age
+      range:
+      - 15
+      - 80
+      type: numeric
+      weight: medium
+    - name: weight_kg
+      range:
+      - 30
+      - 200
+      type: numeric
+      weight: high
+    - name: body_fat_pct
+      range:
+      - 3
+      - 60
+      type: numeric
+      weight: high
+    - name: sit_ups
+      range:
+      - 0
+      - 80
+      type: numeric
+      weight: high
+    - name: broad_jump
+      range:
+      - 0
+      - 300
+      type: numeric
+      weight: high
+    prediction_label: Fitness goal probability
+    target_column: fit
+  higher_education:
+    dataset: data/processed/student_dropout_final.csv
+    description: Predicts student graduation or dropout probability
+    model_path: models/student_dropout_stacking_v4.joblib
+    name: Higher Education Outcome
+    parameters:
+    - name: age_at_enrollment
+      range:
+      - 17
+      - 70
+      type: numeric
+      weight: low
+    - name: admission_grade
+      range:
+      - 0
+      - 200
+      type: numeric
+      weight: high
+    - name: scholarship_holder
+      options:
+      - true
+      - false
+      type: categorical
+      weight: medium
+    - name: tuition_fees_up_to_date
+      options:
+      - true
+      - false
+      type: categorical
+      weight: high
+    - name: debtor
+      options:
+      - true
+      - false
+      type: categorical
+      weight: medium
+    prediction_label: Graduation probability
+    target_column: pass
+  hr:
+    dataset: data/processed/hr_final.csv
+    description: Predicts employee attrition probability
+    model_path: models/hr_stacking_v3.joblib
+    name: HR Attrition
+    parameters:
+    - name: age
+      range:
+      - 18
+      - 60
+      type: numeric
+      weight: medium
+    - name: job_satisfaction
+      range:
+      - 1
+      - 4
+      type: numeric
+      weight: high
+    - name: monthly_income
+      range:
+      - 1000
+      - 20000
+      type: numeric
+      weight: high
+    - name: overtime
+      options:
+      - true
+      - false
+      type: categorical
+      weight: high
+    - name: years_at_company
+      range:
+      - 0
+      - 40
+      type: numeric
+      weight: medium
+    - name: work_life_balance
+      range:
+      - 1
+      - 4
+      type: numeric
+      weight: high
+    - name: distance_from_home
+      range:
+      - 1
+      - 30
+      type: numeric
+      weight: low
+    prediction_label: Attrition probability
+    target_column: attrition
+  loan:
+    dataset: data/raw/finance/loan_synthetic.csv
+    description: Predicts probability of loan default
+    model_path: models/loan_stacking_v4.joblib
+    name: Loan Default Risk
+    parameters:
+    - name: credit_score
+      range:
+      - 300
+      - 850
+      type: numeric
+      weight: high
+    - name: income
+      range:
+      - 0
+      - 500000
+      type: numeric
+      weight: high
+    - name: loan_amount
+      range:
+      - 1000
+      - 100000
+      type: numeric
+      weight: high
+    - name: debt_to_income
+      range:
+      - 0
+      - 1
+      type: numeric
+      weight: high
+    - name: missed_payments
+      range:
+      - 0
+      - 20
+      type: numeric
+      weight: high
+    - name: employment_years
+      range:
+      - 0
+      - 40
+      type: numeric
+      weight: medium
+    prediction_label: Default probability
+    target_column: default
+  mental_health:
+    dataset: data/raw/mental_health/Mental Health Dataset.csv
+    description: Predicts risk of burnout or depression
+    model_path: models/mental_health_stacking_v5.joblib
+    name: Mental Health Risk
+    parameters:
+    - name: work_hours_per_week
+      range:
+      - 0
+      - 80
+      type: numeric
+      weight: high
+    - name: sleep_hours
+      range:
+      - 0
+      - 12
+      type: numeric
+      weight: high
+    - name: stress_level
+      options:
+      - low
+      - medium
+      - high
+      - very_high
+      type: categorical
+      weight: high
+    - name: social_support
+      options:
+      - strong
+      - moderate
+      - weak
+      - none
+      type: categorical
+      weight: high
+    - name: family_history
+      options:
+      - true
+      - false
+      type: categorical
+      weight: medium
+    prediction_label: Mental health risk probability
+    target_column: treatment
+  student:
+    dataset: data/processed/student_final.csv
+    description: Predicts academic pass/fail probability
+    model_path: models/student_stacking_v3.joblib
+    name: Student Performance
+    parameters:
+    - name: study_hours_per_day
+      range:
+      - 0
+      - 16
+      type: numeric
+      weight: high
+    - name: attendance_pct
+      range:
+      - 0
+      - 100
+      type: numeric
+      weight: high
+    - name: sleep_hours
+      range:
+      - 0
+      - 12
+      type: numeric
+      weight: medium
+    - name: stress_level
+      options:
+      - low
+      - medium
+      - high
+      - very_high
+      type: categorical
+      weight: high
+    - name: motivation
+      range:
+      - 1
+      - 5
+      type: numeric
+      weight: medium
+    - name: past_score
+      range:
+      - 0
+      - 100
+      type: numeric
+      weight: high
+    - name: part_time_job
+      options:
+      - true
+      - false
+      type: categorical
+      weight: low
+    - name: extracurricular
+      options:
+      - true
+      - false
+      type: categorical
+      weight: low
+    prediction_label: Pass probability
+    target_column: pass
