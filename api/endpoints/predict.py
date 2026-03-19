@@ -209,3 +209,46 @@ async def transparency_endpoint(req: TransparencyRequest):
     except Exception as e:
         logger.error(f"Transparency error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── POST /predict/conversational ─────────────────────────────
+class ConversationalStartRequest(BaseModel):
+    domain:   str           = Field(..., example="student")
+    question: Optional[str] = None
+
+class ConversationalAnswerRequest(BaseModel):
+    domain:      str  = Field(..., example="student")
+    question:    Optional[str] = None
+    param_key:   str  = Field(..., example="study_hours_per_day")
+    value:       str  = Field(..., example="3-4 hours")
+    skipped:     Optional[bool] = False
+    step:        int  = Field(..., example=1)
+    parameters:  Optional[dict] = {}
+
+@router.post("/conversational/start")
+async def conversational_start(req: ConversationalStartRequest):
+    """Start a conversational session — returns first question."""
+    try:
+        from llm.conversational_mode import ConversationalSession
+        session = ConversationalSession(req.domain, req.question)
+        q = session.get_next_question()
+        return {"success": True, "question": q, "session_domain": req.domain}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/conversational/answer")
+async def conversational_answer(req: ConversationalAnswerRequest):
+    """Submit answer and get next question or prediction-ready signal."""
+    try:
+        from llm.conversational_mode import ConversationalSession
+        session = ConversationalSession(req.domain, req.question)
+        session.parameters = req.parameters or {}
+        session.step = req.step - 1
+        session.reliability = len(session.parameters) / max(len(session.questions), 1)
+        state = session.submit_answer(req.param_key, req.value, req.skipped or False)
+        result = {"success": True, "state": state, "parameters": session.parameters}
+        if state["complete"]:
+            result["prediction_ready"] = session.get_prediction_ready()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
