@@ -11,6 +11,14 @@ st.set_page_config(
 )
 
 st.markdown(load_css(), unsafe_allow_html=True)
+st.markdown("""<style>
+[data-testid="stSidebar"]{display:none !important;}
+[data-testid="collapsedControl"]{display:none !important;}
+[data-testid="stSidebarNav"]{display:none !important;}
+section[data-testid="stSidebarContent"]{display:none !important;}
+header[data-testid="stHeader"]{display:none !important;}
+</style>""", unsafe_allow_html=True)
+
 st.markdown(nav_html(""), unsafe_allow_html=True)
 st.markdown(open("pages/home.html").read(), unsafe_allow_html=True)
 st.markdown(disclaimer_html(), unsafe_allow_html=True)

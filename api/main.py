@@ -47,13 +47,14 @@ async def health():
     }
 
 # ── Routes ────────────────────────────────────────────────────
-from api.endpoints import predict, factcheck, vision, history, auth
+from api.endpoints import predict, factcheck, vision, history, auth, evaluate
 
 app.include_router(predict.router,   prefix="/predict",    tags=["Prediction"])
 app.include_router(factcheck.router, prefix="/fact-check", tags=["Fact Check"])
 app.include_router(vision.router,    prefix="/vision",     tags=["Vision"])
 app.include_router(history.router,   prefix="/history",    tags=["History"])
 app.include_router(auth.router,      prefix="/auth",       tags=["Auth"])
+app.include_router(evaluate.router,  prefix="/evaluate",   tags=["Evaluation"])
 
 # ── Root ──────────────────────────────────────────────────────
 @app.get("/")
