@@ -1,0 +1,297 @@
+<div class="page-wrap">
+
+<!-- PAGE TRANSITION OVERLAY -->
+<div class="page-transition" id="pageTransition"></div>
+
+<!-- SIENA FULLSCREEN MENU OVERLAY -->
+<div class="s-menu-overlay" id="menuOverlay">
+    <span class="s-menu-item" onclick="navigateTo('dashboard')">Dashboard</span>
+    <span class="s-menu-item" onclick="navigateTo('modes')">Modes</span>
+    <span class="s-menu-item" onclick="navigateTo('factcheck')">Fact-Check</span>
+    <span class="s-menu-item" onclick="navigateTo('privacy')">Privacy</span>
+    <div class="s-menu-line"></div>
+    <span class="s-menu-item cta-item" onclick="navigateTo('dashboard')">Try Sambhav</span>
+    <div class="s-menu-sub">
+        <span class="s-menu-sub-item">Academic v1.0</span>
+        <span class="s-menu-sub-item">Sri Indu Institute</span>
+        <span class="s-menu-sub-item">2025-2026</span>
+    </div>
+</div>
+
+<!-- LOGO WATERMARK -->
+<div id="logoWatermark" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+pointer-events:none;z-index:0;width:520px;height:520px;opacity:0.035;">
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+<polygon points="100,10 135,30 160,70 160,130 135,170 100,190 65,170 40,130 40,70 65,30" 
+fill="none" stroke="#C2CD93" stroke-width="2"/>
+<polygon points="100,30 128,46 148,80 148,120 128,154 100,170 72,154 52,120 52,80 72,46"
+fill="none" stroke="#C2CD93" stroke-width="1.5" opacity="0.6"/>
+<text x="100" y="108" text-anchor="middle" font-family="Poppins,sans-serif" 
+font-weight="800" font-size="42" fill="#C2CD93" opacity="0.9">S</text>
+</svg>
+</div>
+
+<!-- HERO SECTION -->
+<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;
+justify-content:center;text-align:center;position:relative;padding:0 40px;">
+
+<!-- CIRCLES -->
+<svg style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;" 
+width="680" height="680" viewBox="0 0 680 680">
+<circle cx="340" cy="340" r="330" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+<circle cx="340" cy="340" r="260" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+<line x1="160" y1="0" x2="160" y2="680" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+<line x1="520" y1="0" x2="520" y2="680" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+</svg>
+
+<!-- SIDE STATS -->
+<div style="position:absolute;left:40px;top:50%;transform:translateY(-55%);">
+<div style="margin-bottom:44px;">
+<div class="side-stat-val" style="font-size:40px;">12</div>
+<div class="side-stat-lbl">Operating Modes</div>
+</div>
+<div>
+<div class="side-stat-val" style="font-size:40px;">18</div>
+<div class="side-stat-lbl">Core Features</div>
+</div>
+</div>
+
+<div style="position:absolute;right:40px;top:50%;transform:translateY(-55%);text-align:right;">
+<div style="margin-bottom:44px;">
+<div class="side-stat-mono" style="font-size:30px;">&lt;0.12</div>
+<div class="side-stat-lbl">Target Brier Score</div>
+</div>
+<div>
+<div class="side-stat-val" style="font-size:40px;">5</div>
+<div class="side-stat-lbl">Input Modalities</div>
+</div>
+</div>
+
+<!-- HERO CONTENT -->
+<div style="position:relative;z-index:1;max-width:720px;">
+<div class="eyebrow-pill" style="display:inline-flex;margin-bottom:24px;">
+<div class="eyebrow-dot"></div>
+<span class="eyebrow-text">MULTI-MODAL PROBABILISTIC INFERENCE ENGINE</span>
+</div>
+<div class="hero-h1" style="font-size:clamp(44px,6vw,80px);">Uncertainty,</div>
+<div class="hero-h2" style="font-size:clamp(36px,5vw,64px);margin-bottom:20px;">
+<span class="hero-accent">Quantified.</span>
+</div>
+<p class="hero-desc" style="font-size:15px;margin-bottom:28px;">
+Sambhav outputs calibrated probability distributions &mdash; not labels.<br>
+Every number explained. Every prediction audited. Zero black box.
+</p>
+
+<!-- BUTTONS -->
+<div style="display:flex;gap:14px;justify-content:center;margin-bottom:32px;flex-wrap:wrap;">
+<button class="btn-primary" onclick="navigateTo('dashboard')">Start a Prediction</button>
+<button class="btn-secondary-glow" onclick="navigateTo('modes')">Explore Modes</button>
+</div>
+
+<!-- MODE CHIPS -->
+<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;" id="mode-chips">
+<span class="chip active" onclick="setChip(this)">Guided</span>
+<span class="chip" onclick="setChip(this)">Free Inference</span>
+<span class="chip" onclick="setChip(this)">Document</span>
+<span class="chip" onclick="setChip(this)">Comparative</span>
+<span class="chip" onclick="setChip(this)">Fact-Check</span>
+</div>
+</div>
+</div>
+
+<!-- STATS STRIP -->
+<div class="stats-strip">
+<div class="stat-cell"><div class="stat-val">12</div><div class="stat-lbl">Operating Modes</div></div>
+<div class="stat-cell"><div class="stat-val">18</div><div class="stat-lbl">Core Features</div></div>
+<div class="stat-cell"><div class="stat-val">&lt;0.12</div><div class="stat-lbl">Target Brier Score</div></div>
+<div class="stat-cell"><div class="stat-val">5</div><div class="stat-lbl">Input Modalities</div></div>
+</div>
+
+<!-- SIENA-STYLE SWIPE STRIP -->
+<div style="padding:40px 0 20px;overflow:hidden;">
+<div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#34323C;
+margin-bottom:16px;padding:0 60px;">OPERATING MODES &mdash; DRAG TO EXPLORE</div>
+<div class="swipe-strip" id="swipeStrip" style="padding:0 60px 20px;">
+<div class="swipe-strip-inner" id="swipeInner">
+<div class="swipe-card"><span class="swipe-card-num">01</span>
+<div class="swipe-card-title">Guided Mode</div>
+<div class="swipe-card-desc">Structured domain-specific prediction</div></div>
+<div class="swipe-card"><span class="swipe-card-num">02</span>
+<div class="swipe-card-title">Free Inference</div>
+<div class="swipe-card-desc">Raw text in, probability report out</div></div>
+<div class="swipe-card"><span class="swipe-card-num">03</span>
+<div class="swipe-card-title">Hybrid Mode</div>
+<div class="swipe-card-desc">Text + image/video combined</div></div>
+<div class="swipe-card"><span class="swipe-card-num">04</span>
+<div class="swipe-card-title">Conversational</div>
+<div class="swipe-card-desc">Natural multi-turn dialogue</div></div>
+<div class="swipe-card"><span class="swipe-card-num">05</span>
+<div class="swipe-card-title">Document Analysis</div>
+<div class="swipe-card-desc">Upload PDF, Word, CSV</div></div>
+<div class="swipe-card"><span class="swipe-card-num">06</span>
+<div class="swipe-card-title">Comparative</div>
+<div class="swipe-card-desc">Side-by-side scenario comparison</div></div>
+<div class="swipe-card"><span class="swipe-card-num">07</span>
+<div class="swipe-card-title">Retrospective</div>
+<div class="swipe-card-desc">Analyse past outcomes</div></div>
+<div class="swipe-card"><span class="swipe-card-num">08</span>
+<div class="swipe-card-title">Simulation</div>
+<div class="swipe-card-desc">Hypothetical scenario analysis</div></div>
+<div class="swipe-card"><span class="swipe-card-num">09</span>
+<div class="swipe-card-title">Continuous Monitor</div>
+<div class="swipe-card-desc">Probability trajectory over time</div></div>
+<div class="swipe-card"><span class="swipe-card-num">10</span>
+<div class="swipe-card-title">Adversarial</div>
+<div class="swipe-card-desc">Stress-test with extreme inputs</div></div>
+<div class="swipe-card"><span class="swipe-card-num">11</span>
+<div class="swipe-card-title">Expert Consultation</div>
+<div class="swipe-card-desc">Multi-domain expert simulation</div></div>
+<div class="swipe-card"><span class="swipe-card-num">12</span>
+<div class="swipe-card-title">What-If Story</div>
+<div class="swipe-card-desc">Branching narrative timelines</div></div>
+</div>
+</div>
+</div>
+
+<!-- FEATURE ROWS -->
+<div style="margin-top:8px;">
+<div class="feature-row">
+<div style="display:flex;align-items:flex-start;gap:20px;width:50%;padding-right:40px;">
+<span class="feature-num">01</span>
+<div><div class="feature-title">Seven-Stage Prediction Pipeline</div>
+<div class="feature-desc">Input parse &rarr; domain detect &rarr; param audit &rarr; ML ensemble &rarr; LLM cross-val &rarr; confidence audit &rarr; output.</div></div>
+</div>
+<div style="display:flex;align-items:flex-start;gap:20px;width:50%;padding-left:40px;border-left:1px solid var(--border);">
+<span class="feature-num">02</span>
+<div><div class="feature-title">Real-Time Reliability Index</div>
+<div class="feature-desc">Live 0&ndash;100% trust score before results. SHAP-powered &mdash; shows exactly which inputs to add.</div></div>
+</div>
+</div>
+<div class="feature-row">
+<div style="display:flex;align-items:flex-start;gap:20px;width:50%;padding-right:40px;">
+<span class="feature-num">03</span>
+<div><div class="feature-title">Three-Engine Audit System</div>
+<div class="feature-desc">Engine 1 audits inputs. Engine 2 audits outputs. Engine 3 audits certainty. Seven flag types.</div></div>
+</div>
+<div style="display:flex;align-items:flex-start;gap:20px;width:50%;padding-left:40px;border-left:1px solid var(--border);">
+<span class="feature-num">04</span>
+<div><div class="feature-title">Dual-LLM Fact-Check Module</div>
+<div class="feature-desc">Groq/Llama for deep historical knowledge. xAI Grok for real-time discourse. Weighted average.</div></div>
+</div>
+</div>
+</div>
+<div style="height:40px;"></div>
+
+<!-- SIENA-STYLE MENU SCRIPT + SWIPE SCRIPT -->
+<script>
+// ── MENU ───────────────────────────────
+var menuOpen = false;
+function toggleMenu() {
+    menuOpen = !menuOpen;
+    var overlay = document.getElementById("menuOverlay");
+    var ham = document.getElementById("hamburger");
+    if (menuOpen) {
+        overlay.classList.add("open");
+        ham.classList.add("open");
+    } else {
+        overlay.classList.remove("open");
+        ham.classList.remove("open");
+    }
+}
+function navigateTo(page) {
+    var t = document.getElementById("pageTransition");
+    t.classList.add("active");
+    setTimeout(function() {
+        window.parent.location.search = "?goto=" + page;
+    }, 300);
+}
+
+// ── CHIP SELECTOR ──────────────────────
+function setChip(el) {
+    document.querySelectorAll("#mode-chips .chip").forEach(function(c) {
+        c.classList.remove("active");
+    });
+    el.classList.add("active");
+}
+
+// ── SWIPE STRIP ────────────────────────
+(function() {
+    var strip = document.getElementById("swipeStrip");
+    var inner = document.getElementById("swipeInner");
+    if (!strip || !inner) return;
+    var isDragging = false;
+    var startX = 0;
+    var scrollLeft = 0;
+    var currentX = 0;
+    var velocity = 0;
+    var lastX = 0;
+    var lastTime = 0;
+    var animFrame;
+
+    strip.addEventListener("mousedown", function(e) {
+        isDragging = true;
+        startX = e.pageX;
+        scrollLeft = currentX;
+        lastX = e.pageX;
+        lastTime = Date.now();
+        cancelAnimationFrame(animFrame);
+        inner.style.transition = "none";
+        strip.style.cursor = "grabbing";
+    });
+    document.addEventListener("mousemove", function(e) {
+        if (!isDragging) return;
+        var dx = e.pageX - startX;
+        var newX = scrollLeft + dx;
+        var maxScroll = -(inner.scrollWidth - strip.offsetWidth + 120);
+        newX = Math.max(maxScroll, Math.min(0, newX));
+        currentX = newX;
+        inner.style.transform = "translateX(" + newX + "px)";
+        var now = Date.now();
+        velocity = (e.pageX - lastX) / (now - lastTime + 1) * 16;
+        lastX = e.pageX;
+        lastTime = now;
+    });
+    document.addEventListener("mouseup", function() {
+        if (!isDragging) return;
+        isDragging = false;
+        strip.style.cursor = "grab";
+        inner.style.transition = "transform 0.6s cubic-bezier(0.25,0.46,0.45,0.94)";
+        var maxScroll = -(inner.scrollWidth - strip.offsetWidth + 120);
+        var target = Math.max(maxScroll, Math.min(0, currentX + velocity * 8));
+        // Snap to nearest card
+        var cardWidth = 300;
+        target = Math.round(target / cardWidth) * cardWidth;
+        target = Math.max(maxScroll, Math.min(0, target));
+        currentX = target;
+        inner.style.transform = "translateX(" + target + "px)";
+    });
+
+    // Touch support
+    strip.addEventListener("touchstart", function(e) {
+        isDragging = true;
+        startX = e.touches[0].pageX;
+        scrollLeft = currentX;
+        inner.style.transition = "none";
+    }, {passive:true});
+    strip.addEventListener("touchmove", function(e) {
+        if (!isDragging) return;
+        var dx = e.touches[0].pageX - startX;
+        var newX = scrollLeft + dx;
+        var maxScroll = -(inner.scrollWidth - strip.offsetWidth + 120);
+        newX = Math.max(maxScroll, Math.min(0, newX));
+        currentX = newX;
+        inner.style.transform = "translateX(" + newX + "px)";
+    }, {passive:true});
+    strip.addEventListener("touchend", function() {
+        isDragging = false;
+        inner.style.transition = "transform 0.6s cubic-bezier(0.25,0.46,0.45,0.94)";
+        var maxScroll = -(inner.scrollWidth - strip.offsetWidth + 120);
+        var cardWidth = 300;
+        var target = Math.round(currentX / cardWidth) * cardWidth;
+        target = Math.max(maxScroll, Math.min(0, target));
+        currentX = target;
+        inner.style.transform = "translateX(" + target + "px)";
+    });
+})();
+</script>
+</div>

@@ -2,7 +2,7 @@ domains:
   behavioral:
     dataset: data/processed/behavioral_final.csv
     description: Predicts behavioral outcome probability
-    model_path: models/behavioral_stacking_v5.joblib
+    model_path: models/behavioral_minilm_v1.joblib
     name: Behavioral Choice
     parameters:
     - name: text_input
@@ -23,7 +23,7 @@ domains:
   claim:
     dataset: data/processed/claim_final.csv
     description: Predicts probability a claim is credible
-    model_path: models/claim_stacking_v5.joblib
+    model_path: models/claim_stacking_v8.joblib
     name: Claim Credibility
     parameters:
     - name: claim_text
@@ -49,7 +49,7 @@ domains:
   disease:
     dataset: data/raw/medical/heart.csv
     description: Predicts risk of heart disease or diabetes
-    model_path: models/disease_stacking_v2.joblib
+    model_path: models/disease_stacking_v3.joblib
     name: Disease Risk
     parameters:
     - name: age
@@ -95,7 +95,7 @@ domains:
   fitness:
     dataset: data/raw/fitness/bodyPerformance.csv
     description: Predicts fitness level achievement probability
-    model_path: models/fitness_stacking_v2.joblib
+    model_path: models/fitness_stacking_v8.joblib
     name: Fitness and Body Performance
     parameters:
     - name: age
@@ -133,7 +133,7 @@ domains:
   higher_education:
     dataset: data/processed/student_dropout_final.csv
     description: Predicts student graduation or dropout probability
-    model_path: models/student_dropout_stacking_v4.joblib
+    model_path: models/student_dropout_stacking_v8.joblib
     name: Higher Education Outcome
     parameters:
     - name: age_at_enrollment
@@ -171,7 +171,7 @@ domains:
   hr:
     dataset: data/processed/hr_final.csv
     description: Predicts employee attrition probability
-    model_path: models/hr_stacking_v3.joblib
+    model_path: models/hr_stacking_v8.joblib
     name: HR Attrition
     parameters:
     - name: age
@@ -221,7 +221,7 @@ domains:
   loan:
     dataset: data/raw/finance/loan_synthetic.csv
     description: Predicts probability of loan default
-    model_path: models/loan_stacking_v4.joblib
+    model_path: models/loan_stacking_v5.joblib
     name: Loan Default Risk
     parameters:
     - name: credit_score
@@ -265,7 +265,7 @@ domains:
   mental_health:
     dataset: data/raw/mental_health/Mental Health Dataset.csv
     description: Predicts risk of burnout or depression
-    model_path: models/mental_health_stacking_v5.joblib
+    model_path: models/mental_health_stacking_v8.joblib
     name: Mental Health Risk
     parameters:
     - name: work_hours_per_week
@@ -307,7 +307,7 @@ domains:
   student:
     dataset: data/processed/student_final.csv
     description: Predicts academic pass/fail probability
-    model_path: models/student_stacking_v3.joblib
+    model_path: models/student_stacking_v8.joblib
     name: Student Performance
     parameters:
     - name: study_hours_per_day

@@ -1,0 +1,119 @@
+Project Sambhav: Complete File Directory
+
+This is a comprehensive list of every file in the project, organized by their functional roles.
+
+## Root Directory
+- .env: Environment variables and API keys.
+- .gitignore: Files excluded from version control.
+- app.py: Main Streamlit application entry point.
+- check_metrics.py: Script to verify model performance metrics.
+- fix_behavioral_claim.py: Maintenance script for behavioral and claim data.
+- model_audit.py: System for auditing model predictions.
+- model_scorecard_full.csv: Generated performance report.
+- requirements.txt: Python package dependencies.
+- retrain_all.py: Master script to trigger retraining across all domains.
+- sambhav.db: Main SQLite database.
+- Sambhav_API_Keys_Reference.md: Documentation for API key management.
+- train_optimised_v2.py: Optimized training script (v2).
+
+## Backend & Core Logic
+
+### core/ (Analysis & Intelligence)
+- ablation_results.md: Results from ablation studies.
+- ablation_studies.py: Logic for testing feature importance.
+- audit_system.py: Tracks and logs model decisions for compliance.
+- fact_checker.py: Verifies accuracy of generated content.
+- feature_engineer.py: Data transformation and feature extraction.
+- predictor.py: The primary inference engine.
+- reliability_index.py: Calculates confidence and uncertainty scores.
+- safety.py: Content filtering and safety guardrails.
+- validate_features.py: Ensures data consistency for models.
+- shap_explainer.py: Model interpretability using SHAP.
+
+### api/ (Interface & Connectivity)
+- main.py: FastAPI server entry point.
+- key_health_monitor.py: Real-time monitoring of API key status.
+- key_rotator.py: Automated rotation of service keys.
+- rate_limiter.py: API request throttling.
+- key_health_log.json: Log file for key health events.
+- api/endpoints/auth.py: Authentication logic.
+- api/endpoints/factcheck.py: Fact-checking endpoints.
+- api/endpoints/history.py: User interaction history.
+- api/endpoints/predict.py: Core prediction endpoints.
+- api/endpoints/vision.py: Multimodal processing endpoints.
+- api/schemas/: Pydantic models for request/response validation.
+
+### llm/ (AI Model Clients)
+- groq_client.py: Groq LPU inference client.
+- multi_agent.py: Agentic workflow coordination.
+- nvidia_client.py: NVIDIA NIM/AI Foundation client.
+- openrouter_client.py: OpenRouter aggregator client.
+- xai_client.py: xAI (Grok) client.
+
+### db/ (Database Layer)
+- database.py: SQLAlchemy engine and session setup.
+- models.py: ORM table definitions.
+
+## Frontend & UI (Streamlit)
+
+- pages/1_Home.py: Landing page logic.
+- pages/2_Modes.py: Domain selection and mode configuration.
+- pages/3_Dashboard.py: Data visualization and metrics.
+- pages/4_Fact_Check.py: Dedicated fact-checking interface.
+- pages/5_Privacy.py: Compliance and privacy settings.
+- pages/6_Login.py: User authentication UI.
+- pages/home.html: Custom HTML template for the home page.
+- utils/styles.py: Full CSS design system and navigation components.
+
+## Machine Learning Models
+
+### models/ (Serialized Models & Training)
+- beast_mental_loan.py: Domain-specific trainer.
+- fast_mental_loan.py: Domain-specific trainer.
+- fix_claim_behavioral.py: Model correction script.
+- fix_mental_loan.py: Model correction script.
+- master_audit_retrain.py: Batch training logic.
+- train_all_domains.py: Batch training logic.
+- trainer.py: Base training class.
+- train_optimised.py: Standard optimized trainer.
+- behavioral_stacking_v1.joblib through v6.joblib: Trained models.
+- claim_stacking_v1.joblib through v5.joblib: Trained models.
+- disease_stacking_v1.joblib, v2.joblib: Trained models.
+- fitness_stacking_v1.joblib, v2.joblib: Trained models.
+- hr_stacking_v1.joblib through v3.joblib: Trained models.
+- loan_stacking_v1.joblib through v4.joblib: Trained models.
+- mental_health_stacking_v1.joblib through v5.joblib: Trained models.
+- student_dropout_stacking_v3.joblib, v4.joblib: Trained models.
+- student_stacking_v1.joblib through v3.joblib: Trained models.
+- student_uci_stacking_v3.joblib: Trained models.
+
+## Data Management
+
+### data/ (Processing & Datasets)
+- clean_datasets.py: Data cleaning.
+- merge_final.py: Data merging.
+- process_student.py: UCI student dataset processor.
+- smote_balance.py: Class balancing using SMOTE.
+- synthetic_data.py: AI-driven synthetic data generation.
+- data/processed/: Cleaned CSV files ready for training (Behavioral, Claim, HR, Student, etc.).
+- data/synthetic/: Generated CSV files (Behavioral, HR, Student).
+- data/raw/: Source data folders (Behavioral, Claim, Finance, Fitness, HR, Medical, Mental Health, Student).
+
+## Multimodal & Testing
+
+### vision/ (Multimedia Pipelines)
+- document_pipeline.py: OCR and document parsing.
+- image_pipeline.py: Computer vision analysis.
+- video_pipeline.py: Temporal video analysis.
+- voice_pipeline.py: Speech processing.
+
+### tests/ (Quality Assurance)
+- unit/: Individual function tests.
+- integration/: End-to-end workflow tests.
+- load/: Performance and scalability tests.
+
+## Internal Folders
+- factcheck/: Storage for fact-checking references.
+- reports/: Target for generated audit reports.
+- schemas/: domain_registry.yaml (Global domain configuration).
+- venv/: Local Python environment.
