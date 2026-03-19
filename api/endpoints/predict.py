@@ -116,3 +116,96 @@ async def list_domains():
         return {"success": True, "domains": domains}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── POST /predict/rich ────────────────────────────────────────
+class PredictRichRequest(BaseModel):
+    domain:     str           = Field(..., example="student")
+    parameters: dict          = Field(..., example={"study_hours": 3})
+    question:   Optional[str] = None
+    skipped:    Optional[list] = []
+    mode:       Optional[str] = "guided"
+
+@router.post("/rich")
+async def predict_rich_endpoint(req: PredictRichRequest):
+    """
+    Full rich prediction — ML + LLM + debate + SHAP + Monte Carlo +
+    failure scenarios + improvement suggestions.
+    Returns three detail levels: simple, detailed, full.
+    """
+    logger.info(f"POST /predict/rich domain={req.domain}")
+    safety = check_hard_blocks(req.question or str(req.parameters))
+    if not safety["safe"]:
+        raise HTTPException(status_code=400, detail={"blocked": True, "message": safety["message"]})
+    try:
+        from core.predictor import predict_rich
+        result = predict_rich(
+            domain=req.domain, parameters=req.parameters,
+            question=req.question, skipped=req.skipped, mode=req.mode
+        )
+        return {"success": True, "result": result,
+                "disclaimer": "Sambhav may be incorrect. Always verify important decisions independently."}
+    except Exception as e:
+        logger.error(f"Rich prediction error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── POST /predict/outcomes ────────────────────────────────────
+class OutcomesRequest(BaseModel):
+    domain:             str           = Field(..., example="student")
+    parameters:         dict          = Field(..., example={"study_hours": 3})
+    question:           Optional[str] = None
+    n_outcomes:         Optional[int] = Field(5, ge=1, le=10)
+    existing_outcomes:  Optional[list] = []
+    mode:               Optional[str] = "independent"
+
+@router.post("/outcomes")
+async def generate_outcomes_endpoint(req: OutcomesRequest):
+    """
+    Multi-outcome generation — Section 8.3.
+    Generate N independent outcomes. Call again with existing_outcomes for more.
+    mode: independent | spectrum | conditional
+    """
+    logger.info(f"POST /predict/outcomes domain={req.domain} n={req.n_outcomes}")
+    try:
+        from core.predictor import generate_outcomes
+        result = generate_outcomes(
+            domain=req.domain, parameters=req.parameters,
+            question=req.question, n_outcomes=req.n_outcomes,
+            existing_outcomes=req.existing_outcomes, mode=req.mode
+        )
+        return {"success": True, "result": result,
+                "disclaimer": "Sambhav may be incorrect. Always verify important decisions independently."}
+    except Exception as e:
+        logger.error(f"Outcomes error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── POST /predict/transparency ────────────────────────────────
+class TransparencyRequest(BaseModel):
+    domain:            str           = Field(..., example="student")
+    parameters:        dict          = Field(..., example={"study_hours": 3})
+    final_probability: float         = Field(..., example=0.637)
+    question:          Optional[str] = None
+    outcome:           Optional[str] = None
+
+@router.post("/transparency")
+async def transparency_endpoint(req: TransparencyRequest):
+    """
+    Section 8.4 — WHY this probability / WHY the minority case /
+    WHEN minority would occur. Called on demand per prediction.
+    """
+    logger.info(f"POST /predict/transparency domain={req.domain} prob={req.final_probability}")
+    try:
+        from core.predictor import explain_prediction_transparency, _get_shap
+        shap_vals = _get_shap(req.domain, req.parameters)
+        result = explain_prediction_transparency(
+            domain=req.domain, parameters=req.parameters,
+            final_probability=req.final_probability,
+            shap_values=shap_vals, question=req.question
+        )
+        return {"success": True, "result": result,
+                "disclaimer": "Sambhav may be incorrect. Always verify important decisions independently."}
+    except Exception as e:
+        logger.error(f"Transparency error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
