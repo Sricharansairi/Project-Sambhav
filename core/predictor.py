@@ -866,3 +866,253 @@ if __name__ == "__main__":
     print(f"  Reliability      : {d['reliability_index']*100:.0f}%")
     print(f"  Audit Flags      : {len(d['audit_flags'])}")
     print(f"  Debate Ran       : {bool(d['debate'])}")
+
+
+# ── Probabilistic Reasoning Transparency (Section 8.4) ───────
+def explain_prediction_transparency(
+    domain: str,
+    parameters: dict,
+    final_probability: float,
+    shap_values: dict,
+    question: str = None,
+) -> dict:
+    """
+    Section 8.4 — Full probabilistic reasoning transparency.
+    Shows WHY the dominant probability, WHY the minority probability,
+    and WHEN the minority outcome would occur.
+
+    Returns three levels:
+    - simple: just the number
+    - detailed: case FOR + case AGAINST + top failure scenario
+    - full: all scenarios + sensitivity + what this probability is NOT saying
+    """
+    from llm.router import route
+
+    question = question or f"What is the probability of a positive outcome in the {domain} domain?"
+    minority_prob = round(1.0 - final_probability, 4)
+    dominant_pct  = round(final_probability * 100, 1)
+    minority_pct  = round(minority_prob * 100, 1)
+
+    # ── Build SHAP-based signal lists ─────────────────────────
+    positive_signals = sorted(
+        [(k, float(v)) for k, v in shap_values.items()
+         if isinstance(v, (int, float)) and float(v) > 0],
+        key=lambda x: x[1], reverse=True
+    )[:5]
+
+    negative_signals = sorted(
+        [(k, float(v)) for k, v in shap_values.items()
+         if isinstance(v, (int, float)) and float(v) < 0],
+        key=lambda x: x[1]
+    )[:5]
+
+    # ── LLM generates case FOR and case AGAINST ───────────────
+    param_str = "\n".join([f"  - {k}: {v}" for k, v in parameters.items()])
+    pos_str   = ", ".join([f"{k}(+{v*100:.1f}%)" for k, v in positive_signals]) or "none detected"
+    neg_str   = ", ".join([f"{k}({v*100:.1f}%)" for k, v in negative_signals]) or "none detected"
+
+    messages = [
+        {"role": "system", "content": (
+            "You are Project Sambhav's probabilistic reasoning engine. "
+            "Given a prediction, explain BOTH sides clearly.\n\n"
+            "Respond in this EXACT JSON format:\n"
+            "{\n"
+            '  "case_for": "<2-3 sentences: why the dominant probability is correct, cite specific parameters>",\n'
+            '  "case_against": "<2-3 sentences: what factors could make the minority probability occur>",\n'
+            '  "when_minority_occurs": [\n'
+            '    {"scenario": "<description>", "trigger": "<what changes>", "new_probability": <0-100>},\n'
+            '    {"scenario": "<description>", "trigger": "<what changes>", "new_probability": <0-100>},\n'
+            '    {"scenario": "<description>", "trigger": "<what changes>", "new_probability": <0-100>}\n'
+            "  ],\n"
+            '  "what_this_is_not_saying": "<1-2 sentences: common misinterpretation to avoid>",\n'
+            '  "key_assumption": "<the single most important assumption in this prediction>"\n'
+            "}"
+        )},
+        {"role": "user", "content": (
+            f"Domain: {domain}\n"
+            f"Question: {question}\n"
+            f"Parameters:\n{param_str}\n\n"
+            f"Prediction: {dominant_pct}% (minority: {minority_pct}%)\n"
+            f"Positive signals: {pos_str}\n"
+            f"Negative signals: {neg_str}\n\n"
+            "Explain both sides. Return JSON only."
+        )}
+    ]
+
+    import json, re
+    result  = route("llm_predict", messages, max_tokens=600, temperature=0.3)
+    raw     = result.get("content", "")
+    raw     = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+    if "```" in raw:
+        raw = re.sub(r"```(?:json)?", "", raw).strip()
+
+    try:
+        parsed = json.loads(raw[raw.find("{"):raw.rfind("}")+1])
+    except:
+        parsed = {
+            "case_for":             f"The {dominant_pct}% probability is supported by {pos_str}.",
+            "case_against":         f"The {minority_pct}% minority case is driven by {neg_str}.",
+            "when_minority_occurs": [
+                {"scenario": "Risk factors worsen", "trigger": "Negative signals increase", "new_probability": int(minority_pct + 10)},
+            ],
+            "what_this_is_not_saying": f"This does not guarantee the outcome — it means {dominant_pct}% of similar cases result positively.",
+            "key_assumption":          "Current parameter values remain stable.",
+        }
+
+    # ── SIMPLE level ──────────────────────────────────────────
+    simple = {
+        "dominant_probability": dominant_pct,
+        "minority_probability": minority_pct,
+        "one_line_reason":      parsed.get("case_for", "")[:120],
+    }
+
+    # ── DETAILED level ────────────────────────────────────────
+    detailed = {
+        **simple,
+        "case_for":              parsed.get("case_for", ""),
+        "case_against":          parsed.get("case_against", ""),
+        "top_failure_scenario":  parsed.get("when_minority_occurs", [{}])[0],
+        "positive_signals":      [(k, f"+{v*100:.1f}%") for k, v in positive_signals],
+        "negative_signals":      [(k, f"{v*100:.1f}%") for k, v in negative_signals],
+        "what_this_is_not_saying": parsed.get("what_this_is_not_saying", ""),
+    }
+
+    # ── FULL level ────────────────────────────────────────────
+    full = {
+        **detailed,
+        "when_minority_occurs": parsed.get("when_minority_occurs", []),
+        "key_assumption":       parsed.get("key_assumption", ""),
+        "all_positive_signals": positive_signals,
+        "all_negative_signals": negative_signals,
+        "domain":               domain,
+        "question":             question,
+        "parameters":           parameters,
+    }
+
+    return {"simple": simple, "detailed": detailed, "full": full}
+
+
+def generate_outcomes(
+    domain: str,
+    parameters: dict,
+    question: str = None,
+    n_outcomes: int = 5,
+    existing_outcomes: list = None,
+    mode: str = "independent",
+) -> dict:
+    """
+    Section 8.3 — Multi-Outcome Generation.
+    mode: independent (default) | spectrum | conditional
+    Call with existing_outcomes to get MORE without repeating.
+    Each outcome supports lazy transparency via explain_outcome_transparency().
+    """
+    from llm.router import route
+    import json, re
+
+    question  = question or f"What are the possible outcomes in the {domain} domain?"
+    param_str = "\n".join([f"  - {k}: {v}" for k, v in parameters.items()])
+    existing  = existing_outcomes or []
+
+    avoid_str = ""
+    if existing:
+        avoid_str = (
+            "\n\nALREADY SHOWN — do NOT repeat these outcomes:\n" +
+            "\n".join([f"  - {o.get('outcome','')}" for o in existing])
+        )
+
+    mode_notes = {
+        "independent": "Probabilities are INDEPENDENT — do NOT sum to 100%. Each is a separate event that can happen or not.",
+        "spectrum":    "Probabilities MUST sum to exactly 100% — these are mutually exclusive outcomes.",
+        "conditional": "Each outcome has a condition. State exactly what must happen for this outcome to occur.",
+    }
+    format_note = mode_notes.get(mode, mode_notes["independent"])
+
+    messages = [
+        {"role": "system", "content": (
+            "You are Project Sambhav multi-outcome engine (Section 8.3).\n"
+            f"MODE: {mode.upper()} — {format_note}\n\n"
+            "RULES:\n"
+            "1. Each outcome must be meaningfully distinct\n"
+            "2. Be precise — not 50% or 70% but 47% or 73%\n"
+            "3. Mix positive and negative outcomes\n"
+            "4. Base probabilities on actual parameter signals\n"
+            "5. reasoning must cite specific parameters\n\n"
+            "Respond in EXACT JSON only:\n"
+            "{\n"
+            '  "outcomes": [\n'
+            '    {\n'
+            '      "outcome": "<clear description>",\n'
+            '      "probability": <0-100>,\n'
+            '      "reasoning": "<1 sentence citing parameters>",\n'
+            '      "type": "<positive|negative|neutral>",\n'
+            '      "condition": "<required condition or null>"\n'
+            "    }\n"
+            "  ],\n"
+            '  "interpretation_note": "<how to read these probabilities>"\n'
+            "}"
+        )},
+        {"role": "user", "content": (
+            f"Domain: {domain}\n"
+            f"Question: {question}\n"
+            f"Parameters:\n{param_str}\n\n"
+            f"Generate {n_outcomes} outcomes." + avoid_str
+        )}
+    ]
+
+    result = route("free_inference", messages, max_tokens=800, temperature=0.5)
+    raw    = result.get("content", "")
+    raw    = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+    if "```" in raw:
+        raw = re.sub(r"```(?:json)?", "", raw).strip()
+
+    try:
+        parsed = json.loads(raw[raw.find("{"):raw.rfind("}")+1])
+        outcomes = parsed.get("outcomes", [])
+    except:
+        outcomes = []
+
+    # Ensure each outcome has all fields
+    clean = []
+    for o in outcomes:
+        if o.get("outcome") and o.get("probability") is not None:
+            clean.append({
+                "outcome":     o.get("outcome", ""),
+                "probability": max(1, min(99, int(o.get("probability", 50)))),
+                "probability_pct": f"{o.get('probability', 50)}%",
+                "reasoning":   o.get("reasoning", ""),
+                "type":        o.get("type", "neutral"),
+                "condition":   o.get("condition"),
+                "has_transparency": True,  # UI shows [? Why] button for each
+            })
+
+    return {
+        "outcomes":             clean,
+        "mode":                 mode,
+        "interpretation_note":  parsed.get("interpretation_note", format_note) if "parsed" in dir() else format_note,
+        "total_shown":          len(existing) + len(clean),
+        "can_generate_more":    True,
+        "domain":               domain,
+        "parameters":           parameters,
+    }
+
+
+def explain_outcome_transparency(
+    domain: str,
+    parameters: dict,
+    outcome: str,
+    probability: float,
+    question: str = None,
+) -> dict:
+    """
+    Called when user clicks [? Why] on a specific outcome.
+    Returns WHY this outcome has this probability + WHEN it would NOT occur.
+    Lazy — only called on demand per outcome.
+    """
+    shap_vals = _get_shap(domain, parameters)
+    return explain_prediction_transparency(
+        domain=domain,
+        parameters=parameters,
+        final_probability=probability / 100,
+        shap_values=shap_vals,
+        question=f"Why does '{outcome}' have {probability}% probability?",
+    )
