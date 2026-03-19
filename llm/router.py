@@ -50,10 +50,10 @@ CHAINS = {
         ("cloudflare",  {"model": "large"}),
     ],
     "fact_check": [
-        ("sambanova",   {"model": "reasoning"}),
+        ("cerebras",    {"model": "large"}),
         ("groq",        {"model": "llama-3.3-70b-versatile"}),
         ("mistral",     {"model": "large"}),
-        ("cerebras",    {"model": "large"}),
+        ("sambanova",   {"model": "fast"}),
     ],
     "multi_agent_debate": [
         ("groq",        {"model": "llama-3.3-70b-versatile"}),
