@@ -69,7 +69,7 @@ async def health():
         "name":    "Project Sambhav",
         "tagline": "Uncertainty, Quantified."
     }
-from api.endpoints import predict, factcheck, vision, history, auth, evaluate, reports
+from api.endpoints import predict, factcheck, vision, history, auth, evaluate
 from api.endpoints.export import router as export_router
 from api.endpoints.modes import router as modes_router
 app.include_router(predict.router,   prefix="/api/predict",    tags=["Prediction"])
@@ -79,7 +79,6 @@ app.include_router(vision.router,    prefix="/api/vision",     tags=["Vision"])
 app.include_router(history.router,   prefix="/api/history",    tags=["History"])
 app.include_router(auth.router,      prefix="/api/auth",       tags=["Auth"])
 app.include_router(evaluate.router,  prefix="/api/evaluate",   tags=["Evaluation"])
-app.include_router(reports.router,   prefix="/api/v1",         tags=["Reports"])
 app.include_router(export_router,    prefix="/api/export",     tags=["Export"])
 from fastapi import APIRouter
 config_router = APIRouter()
