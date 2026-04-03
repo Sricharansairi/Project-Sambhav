@@ -3,23 +3,13 @@ from dotenv import load_dotenv
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-# ── Key loaders ───────────────────────────────────────────────
-def _gemini_keys():
-    keys = []
-    for i in range(1, 10):
-        k = os.getenv(f"GEMINI_API_KEY_{i}")
-        if k and k not in keys: keys.append(k)
-    return keys
-
-GEMINI_KEYS = _gemini_keys()
-_gem_idx    = 0
+from api import key_rotator
 
 def _get_gemini():
-    global _gem_idx
     import google.generativeai as genai
-    genai.configure(api_key=GEMINI_KEYS[_gem_idx % len(GEMINI_KEYS)])
-    _gem_idx += 1
-    return genai.GenerativeModel("gemini-2.0-flash")
+    k = key_rotator.get_key("gemini")
+    genai.configure(api_key=k)
+    return genai.GenerativeModel("models/gemini-2.0-flash")
 
 # ── Base64 encoder ────────────────────────────────────────────
 def _encode_image(path: str) -> tuple:
@@ -134,6 +124,17 @@ def _mediapipe_pose(image_path: str) -> dict:
         logger.warning(f"MediaPipe failed: {e}")
         return {"body_openness": 0.5, "pose_detected": False}
 
+# ── OCR Fallback for non-Vision LLMs ──────────────────────────
+def _ocr_fallback(image_path: str) -> dict:
+    # P.01: OCR fallback for non-Vision LLMs
+    try:
+        import pytesseract
+        text = pytesseract.image_to_string(image_path)
+        return {"ocr_used": True, "text_extracted": text.strip()}
+    except Exception as e:
+        logger.warning(f"OCR fallback failed: {e}")
+        return {"ocr_used": False, "text_extracted": ""}
+
 # ── MAIN ENTRY POINT ──────────────────────────────────────────
 def analyze_image(image_path: str, domain: str = "general") -> dict:
     """
@@ -142,6 +143,7 @@ def analyze_image(image_path: str, domain: str = "general") -> dict:
     2. DeepFace — facial emotion (local, free)
     3. MediaPipe — body language (local, free)
     4. NVIDIA NIM fallback if Gemini fails
+    5. OCR Fallback for non-Vision LLMs (P.01)
     Returns merged result dict ready for predictor.
     """
     if not os.path.exists(image_path):
@@ -177,7 +179,11 @@ def analyze_image(image_path: str, domain: str = "general") -> dict:
     result["body_openness"] = mp_result.get("body_openness", 0.5)
     result["pose_detected"] = mp_result.get("pose_detected", False)
 
-    # Step 4 — Derive inference parameters from vision
+    # Step 4 — Extract OCR fallback for non-Vision LLMs (P.01)
+    ocr_res = _ocr_fallback(image_path)
+    result["ocr_text"] = ocr_res.get("text_extracted", "")
+
+    # Step 5 — Derive inference parameters from vision
     result["inferred_parameters"] = {
         "stress_level":     result.get("stress_level", 0.5),
         "engagement_level": result.get("engagement_level", 0.5),
@@ -186,6 +192,7 @@ def analyze_image(image_path: str, domain: str = "general") -> dict:
         "dominant_emotion": result.get("dominant_emotion", "neutral"),
         "environment":      result.get("environment", "neutral"),
         "people_count":     result.get("people_count", 1),
+        "behavioral_signal":result.get("body_language", "neutral"),
     }
 
     logger.info(f"Image analysis complete: {result.get('dominant_emotion')} "

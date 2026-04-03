@@ -3,10 +3,17 @@ llm/multi_agent.py — Multi-Agent Debate Engine
 Section 8.9 — Three agents debate every prediction before final output.
 Section 8.8 — Devil's Advocate challenges dominant conclusion.
 Uses router.py for full 4-level failover across all providers.
+Note: Agents execute in a sequential and independent manner (no shared context).
 """
 
 import json, logging, re
 from llm.router import route
+
+# ── Transparency configuration ──────────────────────────────────────────────
+# In full_breakdown mode, all_agents arguments are visible to the user:
+# Optimist, Pessimist, Realist (final prediction), Devil's Advocate counter.
+FULL_BREAKDOWN_ALL_AGENTS_VISIBLE = True
+
 
 logger = logging.getLogger(__name__)
 

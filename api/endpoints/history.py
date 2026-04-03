@@ -6,77 +6,75 @@ from api.endpoints.auth import get_current_user
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# In-memory store (replaced by DB in Phase 12)
-_predictions: list = []
-_prediction_counter = 0
-
-def _next_id() -> str:
-    global _prediction_counter
-    _prediction_counter += 1
-    return f"SMB-2026-{_prediction_counter:05d}"
-
-# ── POST /history/save ────────────────────────────────────────
-@router.post("/save")
-async def save_prediction(
-    prediction: dict,
-    user: dict = Depends(get_current_user)
-):
-    """Save a prediction to history."""
-    pid = _next_id()
-    record = {
-        "prediction_id": pid,
-        "user":          user.get("username","guest"),
-        "prediction":    prediction,
-    }
-    _predictions.append(record)
-    return {"success": True, "prediction_id": pid}
+from sqlalchemy.orm import Session
+from db.models import get_db, Prediction
+from db.database import get_predictions, delete_prediction as db_delete_prediction
 
 # ── GET /history ──────────────────────────────────────────────
 @router.get("")
 async def get_history(
     domain:   Optional[str] = None,
     limit:    int            = 20,
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
-    """Get prediction history for current user."""
-    username = user.get("username","guest")
-    if username == "guest":
+    """Get prediction history for current user from database."""
+    user_id = user.get("user_id")
+    if not user_id or user.get("email") == "guest":
         return {"success": True, "predictions": [],
                 "note": "Register to save prediction history"}
-    records = [p for p in _predictions if p["user"] == username]
-    if domain:
-        records = [p for p in records
-                   if p.get("prediction",{}).get("domain") == domain]
+    
+    records = get_predictions(db, user_id, domain, limit)
+    # Map SQLAlchemy objects to dicts for JSON response
+    preds = []
+    for r in records:
+        preds.append({
+            "prediction_id": r.prediction_id,
+            "domain":        r.domain,
+            "question":      r.input_text,
+            "created_at":    r.created_at.isoformat() if r.created_at else None,
+            "final_probability": r.reconciled_prob,
+            "reliability_index": r.reliability_index,
+            "mode":          r.mode,
+            "parameters":    r.parameters
+        })
+        
     return {
         "success":     True,
-        "predictions": records[-limit:],
-        "total":       len(records),
+        "predictions": preds,
+        "total":       len(preds),
     }
-
-# ── GET /history/{prediction_id} ──────────────────────────────
-@router.get("/{prediction_id}")
-async def get_prediction(
-    prediction_id: str,
-    user: dict = Depends(get_current_user)
-):
-    """Get a specific prediction by ID."""
-    for p in _predictions:
-        if p["prediction_id"] == prediction_id:
-            return {"success": True, "prediction": p}
-    raise HTTPException(status_code=404,
-                        detail=f"Prediction {prediction_id} not found")
 
 # ── DELETE /history/{prediction_id} ───────────────────────────
 @router.delete("/{prediction_id}")
-async def delete_prediction(
+async def delete_prediction_endpoint(
     prediction_id: str,
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """Delete a prediction (right to erasure — GDPR/DPDP compliance)."""
-    global _predictions
-    before = len(_predictions)
-    _predictions = [p for p in _predictions
-                    if p["prediction_id"] != prediction_id]
-    if len(_predictions) == before:
-        raise HTTPException(status_code=404, detail="Prediction not found")
+    user_id = user.get("user_id")
+    if not user_id or user.get("email") == "guest":
+         raise HTTPException(status_code=403, detail="Guest accounts cannot delete history")
+         
+    success = db_delete_prediction(db, prediction_id, user_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Prediction not found or unauthorized")
+        
     return {"success": True, "deleted": prediction_id}
+
+
+# ── DELETE /history (Clear All) ───────────────────────────────
+@router.delete("")
+async def clear_history_endpoint(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Clear all history for the current user."""
+    user_id = user.get("user_id")
+    if not user_id or user.get("email") == "guest":
+         raise HTTPException(status_code=403, detail="Guest accounts cannot delete history")
+         
+    db.query(Prediction).filter(Prediction.user_id == user_id).delete()
+    db.commit()
+    return {"success": True, "message": "All history cleared"}

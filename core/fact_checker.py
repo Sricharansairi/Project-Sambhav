@@ -1,8 +1,8 @@
 """
 core/fact_checker.py — Dual-LLM Fact-Check Module
 Section 9 — 8-dimension credibility analysis
-Primary: Router (Groq/Llama for structured output)
-Secondary: SambaNova for cross-validation
+Primary: Cerebras for high-speed cross-validation
+Secondary: Groq/SambaNova for detailed reasoning
 Web search chain: DuckDuckGo -> NewsAPI -> Guardian
 """
 
@@ -97,12 +97,23 @@ def _guardian_search(query: str) -> list:
 
 def search_web(query: str) -> list:
     results = _duckduckgo_search(query)
-    if len(results) < 2:
+    # Filter out results with missing or search-engine links
+    results = [r for r in results if r.get("link") and "duckduckgo.com" not in r["link"]]
+    
+    if len(results) < 3:
         results += _newsapi_search(query)
-    if len(results) < 2:
+    if len(results) < 3:
         results += _guardian_search(query)
-    logger.info(f"Search '{query[:40]}' -> {len(results)} results")
-    return results[:8]
+        
+    # Ensure links are absolute and valid
+    valid_results = []
+    for r in results:
+        link = r.get("link", "")
+        if link.startswith("http"):
+            valid_results.append(r)
+            
+    logger.info(f"Search '{query[:40]}' -> {len(valid_results)} results")
+    return valid_results[:8]
 
 
 # ── Strip thinking tags ───────────────────────────────────────
@@ -131,15 +142,23 @@ SYSTEM_8D = (
     "- intent_analysis: Informing vs misleading (100=clearly informing)\n"
     "- viral_risk: How dangerous if widely believed when false (0=safe)\n\n"
     "IMPORTANT: Use your training knowledge. Poor search results do NOT mean false.\n\n"
-    "Respond ONLY in this EXACT format:\n"
+    "Respond ONLY in this EXACT format (one dimension per block, include REASONING):\n"
     "FACTUAL_ACCURACY: <0-100>\n"
+    "REASONING_FACTUAL_ACCURACY: <detailed reasoning for this score>\n"
     "TEMPORAL_ACCURACY: <0-100>\n"
+    "REASONING_TEMPORAL_ACCURACY: <detailed reasoning for this score>\n"
     "GEOGRAPHIC_ACCURACY: <0-100>\n"
+    "REASONING_GEOGRAPHIC_ACCURACY: <detailed reasoning for this score>\n"
     "SOURCE_RELIABILITY: <0-100>\n"
+    "REASONING_SOURCE_RELIABILITY: <detailed reasoning for this score>\n"
     "LINGUISTIC_PRECISION: <0-100>\n"
+    "REASONING_LINGUISTIC_PRECISION: <detailed reasoning for this score>\n"
     "CONTEXT_COMPLETENESS: <0-100>\n"
+    "REASONING_CONTEXT_COMPLETENESS: <detailed reasoning for this score>\n"
     "INTENT_ANALYSIS: <0-100>\n"
+    "REASONING_INTENT_ANALYSIS: <detailed reasoning for this score>\n"
     "VIRAL_RISK: <0-100>\n"
+    "REASONING_VIRAL_RISK: <detailed reasoning for this score>\n"
     "OVERALL: <0-100>\n"
     "VERDICT: <VERIFIED_TRUE|LIKELY_TRUE|UNCERTAIN|LIKELY_FALSE|PROBABLY_FALSE|VERIFIED_FALSE>\n"
     "EXPLANATION: <2-3 sentences explaining your verdict>\n"
@@ -178,10 +197,14 @@ def analyze_8_dimensions(claim: str, evidence: list) -> dict:
 def _parse_8d(raw: str, claim: str) -> dict:
     out = {
         "claim": claim, "raw": raw,
-        "factual_accuracy": 50, "temporal_accuracy": 50,
-        "geographic_accuracy": 50, "source_reliability": 50,
-        "linguistic_precision": 50, "context_completeness": 50,
-        "intent_analysis": 50, "viral_risk": 50,
+        "factual_accuracy": {"score": 50, "reasoning": ""},
+        "temporal_accuracy": {"score": 50, "reasoning": ""},
+        "geographic_accuracy": {"score": 50, "reasoning": ""},
+        "source_reliability": {"score": 50, "reasoning": ""},
+        "linguistic_precision": {"score": 50, "reasoning": ""},
+        "context_completeness": {"score": 50, "reasoning": ""},
+        "intent_analysis": {"score": 50, "reasoning": ""},
+        "viral_risk": {"score": 50, "reasoning": ""},
         "overall": 50, "verdict": "UNCERTAIN",
         "explanation": "", "pattern_code": "UNCERTAIN",
     }
@@ -194,22 +217,34 @@ def _parse_8d(raw: str, claim: str) -> dict:
         "CONTEXT_COMPLETENESS": "context_completeness",
         "INTENT_ANALYSIS":      "intent_analysis",
         "VIRAL_RISK":           "viral_risk",
-        "OVERALL":              "overall",
     }
+    
     for line in raw.split("\n"):
         line = line.strip()
+        
+        # Parse scores
         for key, field in key_map.items():
             if line.startswith(key + ":"):
                 try:
-                    out[field] = max(0, min(100, int(line.split(":")[1].strip())))
+                    out[field]["score"] = max(0, min(100, int(line.split(":")[1].strip())))
                 except:
                     pass
-        if line.startswith("VERDICT:"):
+            elif line.startswith("REASONING_" + key + ":"):
+                out[field]["reasoning"] = line.split(":", 1)[1].strip()
+        
+        # Parse global fields
+        if line.startswith("OVERALL:"):
+            try:
+                out["overall"] = max(0, min(100, int(line.split(":")[1].strip())))
+            except:
+                pass
+        elif line.startswith("VERDICT:"):
             out["verdict"] = line.split(":", 1)[1].strip()
         elif line.startswith("EXPLANATION:"):
             out["explanation"] = line.split(":", 1)[1].strip()
         elif line.startswith("PATTERN_CODE:"):
             out["pattern_code"] = line.split(":", 1)[1].strip()
+            
     return out
 
 
@@ -271,12 +306,12 @@ def cross_validate(claim: str, primary_score: int) -> dict:
 def detect_misinformation_patterns(claim: str, analysis: dict) -> list:
     patterns = []
     overall    = analysis.get("overall", 50)
-    viral_risk = analysis.get("viral_risk", 0)
-    intent     = analysis.get("intent_analysis", 50)
-    temporal   = analysis.get("temporal_accuracy", 50)
-    factual    = analysis.get("factual_accuracy", 50)
-    linguistic = analysis.get("linguistic_precision", 50)
-    context    = analysis.get("context_completeness", 50)
+    viral_risk = analysis.get("viral_risk", {}).get("score", 0)
+    intent     = analysis.get("intent_analysis", {}).get("score", 50)
+    temporal   = analysis.get("temporal_accuracy", {}).get("score", 50)
+    factual    = analysis.get("factual_accuracy", {}).get("score", 50)
+    linguistic = analysis.get("linguistic_precision", {}).get("score", 50)
+    context    = analysis.get("context_completeness", {}).get("score", 50)
 
     emotional_words = ["hiding", "secret", "truth", "shocking", "exposed",
                        "they don't want", "wake up", "they lied"]
@@ -323,11 +358,11 @@ def detect_misinformation_patterns(claim: str, analysis: dict) -> list:
 # ── Credibility spectrum ──────────────────────────────────────
 CREDIBILITY_SPECTRUM = [
     (90, 100, "VERIFIED",       "Multiple strong sources confirm, no contradictions"),
-    (70,  89, "LIKELY_TRUE",    "Strong evidence supports, minor contradictions"),
+    (70,  89, "LIKELY TRUE",    "Strong evidence supports, minor contradictions"),
     (50,  69, "UNCERTAIN",      "Mixed evidence, context-dependent"),
-    (30,  49, "LIKELY_FALSE",   "Contradicting evidence stronger than supporting"),
-    (10,  29, "PROBABLY_FALSE", "Strong evidence against, very weak support"),
-    ( 0,   9, "VERIFIED_FALSE", "Definitively contradicted by authoritative sources"),
+    (30,  49, "LIKELY FALSE",   "Contradicting evidence stronger than supporting"),
+    (10,  29, "PROBABLY FALSE", "Strong evidence against, very weak support"),
+    ( 0,   9, "VERIFIED FALSE", "Definitively contradicted by authoritative sources"),
 ]
 
 
@@ -338,23 +373,56 @@ def get_credibility_label(score: int) -> tuple:
     return "UNCERTAIN", "Unable to determine"
 
 
-# ── Main fact-check function ──────────────────────────────────
-def fact_check_claim(claim: str) -> dict:
-    logger.info(f"Fact-checking: {claim[:60]}...")
+def fact_check_claim(claim: str, mode: str = "standard") -> dict:
+    """
+    Main fact-check entrypoint.
+    Modes supported: Quick, Standard, Deep, Batch.
+    """
+    if not claim or len(claim) < 10:
+        return {"error": "Claim too short"}
 
-    evidence = search_web(claim)
-    analysis = analyze_8_dimensions(claim, evidence)
-    cv = cross_validate(claim, analysis["overall"])
+    logger.info(f"Fact-checking ({mode}): {claim[:60]}...")
 
-    # Weight primary 80% (has web evidence), secondary 20%
-    # Skip secondary if it returned 0 (parse failure)
-    sec = cv["secondary_score"]
-    if cv["disagreement_flag"] and sec > 5:
-        final_score = int(analysis["overall"] * 0.80 + sec * 0.20)
+    # Step 1 — Evidence gathering
+    if mode == "quick":
+        evidence = []
     else:
-        final_score = analysis["overall"]
+        evidence = search_web(claim)
 
+    evidence_str = "\n".join([f"[{i+1}] {e['title']}: {e['snippet']}" for i, e in enumerate(evidence)])
+
+    # Step 2 — Primary analysis
+    from llm.router import route
+    prompt_8d = f"CLAIM: {claim}\n\nEVIDENCE:\n{evidence_str or 'No external evidence found. Use internal knowledge.'}"
+    
+    # We use a higher temperature for reasoning but low for final scores
+    raw_analysis = route("fact_check", [{"role": "system", "content": SYSTEM_8D}, {"role": "user", "content": prompt_8d}], temperature=0.2)
+    analysis = _parse_8d(raw_analysis.get("content", ""), claim)
+
+    # Step 3 — Cross-validation (Dual LLM)
+    if mode == "quick":
+        sec = analysis["overall"]
+        cv = {"secondary_score": sec, "agreement": True, "disagreement_flag": False}
+    else:
+        cv_res = route("fact_check", [
+            {"role": "system", "content": "You are a critical cross-validator. Review the claim and evidence. Rate credibility 0-100. If you strongly disagree with common consensus, explain why."},
+            {"role": "user", "content": prompt_8d}
+        ], temperature=0.1)
+        
+        import re
+        cv_score_match = re.search(r"(\d+)", cv_res.get("content", ""))
+        sec = int(cv_score_match.group(1)) if cv_score_match else analysis["overall"]
+        
+        cv = {
+            "secondary_score": sec,
+            "disagreement_flag": abs(analysis["overall"] - sec) > 25,
+            "provider": "router"
+        }
+
+    # Final Reconciled Score
+    final_score = round(0.7 * analysis["overall"] + 0.3 * sec)
     final_score = max(5, min(99, final_score))
+
     label, desc = get_credibility_label(final_score)
     patterns = detect_misinformation_patterns(claim, analysis)
 
@@ -363,14 +431,14 @@ def fact_check_claim(claim: str) -> dict:
         "credibility_score":       final_score,
         "credibility_label":       label,
         "credibility_desc":        desc,
-        "dimensions":              {d: analysis.get(d, 50) for d in DIMENSIONS},
+        "dimensions":              {d: analysis.get(d, {"score": 50, "reasoning": ""}) for d in DIMENSIONS},
         "verdict":                 analysis.get("verdict", "UNCERTAIN"),
         "explanation":             analysis.get("explanation", ""),
         "pattern_code":            analysis.get("pattern_code", "UNCERTAIN"),
         "misinformation_patterns": patterns,
         "cross_validation":        cv,
         "sources":                 evidence[:5],
-        "dual_llm_agreement":      not cv["disagreement_flag"],
+        "dual_llm_agreement":      not cv.get("disagreement_flag", False),
         "primary_score":           analysis["overall"],
         "secondary_score":         sec,
     }
@@ -380,7 +448,7 @@ def fact_check_claim(claim: str) -> dict:
 def fact_check_batch(text: str) -> dict:
     import re as _re
     claims = [s.strip() for s in _re.split(r"[.!?]", text)
-              if 25 < len(s.strip()) < 300][:12]
+              if 25 < len(s.strip()) < 300][:50]
 
     logger.info(f"Batch checking {len(claims)} claims...")
     results = []
@@ -406,6 +474,18 @@ def fact_check_batch(text: str) -> dict:
                                      for p in r.get("misinformation_patterns", [])}),
     }
 
+class FactChecker:
+    """Entrypoint class for Sambhav Fact-Checking engine."""
+    @staticmethod
+    def verify(claim: str, mode: str = "full"):
+        return fact_check_claim(claim, mode=mode)
+    
+    @staticmethod
+    def batch_verify(text: str):
+        return fact_check_batch(text)
+
+
+check_claim = fact_check_claim
 
 if __name__ == "__main__":
     print("Fact-Checker Test\n" + "=" * 50)

@@ -4,6 +4,28 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 # ── Whisper transcription ─────────────────────────────────────
+def _groq_whisper(audio_path: str) -> dict:
+    """Use Groq API for high-speed Whisper transcription."""
+    try:
+        from groq import Groq
+        from api.key_rotator import get_key
+        key = get_key("groq")
+        if not key: return {"success": False, "error": "No Groq key"}
+        
+        client = Groq(api_key=key)
+        with open(audio_path, "rb") as f:
+            transcription = client.audio.transcriptions.create(
+                file=(os.path.basename(audio_path), f.read()),
+                model="whisper-large-v3",
+                response_format="json",
+                language="en",
+                temperature=0.0
+            )
+        return {"text": transcription.text, "provider": "groq_whisper", "success": True}
+    except Exception as e:
+        logger.warning(f"Groq Whisper failed: {e}")
+        return {"success": False, "error": str(e)}
+
 def transcribe(audio_path: str) -> dict:
     """
     Transcribe audio — cascade:
@@ -76,6 +98,49 @@ def extract_audio(video_path: str) -> str:
         return ""
 
 # ── Analyze transcribed text ──────────────────────────────────
+def analyze_voice_with_llm(text: str, domain: str) -> dict:
+    """
+    Extract domain-specific parameters from voice transcript.
+    Section 6.3 — Hybrid input extraction.
+    """
+    try:
+        from llm.router import route
+        from api.endpoints.predict import _load_registry
+        import json, re
+
+        reg = _load_registry()
+        domain_params = reg.get(domain, {}).get("parameters", {})
+        
+        param_info = ""
+        if domain_params:
+            for k, p in (domain_params.items() if isinstance(domain_params, dict) else enumerate(domain_params)):
+                key = p.get("key") or k
+                label = p.get("label", key)
+                param_info += f"- {key}: {label}\n"
+
+        messages = [
+            {"role": "system", "content": (
+                f"You are the Sambhav Voice Analysis engine for the {domain} domain.\n"
+                f"Analyze the spoken transcript and extract relevant parameters.\n"
+                f"Parameters to look for:\n{param_info or 'Any domain-relevant signals'}\n\n"
+                "Respond ONLY in JSON format:\n"
+                "{\n"
+                '  "parameters": {"key": "value", ...},\n'
+                '  "confidence": <0.0-1.0>,\n'
+                '  "summary": "<1 sentence summary>"\n'
+                "}"
+            )},
+            {"role": "user", "content": text}
+        ]
+
+        raw = route("safety_screen", messages, max_tokens=300, temperature=0.1)
+        clean = re.sub(r"```(?:json)?", "", raw).strip()
+        data = json.loads(clean[clean.find("{"):clean.rfind("}")+1])
+        return data
+    except Exception as e:
+        logger.error(f"Voice LLM analysis failed: {e}")
+        return {"parameters": {}, "confidence": 0.0}
+
 def analyze_transcript(text: str, domain: str) -> dict:
     """Run full NLP + LLM analysis on transcribed text."""
     if not text:
@@ -89,21 +154,19 @@ def analyze_transcript(text: str, domain: str) -> dict:
         linguistic  = extract_linguistic_features(text)
         sentiment   = extract_sentiment_features(text)
 
-        # LLM parameter extraction
-        from llm.groq_client import llm_predict
-        llm_result  = llm_predict(domain, {"transcript": text[:500]},
-                       f"Based on this spoken text, what is the probability of a positive outcome?")
+        # Step 1 — Fast parameter extraction (Mode 3 Hybrid)
+        llm_result = analyze_voice_with_llm(text, domain)
 
         return {
             "transcript":         text,
             "linguistic_features":linguistic,
             "sentiment_features": sentiment,
-            "llm_probability":    llm_result.get("probability"),
-            "llm_confidence":     llm_result.get("confidence"),
-            "llm_reasoning":      llm_result.get("reasoning"),
+            "llm_confidence":     llm_result.get("confidence", 0.5),
+            "summary":            llm_result.get("summary", ""),
             "inferred_parameters": {
                 **linguistic,
                 **sentiment,
+                **llm_result.get("parameters", {}),
                 "transcript_length": len(text.split()),
             }
         }

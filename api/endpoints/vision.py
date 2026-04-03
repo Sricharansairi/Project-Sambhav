@@ -36,9 +36,8 @@ async def analyze_image_endpoint(
     domain: str        = Form(default="general"),
 ):
     """
-    Analyze uploaded image.
+    Analyze uploaded image and run auto-prediction (Mode 3 Hybrid).
     Extracts: emotion, stress, engagement, body language, environment.
-    Uses Gemini Vision → DeepFace → MediaPipe.
     """
     logger.info(f"POST /vision/image domain={domain} file={file.filename}")
 
@@ -52,11 +51,37 @@ async def analyze_image_endpoint(
 
     try:
         from vision.image_pipeline import analyze_image
+        from core.predictor import predict, generate_outcomes
+        
+        # Step 1 — Vision analysis (P.03/P.04)
         result = analyze_image(tmp_path, domain)
+        
+        # Step 2 — Insufficient Info Check
+        params = result.get("inferred_parameters", {})
+        if result.get("confidence") == "LOW" or not params:
+            return {
+                "success": True,
+                "insufficient_info": True,
+                "reason": "The image is too blurry or lacks clear domain-relevant signals (e.g., face, body language).",
+                "result": result
+            }
+
+        # Step 3 — Auto Prediction
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            pred_future = executor.submit(predict, domain=domain, params=params)
+            out_future  = executor.submit(generate_outcomes, domain=domain, parameters=params)
+            
+            prediction = pred_future.result()
+            outcomes   = out_future.result()
+
         return {
             "success":    True,
             "result":     result,
-            "disclaimer": "Sambhav may be incorrect. Always verify important decisions independently.",
+            "prediction": prediction.to_dict(),
+            "outcomes":   outcomes.get("outcomes", []),
+            "insufficient_info": False,
+            "disclaimer": "Sambhav vision is probabilistic. Always verify independently.",
         }
     except Exception as e:
         logger.error(f"Image analysis error: {e}")
@@ -73,9 +98,8 @@ async def analyze_video_endpoint(
     mode:   str        = Form(default="standard"),
 ):
     """
-    Analyze uploaded video.
+    Analyze uploaded video and run auto-prediction.
     Extracts frame-by-frame emotion timeline + key moments.
-    Modes: fast (15-20s) | standard (25-40s) | deep (60-90s)
     """
     logger.info(f"POST /vision/video domain={domain} mode={mode} file={file.filename}")
 
@@ -89,11 +113,37 @@ async def analyze_video_endpoint(
 
     try:
         from vision.video_pipeline import analyze_video
+        from core.predictor import predict, generate_outcomes
+        
+        # Step 1 — Video analysis (P.07/P.08/P.09)
         result = analyze_video(tmp_path, domain, mode)
+        
+        # Step 2 — Insufficient Info Check
+        params = result.get("inferred_parameters", {})
+        if not params or result.get("aggregated", {}).get("frame_reliability", 0) < 0.3:
+            return {
+                "success": True,
+                "insufficient_info": True,
+                "reason": "The video duration is too short or frames are unreadable.",
+                "result": result
+            }
+
+        # Step 3 — Auto Prediction
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            pred_future = executor.submit(predict, domain=domain, params=params)
+            out_future  = executor.submit(generate_outcomes, domain=domain, parameters=params)
+            
+            prediction = pred_future.result()
+            outcomes   = out_future.result()
+
         return {
             "success":    True,
             "result":     result,
-            "disclaimer": "Sambhav may be incorrect. Always verify important decisions independently.",
+            "prediction": prediction.to_dict(),
+            "outcomes":   outcomes.get("outcomes", []),
+            "insufficient_info": False,
+            "disclaimer": "Video analysis is based on temporal emotional cues.",
         }
     except Exception as e:
         logger.error(f"Video analysis error: {e}")
@@ -109,8 +159,7 @@ async def analyze_document_endpoint(
     domain: str        = Form(default="general"),
 ):
     """
-    Analyze uploaded document (PDF/DOCX/TXT).
-    Extracts text → LLM parameter extraction → prediction-ready output.
+    Analyze uploaded document (PDF/DOCX/TXT) and run prediction.
     """
     logger.info(f"POST /vision/document domain={domain} file={file.filename}")
 
@@ -124,21 +173,34 @@ async def analyze_document_endpoint(
 
     try:
         from vision.document_pipeline import analyze_document
+        from core.predictor import predict, generate_outcomes
+        
+        # Step 1 — Document analysis (P.15-P.19)
         result = analyze_document(tmp_path, domain)
+        params = result.get("parameters", {})
+        if not params or result.get("confidence") == "LOW":
+            return {
+                "success": True,
+                "insufficient_info": True,
+                "reason": "The document does not contain enough data points for a reliable {domain} prediction.",
+                "result": result
+            }
 
-        # Safety check on extracted text
-        if result.get("text_preview"):
-            safety = check_hard_blocks(result["text_preview"])
-            if not safety["safe"]:
-                raise HTTPException(
-                    status_code=400,
-                    detail={"blocked": True,
-                            "message": safety["message"]})
+        # Step 3 — Auto Prediction
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            pred_future = executor.submit(predict, domain=domain, params=params)
+            out_future  = executor.submit(generate_outcomes, domain=domain, parameters=params)
+            
+            prediction = pred_future.result()
+            outcomes   = out_future.result()
 
         return {
             "success":    True,
             "result":     result,
-            "disclaimer": "Sambhav may be incorrect. Always verify important decisions independently.",
+            "prediction": prediction.to_dict(),
+            "outcomes":   outcomes.get("outcomes", []),
+            "insufficient_info": False
         }
     except HTTPException: raise
     except Exception as e:
@@ -155,8 +217,7 @@ async def analyze_voice_endpoint(
     domain: str        = Form(default="general"),
 ):
     """
-    Transcribe and analyze voice input.
-    Uses Whisper → NLP features → LLM analysis.
+    Transcribe and analyze voice input with auto-prediction.
     """
     logger.info(f"POST /vision/voice domain={domain} file={file.filename}")
 
@@ -172,11 +233,36 @@ async def analyze_voice_endpoint(
 
     try:
         from vision.voice_pipeline import analyze_voice
+        from core.predictor import predict, generate_outcomes
+        
+        # Step 1 — Voice analysis (P.11-P.14)
         result = analyze_voice(tmp_path, domain)
+        
+        # Step 2 — Insufficient Info Check
+        params = result.get("inferred_parameters", {})
+        if not params or not result.get("transcript"):
+            return {
+                "success": True,
+                "insufficient_info": True,
+                "reason": "Audio is silent or transcription failed.",
+                "result": result
+            }
+
+        # Step 3 — Auto Prediction
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            pred_future = executor.submit(predict, domain=domain, params=params)
+            out_future  = executor.submit(generate_outcomes, domain=domain, parameters=params)
+            
+            prediction = pred_future.result()
+            outcomes   = out_future.result()
+
         return {
             "success":    True,
             "result":     result,
-            "disclaimer": "Sambhav may be incorrect. Always verify important decisions independently.",
+            "prediction": prediction.to_dict(),
+            "outcomes":   outcomes.get("outcomes", []),
+            "insufficient_info": False
         }
     except Exception as e:
         logger.error(f"Voice analysis error: {e}")

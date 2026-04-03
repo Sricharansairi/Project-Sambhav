@@ -5,6 +5,13 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from typing import Optional
 from jose import jwt, JWTError
+from sqlalchemy.orm import Session
+
+# Import DB dependencies
+from db.models import get_db, User
+from db.database import create_user, get_user_by_email, log_event
+
+from passlib.context import CryptContext
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -14,19 +21,18 @@ ALGORITHM          = "HS256"
 TOKEN_EXPIRE_HOURS = 24
 
 security = HTTPBearer(auto_error=False)
-_users: dict = {}
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def _hash_password(password: str) -> str:
-    """Simple secure hash — no bcrypt 72-byte limit."""
-    return hashlib.pbkdf2_hmac(
-        'sha256', password.encode(), SECRET_KEY.encode(), 100000).hex()
+    """Strong bcrypt hashing."""
+    return pwd_context.hash(password)
 
 def _verify_password(password: str, hashed: str) -> bool:
-    return hmac.compare_digest(_hash_password(password), hashed)
+    return pwd_context.verify(password, hashed)
 
-def _create_token(username: str, tier: str = "registered") -> str:
+def _create_token(user_id: str, email: str, tier: str = "registered") -> str:
     expire  = datetime.utcnow() + timedelta(hours=TOKEN_EXPIRE_HOURS)
-    payload = {"sub": username, "tier": tier, "exp": expire}
+    payload = {"sub": email, "user_id": user_id, "tier": tier, "exp": expire}
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 def _decode_token(token: str) -> dict:
@@ -36,53 +42,158 @@ def _decode_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 def get_current_user(
-    creds: Optional[HTTPAuthorizationCredentials] = Depends(security)
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    db: Session = Depends(get_db)
 ) -> dict:
     if not creds:
-        return {"username": "guest", "tier": "guest"}
-    return _decode_token(creds.credentials)
+        return {"email": "guest", "tier": "guest", "user_id": None}
+        
+    payload = _decode_token(creds.credentials)
+    
+    # Verify user still exists in DB (unless they are a hardcoded guest token)
+    if payload.get("email") != "guest":
+        user = get_user_by_email(db, payload.get("sub"))
+        if not user or not user.is_active:
+            raise HTTPException(status_code=401, detail="User not found or disabled")
+            
+    return payload
 
 class RegisterRequest(BaseModel):
-    username: str = Field(..., min_length=3, max_length=30)
+    username: Optional[str] = Field(None, example="legacy_ui_field") # Ignored but kept for UI compat
     email:    str = Field(..., example="user@example.com")
     password: str = Field(..., min_length=6)
 
 class LoginRequest(BaseModel):
-    username: str
+    email:    str = Field(..., example="user@example.com")
     password: str
 
 @router.post("/register")
-async def register(req: RegisterRequest):
-    if req.username in _users:
-        raise HTTPException(status_code=400, detail="Username already exists")
-    _users[req.username] = {
-        "username":      req.username,
-        "email":         req.email,
-        "password_hash": _hash_password(req.password),
-        "tier":          "registered",
-        "created_at":    datetime.utcnow().isoformat(),
-    }
-    token = _create_token(req.username)
-    logger.info(f"New user registered: {req.username}")
+async def register(req: RegisterRequest, db: Session = Depends(get_db)):
+    # Check if email exists
+    if get_user_by_email(db, req.email):
+        raise HTTPException(status_code=400, detail="Email already registered")
+        
+    # Postgres handles gen_random_uuid internally
+    user = create_user(
+        db=db, 
+        email=req.email, 
+        password_hash=_hash_password(req.password),
+        tier="registered"
+    )
+    
+    token = _create_token(str(user.user_id), user.email)
+    logger.info(f"New user registered in Supabase: {user.email}")
+    
+    # Log audit event
+    log_event(db, "registration", user_id=str(user.user_id), details={"email": user.email})
+    
     return {"success": True, "token": token,
-            "username": req.username, "tier": "registered"}
+            "email": req.email, "tier": "registered", "user_id": str(user.user_id)}
 
 @router.post("/login")
-async def login(req: LoginRequest):
-    user = _users.get(req.username)
-    if not user or not _verify_password(req.password, user["password_hash"]):
+async def login(req: LoginRequest, db: Session = Depends(get_db)):
+    user = get_user_by_email(db, req.email)
+    
+    if not user or not _verify_password(req.password, user.password_hash):
+        log_event(db, "failed_login", details={"email": req.email})
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    token = _create_token(req.username, user["tier"])
+        
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Account disabled")
+        
+    # Update last login timestamp
+    user.last_login = datetime.utcnow()
+    db.commit()
+
+    token = _create_token(str(user.user_id), user.email, user.tier)
+    log_event(db, "login", user_id=str(user.user_id))
+    
     return {"success": True, "token": token,
-            "username": req.username, "tier": user["tier"]}
+            "email": user.email, "tier": user.tier, "user_id": str(user.user_id)}
 
 @router.post("/guest")
 async def guest_login():
-    token = _create_token("guest", "guest")
+    token = _create_token("guest_id", "guest", "guest")
     return {"success": True, "token": token,
-            "username": "guest", "tier": "guest",
+            "email": "guest", "tier": "guest",
             "note": "Guest predictions limited to 10/day"}
 
 @router.get("/me")
-async def get_me(user: dict = Depends(get_current_user)):
-    return {"success": True, "user": user}
+async def get_me(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    if user.get("email") == "guest":
+        return {"success": True, "user": user, "stats": {}}
+        
+    db_user = get_user_by_email(db, user.get("email"))
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Return safe user profile
+    profile = {
+        "user_id": str(db_user.user_id),
+        "email": db_user.email,
+        "tier": db_user.tier,
+        "total_preds": db_user.total_preds,
+        "created_at": db_user.created_at.isoformat() if db_user.created_at else None,
+        "last_login": db_user.last_login.isoformat() if db_user.last_login else None
+    }
+    return {"success": True, "user": profile}
+
+
+# ── Password Reset (email-based) ─────────────────────────────
+class ResetPasswordRequest(BaseModel):
+    email:        str = Field(..., example="user@example.com")
+    new_password: str = Field(..., min_length=6)
+
+@router.post("/reset-password")
+async def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Reset password by email — no old password needed (forgot password flow)."""
+    user = get_user_by_email(db, req.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="No account found with this email")
+    user.password_hash = _hash_password(req.new_password)
+    db.commit()
+    log_event(db, "password_reset", user_id=str(user.user_id))
+    return {"success": True, "message": "Password reset successfully. Please sign in."}
+
+
+# ── Change Password (requires current password) ──────────────
+class ChangePasswordRequest(BaseModel):
+    old_password: str = Field(..., min_length=6)
+    new_password: str = Field(..., min_length=6)
+
+@router.post("/change-password")
+async def change_password(
+    req: ChangePasswordRequest,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Change password — requires old password for verification."""
+    if user.get("email") == "guest":
+        raise HTTPException(status_code=403, detail="Guest accounts cannot change password")
+    db_user = get_user_by_email(db, user.get("email"))
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not _verify_password(req.old_password, db_user.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    db_user.password_hash = _hash_password(req.new_password)
+    db.commit()
+    log_event(db, "password_change", user_id=str(db_user.user_id))
+    return {"success": True, "message": "Password changed successfully"}
+
+
+# ── Delete Account (soft delete) ─────────────────────────────
+@router.delete("/me")
+async def delete_account(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Soft-delete account — GDPR/DPDP compliance."""
+    if user.get("email") == "guest":
+        raise HTTPException(status_code=403, detail="Guest accounts cannot be deleted")
+    db_user = get_user_by_email(db, user.get("email"))
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    db_user.is_active = False
+    db.commit()
+    log_event(db, "account_deleted", user_id=str(db_user.user_id))
+    return {"success": True, "message": "Account deleted. All data will be purged within 30 days."}

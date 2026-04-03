@@ -1,6 +1,6 @@
 """
 llm/temporal_decay.py — Section 8.6 Temporal Prediction & Probability Decay
-Projects how current probability evolves over time toward a deadline.
+Projects how current probability evolves over time toward a deadline (evolution chart).
 Uses deadline proximity + resource trajectory + LLM domain knowledge.
 """
 
@@ -69,7 +69,7 @@ def compute_decay_curve(
         curve.append({
             "day":         day,
             "probability": round(prob, 4),
-            "pct":         f"{prob*100:.1f}%",
+            "pct":         f"{(prob or 0.0)*100:.1f}%",
             "label":       f"Day {day}",
         })
 
@@ -143,7 +143,7 @@ def generate_temporal_narrative(
             f"Domain: {domain}\n"
             f"Question: {question}\n"
             f"Parameters:\n{param_str}\n"
-            f"Current probability: {base_probability*100:.1f}%\n"
+            f"Current probability: {(base_probability or 0.0)*100:.1f}%\n"
             f"Timeline: {days_total} days\n\n"
             "Generate temporal probability trajectory."
         )}

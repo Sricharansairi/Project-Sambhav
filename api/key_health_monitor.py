@@ -100,7 +100,7 @@ def test_gemini() -> dict:
         try:
             import google.generativeai as genai
             genai.configure(api_key=k)
-            genai.GenerativeModel("gemini-2.0-flash-lite"
+            genai.GenerativeModel("models/gemini-flash-latest"
                 ).generate_content("OK")
             results.append({"key": i, "status": "ok"})
         except Exception as e:
@@ -181,6 +181,44 @@ def test_assemblyai() -> dict:
     return {"service": "assemblyai", "results": results,
             "working": sum(1 for r in results if r["status"]=="ok")}
 
+def test_cohere() -> dict:
+    results = []
+    for i in range(1, 15):
+        k = os.getenv(f"COHERE_API_KEY_{i}")
+        if not k: continue
+        try:
+            import cohere
+            co = cohere.Client(k)
+            co.chat(model="command-r-08-2024", message="OK", max_tokens=10)
+            results.append({"key": i, "status": "ok"})
+        except Exception as e:
+            results.append({"key": i, "status": "error", "error": str(e)[:50]})
+        time.sleep(0.5)
+    return {"service": "cohere", "results": results,
+            "working": sum(1 for r in results if r["status"]=="ok")}
+
+def test_xai() -> dict:
+    results = []
+    for i in range(1, 15):
+        k = os.getenv(f"XAI_API_KEY_{i}")
+        if not k: continue
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=k, base_url="https://api.x.ai/v1")
+            client.chat.completions.create(
+                model="grok-beta", # Fallback to beta for health check
+                messages=[{"role":"user","content":"OK"}], max_tokens=3)
+            results.append({"key": i, "status": "ok"})
+        except Exception as e:
+            err = str(e).lower()
+            if "403" in err or "credits" in err or "license" in err or "400" in err:
+                results.append({"key": i, "status": "error", "error": "no credits"})
+            else:
+                results.append({"key": i, "status": "error", "error": str(e)[:50]})
+        time.sleep(0.5)
+    return {"service": "xai", "results": results,
+            "working": sum(1 for r in results if r["status"]=="ok")}
+
 # ── MASTER HEALTH CHECK ───────────────────────────────────────
 def run_full_health_check(verbose: bool = True) -> dict:
     """
@@ -202,6 +240,8 @@ def run_full_health_check(verbose: bool = True) -> dict:
         ("GNews",       test_gnews),
         ("Guardian",    test_guardian),
         ("AssemblyAI",  test_assemblyai),
+        ("Cohere",      test_cohere),
+        ("xAI",         test_xai),
     ]
 
     report = {"timestamp": timestamp, "services": {}}

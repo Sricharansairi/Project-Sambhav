@@ -5,17 +5,19 @@ from db.models import User, Prediction, Evaluation, FactCheck, AuditLog, Monitor
 
 logger = logging.getLogger(__name__)
 
+# Project Sambhav uses Supabase PostgreSQL for high-reliability persistence.
+# The connection string is managed via the DATABASE_URL environment variable.
+
 def generate_id(prefix: str = "SMB") -> str:
     """Generate unique ID like SMB-2026-00001."""
     short = str(uuid.uuid4())[:8].upper()
     return f"{prefix}-2026-{short}"
 
 # ── USER OPERATIONS ───────────────────────────────────────────
-def create_user(db: Session, username: str, email: str,
+def create_user(db: Session, email: str,
                 password_hash: str, tier: str = "registered") -> User:
     user = User(
-        user_id       = generate_id("USR"),
-        username      = username,
+        user_id       = uuid.uuid4(),
         email         = email,
         password_hash = password_hash,
         tier          = tier,
@@ -25,11 +27,10 @@ def create_user(db: Session, username: str, email: str,
     db.add(user)
     db.commit()
     db.refresh(user)
-    logger.info(f"User created: {username}")
+    logger.info(f"User created: {email}")
     return user
 
-def get_user_by_username(db: Session, username: str) -> User:
-    return db.query(User).filter(User.username == username).first()
+# Removed get_user_by_username - use get_user_by_email instead
 
 def get_user_by_email(db: Session, email: str) -> User:
     return db.query(User).filter(User.email == email).first()
@@ -52,16 +53,16 @@ def save_prediction(db: Session, user_id: str,
         prediction_id     = generate_id("SMB"),
         user_id           = user_id,
         domain            = prediction_result.get("domain"),
-        question          = prediction_result.get("question"),
+        input_text        = prediction_result.get("question") or prediction_result.get("input_text"),
         parameters        = prediction_result.get("raw_parameters", {}),
         ml_probability    = prediction_result.get("ml_probability"),
         llm_probability   = prediction_result.get("llm_probability"),
-        final_probability = prediction_result.get("final_probability"),
-        confidence_tier   = prediction_result.get("confidence_tier"),
+        reconciled_prob   = prediction_result.get("final_probability"),
+        warning_level     = prediction_result.get("confidence_tier"),
+        agreement_gap     = prediction_result.get("gap"),
         reliability_index = prediction_result.get("reliability_index"),
         audit_flags       = prediction_result.get("audit_flags", []),
         shap_values       = prediction_result.get("shap_values", {}),
-        debate            = prediction_result.get("debate", {}),
         mode              = prediction_result.get("mode", "guided"),
         created_at        = datetime.utcnow(),
     )
@@ -112,14 +113,13 @@ def save_evaluation(db: Session, prediction_id: str,
     else:              grade = "F"
 
     ev = Evaluation(
-        evaluation_id   = generate_id("EVL"),
         prediction_id   = prediction_id,
-        evaluator_id    = evaluator_id,
-        actual_outcome  = actual_outcome,
+        evaluator_user_id= evaluator_id,
+        actual_outcomes = {"truth": actual_outcome},
         brier_score     = round(brier, 4),
         lessons_learned = lessons,
-        grade           = grade,
-        created_at      = datetime.utcnow(),
+        evaluation_grade= grade,
+        evaluated_at    = datetime.utcnow(),
     )
     db.add(ev)
     db.commit()
@@ -183,6 +183,31 @@ def create_monitoring_session(db: Session, user_id: str,
     db.commit()
     db.refresh(session)
     return session
+
+def get_user_calibration_bias(db: Session, user_id: str) -> float:
+    """
+    Calculate the user's calibration bias.
+    Positive bias means the user's predictions are higher than reality (overconfident).
+    Negative bias means predictions are lower than reality (underconfident).
+    """
+    # Fetch all resolved predictions for this user
+    # Prediction has a relationship to Evaluation in models.py
+    # We join Prediction and Evaluation
+    from db.models import Prediction, Evaluation
+    results = db.query(Prediction.reconciled_prob, Evaluation.actual_outcomes)\
+        .join(Evaluation, Prediction.prediction_id == Evaluation.prediction_id)\
+        .filter(Prediction.user_id == user_id).all()
+    
+    if not results:
+        return 0.0
+    
+    biases = []
+    for pred_prob, actual in results:
+        # actual is a dict like {"truth": True}
+        actual_val = 1.0 if actual.get("truth") else 0.0
+        biases.append(pred_prob - actual_val)
+        
+    return sum(biases) / len(biases)
 
 def get_user_stats(db: Session, user_id: str) -> dict:
     """Get user statistics — predictions, avg Brier, best domain."""

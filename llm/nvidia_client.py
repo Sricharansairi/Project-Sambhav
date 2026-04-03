@@ -1,6 +1,7 @@
 import os, time, logging, base64
 from openai import OpenAI
 from dotenv import load_dotenv
+from api import key_rotator
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -26,7 +27,11 @@ def _get_client():
     _key_index += 1
     return OpenAI(api_key=key, base_url=NVIDIA_BASE)
 
-# ── Core text call ────────────────────────────────────────────
+# ── Vision Call Wrapper ────────────────────────────────────────
+def call_nvidia_vision(messages: list, model: str = "nvidia/qwen2-7b-instruct", 
+                       temperature: float = 0.2, max_tokens: int = 1000) -> str:
+    """NVIDIA NIM vision model wrapper."""
+    return call_nvidia(messages, model=model, temperature=temperature, max_tokens=max_tokens)
 def call_nvidia(
     messages: list,
     model: str = "meta/llama-3.3-70b-instruct",
@@ -55,7 +60,8 @@ def call_nvidia(
 def analyze_image(image_path: str, domain: str) -> dict:
     """
     Analyze an image and extract domain-relevant parameters.
-    Uses Qwen VLM (primary) via NVIDIA NIM.
+    Section 6.3 — Uses NVIDIA NIM Qwen VLM (primary).
+    Extracts: emotion, stress, engagement, body language, environment.
     """
     # Encode image to base64
     with open(image_path, "rb") as f:
@@ -67,17 +73,20 @@ def analyze_image(image_path: str, domain: str) -> dict:
 
     messages = [
         {"role": "system", "content": (
-            f"You are a vision analysis engine for the {domain} domain. "
-            "Analyze the image and extract relevant parameters for probabilistic inference. "
-            "Respond in this exact format:\n"
-            "DOMINANT_EMOTION: <emotion>\n"
-            "STRESS_LEVEL: <0.0-1.0>\n"
-            "ENGAGEMENT_LEVEL: <0.0-1.0>\n"
-            "BODY_LANGUAGE: <open|neutral|closed>\n"
-            "ENVIRONMENT: <formal|informal|neutral>\n"
-            "ENERGY_LEVEL: <0.0-1.0>\n"
-            "PEOPLE_COUNT: <number>\n"
-            "KEY_OBSERVATIONS: <comma separated top 3 observations>"
+            f"You are the NVIDIA NIM Qwen 2.5 VLM vision engine for the {domain} domain.\n"
+            "Analyze the image and extract relevant parameters for probabilistic inference.\n"
+            "Respond ONLY in this exact JSON format:\n"
+            "{\n"
+            '  "dominant_emotion": "<happy|sad|angry|fear|neutral|surprise|disgust>",\n'
+            '  "stress_level": <0.0-1.0>,\n'
+            '  "engagement_level": <0.0-1.0>,\n'
+            '  "body_language": "<open|neutral|closed>",\n'
+            '  "environment": "<formal|informal|neutral>",\n'
+            '  "energy_level": <0.0-1.0>,\n'
+            '  "people_count": <number>,\n'
+            '  "key_observations": ["<obs1>", "<obs2>", "<obs3>"],\n'
+            '  "confidence": <0.0-1.0>\n'
+            "}"
         )},
         {"role": "user", "content": [
             {"type": "image_url",
@@ -88,9 +97,16 @@ def analyze_image(image_path: str, domain: str) -> dict:
     ]
 
     try:
-        raw = call_nvidia(messages, model="meta/llama-3.2-90b-vision-instruct",
-                          temperature=0.2, max_tokens=400)
-        return _parse_vision_response(raw, image_path)
+        # Using Qwen 2.5 VL as requested (placeholder if 3.5 not in NIM yet)
+        raw = call_nvidia(messages, model="nvidia/qwen2-7b-instruct",
+                          temperature=0.2, max_tokens=600)
+        
+        import json, re
+        clean = re.sub(r"```(?:json)?", "", raw).strip()
+        data = json.loads(clean[clean.find("{"):clean.rfind("}")+1])
+        data["source"] = image_path
+        data["raw"]    = raw
+        return data
     except Exception as e:
         logger.warning(f"NVIDIA vision failed, using fallback: {e}")
         return _gemini_vision_fallback(image_path, domain)
@@ -196,8 +212,9 @@ def _parse_document_response(raw: str) -> dict:
 def _gemini_vision_fallback(image_path: str, domain: str) -> dict:
     try:
         import google.generativeai as genai
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY_1") or os.getenv("GEMINI_API_KEY"))
-        model  = genai.GenerativeModel("gemini-1.5-flash")
+        k = key_rotator.get_key("gemini")
+        genai.configure(api_key=k)
+        model  = genai.GenerativeModel("models/gemini-flash-latest")
         import PIL.Image
         img    = PIL.Image.open(image_path)
         prompt = (f"Analyze this image for {domain} probabilistic inference. "

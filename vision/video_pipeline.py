@@ -215,9 +215,6 @@ def analyze_video(
         try: os.unlink(frame["path"])
         except: pass
 
-        # Rate limit protection
-        time.sleep(0.3)
-
     # Build outputs
     timeline    = build_timeline(frame_results)
     key_moments = detect_key_moments(timeline)

@@ -1,14 +1,102 @@
+# Environments
 .env
 *.env
 venv/
+.venv/
+env/
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
-models/*.joblib
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Data & Models
 data/raw/
 data/processed/
+models/*.joblib
+models/*.joblib copy
+models/*.pkl
+models/*.pth
+models/*.h5
+models/*.json
 *.db
 sambhav.db
-.DS_Store
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.DS_Store
+frontend/*.log
+frontend/package-lock.json
+
+# Logs & Diagnostics
+*.log
 api/key_health_log.json
 api/key_health_log.txt
+sambhav_diagnostic_results.json
+backend_setup.log
+frontend_setup.log
+vite.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation & Zips
+*.docx
+*.pdf
+*.zip
+*.pptx
+*.xlsx
+test_exports/
+_docx_extract/
+
+# Backups & Temporary
+*_v14*.py
+*_v25*.py
+*_v26*.py
+sambhav_fixes/
+sambhav_exports_v3.py
+medico_v19.joblib
+auth
+mcp
+figma
+eval_reports/
+alembic.ini
+alembic/
+api/endpoints/export.py
+api/endpoints/modes.py
+api/endpoints/reports.py
+master_prediction_framework.py
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Tests & Debug
+debug_*.py
+test_*.py
+parse_tests.py
+extract_tests.py
+fix_tests.py
+sambhav_full_diagnostic.py
+tmp_doc.txt

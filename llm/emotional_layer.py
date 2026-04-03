@@ -1,6 +1,6 @@
 """
 llm/emotional_layer.py — Section 8.13 Emotional Intelligence Layer
-Detects emotional charge in the USER'S QUESTION (not the prediction context).
+Detects emotional charge in the USER'S QUESTION using VADER sentiment analysis patterns.
 If high anxiety/urgency detected — switches to empathetic framing.
 Same probabilities, same accuracy — different communication style.
 """

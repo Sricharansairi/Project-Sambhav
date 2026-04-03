@@ -34,6 +34,10 @@ def call_groq(
     model: str = "llama-3.3-70b-versatile",
     retries: int = 4
 ) -> str:
+    # Use faster model for simple probability tasks if not explicitly requested
+    if model == "llama-3.3-70b-versatile" and len(messages) < 10:
+        model = "llama-3.1-8b-instant"
+        
     fallback_model = "deepseek-r1-distill-llama-70b"
     for attempt in range(retries):
         try:
@@ -129,7 +133,8 @@ def llm_predict(domain: str, parameters: dict, question: str = None) -> dict:
     }
     messages = [system_msg] + shots + [user_msg]
 
-    raw = call_groq(messages, temperature=0.2, max_tokens=300)
+    # Using 8B for speed in probability estimation (Section 6.1)
+    raw = call_groq(messages, temperature=0.1, max_tokens=150, model="llama-3.1-8b-instant")
 
     # Parse response
     result = {"raw": raw, "probability": None, "confidence": "MODERATE",
@@ -151,52 +156,69 @@ def llm_predict(domain: str, parameters: dict, question: str = None) -> dict:
 
 
 # ── Free Inference Mode ───────────────────────────────────────
-def free_inference(text: str, n_outcomes: int = 5) -> list:
+def free_inference(text: str, n_outcomes: int = 5) -> dict:
+    """
+    Advanced Free Inference (Mode 2).
+    Extracts entities, signals, domain, hypotheses, and calibrated probabilities.
+    """
     messages = [
         {"role": "system", "content": (
-            "You are a probabilistic inference engine. "
-            "Given any text, generate independent probability estimates for likely outcomes. "
-            "CRITICAL: probabilities are NOT related and do NOT sum to 100. Each is independent.\n"
-            "Respond ONLY in this exact format per outcome:\n"
-            "OUTCOME: <description>\nPROBABILITY: <0-100>\nREASONING: <1 sentence>\n---"
+            "You are the Sambhav Free Inference Engine (Mode 2).\n"
+            "Analyze the provided text and extract structural probabilistic data.\n\n"
+            "YOUR TASK:\n"
+            "1. Detect the most likely domain (student, hr, disease, loan, etc.)\n"
+            "2. Extract relevant entities and parameters\n"
+            "3. Identify positive signals (+) and negative signals (-)\n"
+            "4. Generate independent outcome hypotheses\n"
+            "5. Assign calibrated probabilities (0-100) to each\n"
+            "6. Compute a Reliability Index (0.0-1.0) based on info completeness\n"
+            "7. List missing information that would improve accuracy\n\n"
+            "Respond ONLY in valid JSON format:\n"
+            "{\n"
+            '  "domain": "<detected_domain>",\n'
+            '  "entities": ["<entity1>", "<entity2>"],\n'
+            '  "positive_signals": ["<signal1>", "<signal2>"],\n'
+            '  "negative_signals": ["<signal1>", "<signal2>"],\n'
+            '  "reliability_index": <0.0-1.0>,\n'
+            '  "missing_info": ["<info1>", "<info2>"],\n'
+            '  "outcomes": [\n'
+            '    {"outcome": "<description>", "probability": <0-100>, "reasoning": "<1 sentence>"},\n'
+            "    ...\n"
+            "  ]\n"
+            "}"
         )},
-        {"role": "user", "content": (
-            f"Analyze this situation and generate {n_outcomes} independent probability estimates:\n\n"
-            f"{text}"
-        )}
+        {"role": "user", "content": f"Analyze this situation:\n\n{text}"}
     ]
-    raw = call_groq(messages, temperature=0.5, max_tokens=1500)
-    outcomes = []
     
-    # Try --- separator first
-    blocks = [b.strip() for b in raw.split("---") if b.strip()]
+    raw = call_groq(messages, temperature=0.2, max_tokens=1500)
     
-    # Fallback — split by OUTCOME: if no --- found
-    if len(blocks) <= 1:
-        import re
-        parts = re.split(r"(?=OUTCOME:)", raw)
-        blocks = [p.strip() for p in parts if p.strip()]
-    
-    for block in blocks:
-        if not block: continue
-        outcome = {}
-        for line in block.split("\n"):
-            line = line.strip()
-            if line.startswith("OUTCOME:"):
-                outcome["outcome"] = line.split(":",1)[1].strip()
-            elif line.startswith("PROBABILITY:"):
-                try:
-                    outcome["probability"] = float(
-                        line.split(":")[1].strip().replace("%","")) / 100
-                except:
-                    outcome["probability"] = 0.5
-            elif line.startswith("REASONING:"):
-                outcome["reasoning"] = line.split(":",1)[1].strip()
-        if outcome.get("outcome") and "probability" in outcome:
-            outcomes.append(outcome)
-    return outcomes[:n_outcomes]
+    # Clean JSON if wrapped in markdown
+    import re, json
+    clean = re.sub(r"```(?:json)?", "", raw).strip()
+    try:
+        data = json.loads(clean[clean.find("{"):clean.rfind("}")+1])
+        # Ensure probabilities are 0.0-1.0 for consistency with other modes
+        for o in data.get("outcomes", []):
+            if o.get("probability", 0) > 1:
+                o["probability"] = o["probability"] / 100.0
+        return data
+    except Exception as e:
+        logger.error(f"Free inference JSON parse failed: {e}")
+        # Fallback to simple list if JSON fails
+        return {
+            "domain": "general",
+            "outcomes": [],
+            "error": "Failed to parse structured response"
+        }
 
-# ── Quick health check ────────────────────────────────────────
+# ── Quick probability helper ──────────────────────────────────
+def get_llm_probability(question: str, parameters: dict, domain: str) -> float:
+    """
+    Fast LLM probability generation for dual-layer prediction.
+    Section 6.1 — Optimized for speed.
+    """
+    res = llm_predict(domain, parameters, question)
+    return res.get("probability") or 0.5
 def health_check() -> dict:
     try:
         resp = call_groq(

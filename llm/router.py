@@ -32,22 +32,19 @@ TEMPERATURES = {
 # ── Provider chains per call type (Section 12.4) ─────────────
 CHAINS = {
     "domain_detect": [
-        ("groq",        {"model": "llama-3.3-70b-versatile"}),
+        ("groq",        {"model": "llama-3.1-8b-instant"}),
+        ("cerebras",    {"model": "small"}),
         ("sambanova",   {"model": "fast"}),
-        ("cerebras",    {"model": "large"}),
-        ("cloudflare",  {"model": "large"}),
     ],
     "llm_predict": [
-        ("groq",        {"model": "llama-3.3-70b-versatile"}),
+        ("groq",        {"model": "llama-3.1-8b-instant"}),
+        ("cerebras",    {"model": "small"}),
         ("sambanova",   {"model": "fast"}),
-        ("cerebras",    {"model": "large"}),
-        ("cloudflare",  {"model": "large"}),
     ],
     "free_inference": [
-        ("groq",        {"model": "llama-3.3-70b-versatile"}),
-        ("sambanova",   {"model": "large"}),
-        ("cerebras",    {"model": "large"}),
-        ("cloudflare",  {"model": "large"}),
+        ("groq",        {"model": "llama-3.1-8b-instant"}),
+        ("cerebras",    {"model": "small"}),
+        ("sambanova",   {"model": "fast"}),
     ],
     "fact_check": [
         ("cerebras",    {"model": "large"}),
@@ -68,10 +65,10 @@ CHAINS = {
         ("cerebras",    {"model": "large"}),
     ],
     "conversational": [
-        ("groq",        {"model": "llama-3.3-70b-versatile"}),
+        ("groq",        {"model": "llama-3.1-8b-instant"}),  # Speed optimized
         ("sambanova",   {"model": "fast"}),
-        ("cerebras",    {"model": "large"}),
-        ("cloudflare",  {"model": "large"}),
+        ("cerebras",    {"model": "small"}),
+        ("cloudflare",  {"model": "small"}),
     ],
     "document_analysis": [
         ("sambanova",   {"model": "document"}),
@@ -80,16 +77,27 @@ CHAINS = {
         ("cloudflare",  {"model": "large"}),
     ],
     "outcome_simulation": [
-        ("groq",        {"model": "llama-3.3-70b-versatile"}),
-        ("sambanova",   {"model": "large"}),
-        ("cerebras",    {"model": "large"}),
-        ("cloudflare",  {"model": "large"}),
+        ("groq",        {"model": "llama-3.1-8b-instant"}),
+        ("sambanova",   {"model": "fast"}),
+        ("cerebras",    {"model": "small"}),
+    ],
+    "llm_probability": [
+        ("groq",        {"model": "llama-3.1-8b-instant"}),
+        ("cerebras",    {"model": "small"}),
+        ("sambanova",   {"model": "fast"}),
+    ],
+    "outcome_generation": [
+        ("groq",        {"model": "llama-3.1-8b-instant"}),
+        ("cerebras",    {"model": "small"}),
+        ("sambanova",   {"model": "fast"}),
+    ],
+    "transparency": [
+        ("groq",        {"model": "llama-3.1-8b-instant"}),
+        ("cerebras",    {"model": "small"}),
     ],
     "safety_screen": [
+        ("groq",        {"model": "llama-3.1-8b-instant"}),
         ("mistral",     {"model": "small"}),
-        ("groq",        {"model": "llama-3.3-70b-versatile"}),
-        ("sambanova",   {"model": "fast"}),
-        ("cerebras",    {"model": "large"}),
     ],
 }
 

@@ -26,41 +26,39 @@ DOMAIN_QUESTIONS = {
         ("motivation",          "How motivated is the student (1-5)?",
          ["1 - Very low", "2 - Low", "3 - Medium", "4 - High", "5 - Very high"]),
     ],
-    "hr": [
-        ("job_satisfaction",    "How satisfied is the employee with their job (1-4)?",
-         ["1 - Very dissatisfied", "2 - Dissatisfied", "3 - Satisfied", "4 - Very satisfied"]),
-        ("work_life_balance",   "How is their work-life balance (1-4)?",
-         ["1 - Bad", "2 - Good", "3 - Better", "4 - Best"]),
-        ("overtime",            "Does the employee work overtime?",
-         ["Yes", "No"]),
-        ("years_at_company",    "How many years have they been at the company?",
-         ["Less than 1", "1-3 years", "3-7 years", "7+ years"]),
-        ("monthly_income",      "What is their approximate monthly income?",
-         ["Below 3000", "3000-6000", "6000-10000", "Above 10000"]),
+    "job_life": [
+        ("role_satisfaction",    "How satisfied is the individual with their current role (1-5)?",
+         ["1 - Very low", "2 - Low", "3 - Medium", "4 - High", "5 - Very high"]),
+        ("lifestyle_balance",    "How is their work-life or lifestyle balance (1-5)?",
+         ["1 - Very poor", "2 - Poor", "3 - Fair", "4 - Good", "5 - Excellent"]),
+        ("tenure_duration",      "How long has the individual been in their current position?",
+         ["Less than 1 yr", "1-2 years", "3-5 years", "6-10 years", "10+ years"]),
+        ("growth_opportunity",   "How do they perceive their current growth opportunities?",
+         ["None", "Limited", "Moderate", "Significant", "Exceptional"]),
+        ("workplace_culture",    "How would they rate their workplace culture or environment?",
+         ["Toxic", "Neutral", "Positive", "Excellent"]),
     ],
-    "disease": [
-        ("age",             "What is the patient's age?",
+    "health": [
+        ("age",             "What is the individual's age?",
          ["Under 30", "30-45", "45-60", "Above 60"]),
-        ("glucose",         "What is their glucose level (mg/dL)?",
+        ("glucose",         "What is their approximate glucose level (mg/dL)?",
          ["Below 100", "100-125", "126-199", "200+"]),
-        ("bmi",             "What is their BMI?",
+        ("bmi",             "What is their BMI range?",
          ["Under 18.5", "18.5-24.9", "25-29.9", "30+"]),
         ("blood_pressure",  "What is their blood pressure (systolic)?",
          ["Below 120", "120-129", "130-139", "140+"]),
-        ("smoking",         "Do they smoke?",
-         ["Never", "Former smoker", "Current smoker"]),
+        ("health_habits",    "How would they rate their overall health habits?",
+         ["Poor", "Fair", "Good", "Excellent"]),
     ],
-    "loan": [
-        ("credit_score",    "What is their credit score?",
+    "financial": [
+        ("financial_score",  "What is their financial health or credit score?",
          ["Below 580", "580-669", "670-739", "740+"]),
-        ("income",          "What is their annual income?",
-         ["Below 30000", "30000-60000", "60000-100000", "100000+"]),
-        ("loan_amount",     "How much loan are they requesting?",
-         ["Below 10000", "10000-30000", "30000-60000", "60000+"]),
-        ("missed_payments", "How many missed payments in their history?",
-         ["0", "1-2", "3-5", "6+"]),
-        ("employment_years","How many years have they been employed?",
-         ["0-1 years", "1-3 years", "3-7 years", "7+ years"]),
+        ("annual_income",    "What is the annual income or revenue?",
+         ["Below ₹3 lakh", "₹3 – 6 lakh", "₹6 – 12 lakh", "₹12 – 25 lakh", "₹25 lakh+"]),
+        ("transaction_amount","What is the total amount involved in this scenario?",
+         ["Below ₹1 lakh", "₹1 – 5 lakh", "₹5 – 10 lakh", "₹10 – 25 lakh", "₹25 lakh+"]),
+        ("stability_duration","Duration of current financial or employment stability?",
+         ["None", "< 1 year", "1-3 years", "3-7 years", "7+ years"]),
     ],
     "mental_health": [
         ("sleep_hours",       "How many hours of sleep per night?",
@@ -84,21 +82,19 @@ CHIP_VALUES = {
     "Low": "low", "Medium": "medium", "High": "high", "Very High": "very_high",
     "Less than 5": 4, "5-6 hours": 5.5, "7-8 hours": 7.5, "More than 8": 9,
     "1 - Very low": 1, "2 - Low": 2, "3 - Medium": 3, "4 - High": 4, "5 - Very high": 5,
-    "1 - Very dissatisfied": 1, "2 - Dissatisfied": 2, "3 - Satisfied": 3, "4 - Very satisfied": 4,
-    "1 - Bad": 1, "2 - Good": 2, "3 - Better": 3, "4 - Best": 4,
-    "Yes": 1, "No": 0,
-    "Less than 1": 0.5, "1-3 years": 2, "3-7 years": 5, "7+ years": 10,
-    "Below 3000": 2000, "3000-6000": 4500, "6000-10000": 8000, "Above 10000": 12000,
+    "1 - Very poor": 1, "2 - Poor": 2, "3 - Fair": 3, "4 - Good": 4, "5 - Excellent": 5,
+    "Less than 1 yr": 0.5, "1-2 years": 1.5, "3-5 years": 4, "6-10 years": 8, "10+ years": 13,
+    "None": 0, "Limited": 1, "Moderate": 2, "Significant": 3, "Exceptional": 4,
+    "Toxic": 0, "Neutral": 1, "Positive": 2, "Excellent": 3,
     "Under 30": 25, "30-45": 37, "45-60": 52, "Above 60": 65,
     "Below 100": 90, "100-125": 112, "126-199": 160, "200+": 220,
     "Under 18.5": 17, "18.5-24.9": 22, "25-29.9": 27, "30+": 33,
     "Below 120": 110, "120-129": 124, "130-139": 134, "140+": 150,
-    "Never": 0, "Former smoker": 0.5, "Current smoker": 1,
+    "Poor": 0, "Fair": 1, "Good": 2,
     "Below 580": 550, "580-669": 625, "670-739": 705, "740+": 780,
-    "Below 30000": 20000, "30000-60000": 45000, "60000-100000": 80000, "100000+": 120000,
-    "Below 10000": 7000, "10000-30000": 20000, "30000-60000": 45000, "60000+": 75000,
-    "0": 0, "1-2": 1, "3-5": 4, "6+": 8,
-    "0-1 years": 0.5, "1-3 years": 2, "3-7 years": 5, "7+ years": 10,
+    "Below ₹3 lakh": 200000, "₹3 – 6 lakh": 450000, "₹6 – 12 lakh": 900000, "₹12 – 25 lakh": 1800000, "₹25 lakh+": 3500000,
+    "Below ₹1 lakh": 50000, "₹1 – 5 lakh": 250000, "₹5 – 10 lakh": 750000, "₹10 – 25 lakh": 1750000, "₹25 lakh+": 3500000,
+    "< 1 year": 0.5,
     "Less than 40": 35, "40-50": 45, "50-60": 55, "60+": 65,
     "None": "none", "Weak": "weak", "Moderate": "moderate", "Strong": "strong",
 }
@@ -108,32 +104,46 @@ class ConversationalSession:
     """
     Manages a multi-turn conversational prediction session.
     Section 6.4 — one question at a time, stops at RI >= 75%.
+    Powered by Groq LLM for dynamic questioning.
     """
 
     def __init__(self, domain: str, question: str = None):
         self.domain      = domain
         self.question    = question or f"What is the probability of a positive outcome?"
         self.parameters  = {}
-        self.history     = []
+        self.history     = []  # List of {"role": "user"|"assistant", "content": "..."}
         self.step        = 0
         self.complete    = False
-        self.questions   = DOMAIN_QUESTIONS.get(domain, [])
         self.reliability = 0.0
+        self.max_steps   = 8
 
     def get_next_question(self) -> dict:
-        """Returns next question to ask, or None if session complete."""
-        if self.step >= len(self.questions):
+        """Returns next question to ask using LLM, or None if session complete."""
+        if self.complete or self.step >= self.max_steps:
             self.complete = True
             return None
 
-        param_key, question_text, options = self.questions[self.step]
+        # Call LLM to generate the next smart question
+        resp = generate_conversational_response(
+            domain=self.domain,
+            question=self.question,
+            conversation_history=self.history,
+            current_parameters=self.parameters
+        )
+
+        if resp.get("ready_to_predict") or resp.get("reliability", 0) >= 75:
+            self.complete = True
+            return None
+
+        self.reliability = resp.get("reliability", 0) / 100.0
+
         return {
             "step":        self.step + 1,
-            "total_steps": len(self.questions),
-            "param_key":   param_key,
-            "question":    question_text,
-            "options":     options,
-            "progress":    f"{self.step + 1} of {len(self.questions)}",
+            "total_steps": self.max_steps,
+            "param_key":   resp.get("asking_for") or f"param_{self.step}",
+            "question":    resp.get("message"),
+            "options":     resp.get("suggested_options", []),
+            "progress":    f"{self.step + 1} of dynamic",
             "reliability": round(self.reliability * 100, 1),
             "can_skip":    True,
         }
@@ -141,23 +151,17 @@ class ConversationalSession:
     def submit_answer(self, param_key: str, value: str, skipped: bool = False) -> dict:
         """Process user answer and return updated state."""
         if not skipped:
-            # Convert chip selection to numeric value
+            # Convert chip selection to numeric value if it matches our known mappings
             numeric_val = CHIP_VALUES.get(value, value)
             self.parameters[param_key] = numeric_val
-            self.history.append({
-                "step":      self.step + 1,
-                "param":     param_key,
-                "raw_value": value,
-                "value":     numeric_val,
-            })
+            
+            # Update history for LLM context
+            self.history.append({"role": "user", "content": value})
 
         self.step += 1
 
-        # Update reliability
-        self.reliability = min(1.0, len(self.parameters) / max(len(self.questions), 1))
-
-        # Check if we should stop
-        if self.reliability >= 0.75 or self.step >= len(self.questions):
+        # Check if we should stop based on reliability or max steps
+        if self.reliability >= 0.75 or self.step >= self.max_steps:
             self.complete = True
 
         return {
@@ -200,31 +204,24 @@ def generate_conversational_response(
 
     messages = [
         {"role": "system", "content": (
-            "You are Sambhav, a probabilistic inference assistant.\n"
-            "You collect information through natural conversation to make predictions.\n"
-            "Ask ONE focused question at a time — never multiple questions.\n"
-            "Be warm and concise. Stop collecting when you have enough info (5+ parameters).\n\n"
-            f"Domain: {domain}\n"
-            f"Goal: {question}\n"
-            f"Parameters collected so far:\n{param_str or 'None yet'}\n"
-            f"Reliability Index: {reliability}%\n\n"
-            "If reliability >= 75%, say you have enough info and offer to predict.\n"
-            "Otherwise ask the most impactful missing parameter.\n\n"
-            "Respond in JSON:\n"
+            "You are Sambhav. Collect 1 info at a time for prediction.\n"
+            "Ask ONE focused question. Be concise.\n\n"
+            f"Domain: {domain} | Goal: {question}\n"
+            f"Params: {param_str or 'None'}\n"
+            f"RI: {reliability}%\n"
+            "If RI >= 75%, say 'Ready to predict'.\n"
+            "JSON ONLY:\n"
             "{\n"
-            '  "message": "<your conversational response>",\n'
-            '  "asking_for": "<parameter name you are asking about or null>",\n'
-            '  "ready_to_predict": <true|false>,\n'
-            '  "suggested_options": ["<option1>", "<option2>", "<option3>"]\n'
+            '  "message": "...",\n'
+            '  "asking_for": "param_key",\n'
+            '  "ready_to_predict": bool,\n'
+            '  "suggested_options": ["opt1", "opt2"]\n'
             "}"
         )},
-        {"role": "user", "content": (
-            f"Conversation so far:\n{history_str}\n\n"
-            "What should Sambhav say next?"
-        )}
+        {"role": "user", "content": f"History:\n{history_str}\nNext?"}
     ]
 
-    result = route("conversational", messages, max_tokens=300, temperature=0.3)
+    result = route("conversational", messages, max_tokens=100, temperature=0.1)
     raw    = result.get("content", "")
     raw    = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
     if "```" in raw:

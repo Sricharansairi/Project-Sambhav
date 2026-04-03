@@ -1,6 +1,10 @@
-Domain,Accuracy,AUC-ROC,Brier,ECE,Brier<0.12,ECE<0.08
-Student,79.3%,0.9057,0.1246,0.0929,✗,✗
-Higher Ed,89.5%,0.9517,0.0769,0.0700,✓,✓
-HR Attrition,81.1%,0.9259,0.1248,0.1300,✗,✗
-Behavioral,ERR,ERR,ERR,ERR,✗,✗
-Claim,ERR,ERR,ERR,ERR,✗,✗
+Domain,Accuracy,AUC,Brier,ECE,Pass
+Student,ERR,ERR,ERR,ERR,False
+Higher Ed,ERR,ERR,ERR,ERR,False
+HR,ERR,ERR,ERR,ERR,False
+Disease,N/A,N/A,N/A,N/A,False
+Fitness,N/A,N/A,N/A,N/A,False
+Loan,N/A,N/A,N/A,N/A,False
+MentalHealth,N/A,N/A,N/A,N/A,False
+Claim,ERR,ERR,ERR,ERR,False
+Behavioral,ERR,ERR,ERR,ERR,False

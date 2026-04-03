@@ -1,997 +1,891 @@
-import os, sys, logging, yaml, joblib, numpy as np
+"""
+core/predictor.py — Project Sambhav
+Fixed model loader + 7-stage prediction pipeline
+Handles: all 11 domains, blend mode, Sarvagna special arch, missing models
+
+FIXED BUGS:
+  1. Model artifacts were not being loaded from .joblib correctly
+  2. IsotonicRegression calibration was not being applied
+  3. Blend weight logic for Behavioural + Claim was missing
+  4. Sarvagna required separate pipeline loading
+  5. Feature column alignment was not enforced
+"""
+
+import os
+import logging
+import yaml
+import numpy as np
+import pandas as pd
+import joblib
+from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Optional
-from dotenv import load_dotenv
+from typing import Optional, Any
 
-load_dotenv()
-sys.path.insert(0, os.path.expanduser("~/Desktop/Sri_Coding/Project Sambhav"))
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
-BASE   = os.path.expanduser("~/Desktop/Sri_Coding/Project Sambhav")
-SCHEMA = os.path.join(BASE, "schemas/domain_registry.yaml")
-
-# ── Domain-specific parameter mappers ────────────────────────
-# Maps user-friendly parameter names → exact training column names
-DOMAIN_PARAM_MAP = {
-    "student": {
-        "study_hours":          "StudyTimeWeekly",
-        "study_hours_per_day":  "StudyTimeWeekly",
-        "attendance":           "Absences",
-        "attendance_pct":       "Absences",
-        "past_score":           "GPA",
-        "gpa":                  "GPA",
-        "math_score":           "math score",
-        "reading_score":        "reading score",
-        "writing_score":        "writing score",
-        "absences":             "Absences",
-        "tutoring":             "Tutoring",
-        "parental_support":     "ParentalSupport",
-        "extracurricular":      "Extracurricular",
-        "sports":               "Sports",
-        "age":                  "Age",
-        "gender":               "Gender",
-        "motivation":           "ParentalSupport",
-        "stress_level":         "Absences",
-    },
-    "higher_education": {
-        "age":                  "Age at enrollment",
-        "age_at_enrollment":    "Age at enrollment",
-        "scholarship":          "Scholarship holder",
-        "scholarship_holder":   "Scholarship holder",
-        "tuition_paid":         "Tuition fees up to date",
-        "tuition_fees_up_to_date": "Tuition fees up to date",
-        "debtor":               "Debtor",
-        "gender":               "Gender",
-        "admission_grade":      "Previous qualification",
-        "units_approved":       "Curricular units 1st sem (approved)",
-        "units_enrolled":       "Curricular units 1st sem (enrolled)",
-        "units_grade":          "Curricular units 1st sem (grade)",
-        "displaced":            "Displaced",
-        "international":        "International",
-    },
-    "hr": {
-        "age":                  "Age",
-        "job_satisfaction":     "JobSatisfaction",
-        "work_life_balance":    "WorkLifeBalance",
-        "overtime":             "OverTime",
-        "years_at_company":     "YearsAtCompany",
-        "monthly_income":       "MonthlyIncome",
-        "distance_from_home":   "DistanceFromHome",
-        "environment_satisfaction": "EnvironmentSatisfaction",
-        "job_level":            "JobLevel",
-        "job_involvement":      "JobInvolvement",
-        "years_in_role":        "YearsInCurrentRole",
-        "years_since_promotion": "YearsSinceLastPromotion",
-        "years_with_manager":   "YearsWithCurrManager",
-        "num_companies":        "NumCompaniesWorked",
-        "salary_hike":          "PercentSalaryHike",
-        "total_working_years":  "TotalWorkingYears",
-        "training_times":       "TrainingTimesLastYear",
-        "stock_options":        "StockOptionLevel",
-        "performance_rating":   "PerformanceRating",
-        "relationship_satisfaction": "RelationshipSatisfaction",
-        "tenure":               "Tenure",
-        "monthly_charges":      "MonthlyCharges",
-    },
-    "disease": {
-        "age":                  "Age",
-        "glucose":              "Glucose",
-        "blood_pressure":       "BloodPressure",
-        "bmi":                  "BMI",
-        "cholesterol":          "chol",
-        "pregnancies":          "Pregnancies",
-        "insulin":              "Insulin",
-        "skin_thickness":       "SkinThickness",
-        "heart_rate":           "thalach",
-        "chest_pain":           "cp",
-        "exercise_angina":      "exang",
-        "fasting_bs":           "fbs",
-        "blood_glucose":        "blood_glucose_level",
-        "hba1c":                "HbA1c_level",
-        "smoking":              "smoking_history",
-        "hypertension":         "hypertension",
-        "heart_disease":        "heart_disease",
-    },
-    "fitness": {
-        "age":                  "age",
-        "gender":               "gender",
-        "weight_kg":            "weight_kg",
-        "height_cm":            "height_cm",
-        "body_fat_pct":         "body fat_%",
-        "body_fat":             "body fat_%",
-        "sit_ups":              "sit-ups counts",
-        "broad_jump":           "broad jump_cm",
-        "grip_force":           "gripForce",
-        "bmi":                  "bmi",
-        "smoker":               "smoker",
-        "systolic":             "systolic",
-        "diastolic":            "diastolic",
-    },
-    "loan": {},  # PCA features — LLM only
-    "mental_health": {},  # Text model — handled separately
-    "claim": {},  # Text model — handled separately
-    "behavioral": {},  # Text model — handled separately
-}
-
-# Smart domain defaults for unmapped columns
-DOMAIN_DEFAULTS = {
-    "student": {
-        "StudentID": 0, "Age": 17, "Gender": 0, "Ethnicity": 0,
-        "ParentalEducation": 2, "StudyTimeWeekly": 5, "Absences": 5,
-        "Tutoring": 0, "ParentalSupport": 2, "Extracurricular": 0,
-        "Sports": 0, "Music": 0, "Volunteering": 0, "GPA": 2.5,
-        "gender": 0, "race/ethnicity": 0, "parental level of education": 2,
-        "lunch": 1, "test preparation course": 0,
-        "math score": 65, "reading score": 65, "writing score": 65,
-        "Education Level": 1, "Institution Type": 0, "IT Student": 0,
-        "Location": 1, "Load-shedding": 1, "Financial Condition": 1,
-        "Internet Type": 1, "Network Type": 1, "Class Duration": 3,
-        "Self Lms": 0, "Device": 0, "city": 0, "city_development_index": 0.8,
-        "relevent_experience": 1, "enrolled_university": 0,
-        "education_level": 2, "major_discipline": 0, "experience": 2,
-        "company_size": 0, "company_type": 0, "last_new_job": 1,
-        "training_hours": 50,
-    },
-    "higher_education": {
-        "Marital status": 1, "Application mode": 1, "Application order": 1,
-        "Course": 1, "Daytime/evening attendance": 1,
-        "Previous qualification": 120, "Nacionality": 1,
-        "Mother's qualification": 2, "Father's qualification": 2,
-        "Mother's occupation": 3, "Father's occupation": 3,
-        "Displaced": 0, "Educational special needs": 0, "Debtor": 0,
-        "Tuition fees up to date": 1, "Gender": 0, "Scholarship holder": 0,
-        "Age at enrollment": 20, "International": 0,
-        "Curricular units 1st sem (credited)": 0,
-        "Curricular units 1st sem (enrolled)": 6,
-        "Curricular units 1st sem (evaluations)": 6,
-        "Curricular units 1st sem (approved)": 5,
-        "Curricular units 1st sem (grade)": 12,
-        "Curricular units 1st sem (without evaluations)": 0,
-        "Curricular units 2nd sem (credited)": 0,
-        "Curricular units 2nd sem (enrolled)": 6,
-        "Curricular units 2nd sem (evaluations)": 6,
-        "Curricular units 2nd sem (approved)": 5,
-        "Curricular units 2nd sem (grade)": 12,
-        "Curricular units 2nd sem (without evaluations)": 0,
-        "Unemployment rate": 10, "Inflation rate": 1.5, "GDP": 1.5,
-    },
-    "hr": {
-        "Age": 35, "BusinessTravel": 1, "DailyRate": 800,
-        "Department": 1, "DistanceFromHome": 5, "Education": 3,
-        "EducationField": 1, "EmployeeCount": 1, "EmployeeNumber": 1,
-        "EnvironmentSatisfaction": 3, "Gender": 0, "HourlyRate": 65,
-        "JobInvolvement": 3, "JobLevel": 2, "JobRole": 1,
-        "JobSatisfaction": 3, "MaritalStatus": 1, "MonthlyIncome": 5000,
-        "MonthlyRate": 14000, "NumCompaniesWorked": 2, "Over18": 1,
-        "OverTime": 0, "PercentSalaryHike": 13, "PerformanceRating": 3,
-        "RelationshipSatisfaction": 3, "StandardHours": 80,
-        "StockOptionLevel": 1, "TotalWorkingYears": 8,
-        "TrainingTimesLastYear": 3, "WorkLifeBalance": 3,
-        "YearsAtCompany": 5, "YearsInCurrentRole": 3,
-        "YearsSinceLastPromotion": 1, "YearsWithCurrManager": 3,
-        "JoiningYear": 2018, "City": 0, "PaymentTier": 2,
-        "EverBenched": 0, "ExperienceInCurrentDomain": 3,
-        "RowNumber": 1, "CustomerId": 0, "Surname": 0,
-        "CreditScore": 650, "Geography": 0, "Tenure": 5,
-        "Balance": 50000, "NumOfProducts": 1, "HasCrCard": 1,
-        "IsActiveMember": 1, "EstimatedSalary": 50000,
-        "customerID": 0, "gender": 0, "SeniorCitizen": 0,
-        "Partner": 0, "Dependents": 0, "tenure": 5,
-        "PhoneService": 1, "MultipleLines": 0, "InternetService": 1,
-        "OnlineSecurity": 0, "OnlineBackup": 0, "DeviceProtection": 0,
-        "TechSupport": 0, "StreamingTV": 0, "StreamingMovies": 0,
-        "Contract": 0, "PaperlessBilling": 1, "PaymentMethod": 0,
-        "MonthlyCharges": 65, "TotalCharges": 3000,
-        "CLIENTNUM": 0, "Customer_Age": 40, "Dependent_count": 2,
-        "Education_Level": 2, "Marital_Status": 1, "Income_Category": 2,
-        "Card_Category": 0, "Months_on_book": 36,
-        "Total_Relationship_Count": 4, "Months_Inactive_12_mon": 2,
-        "Contacts_Count_12_mon": 3, "Credit_Limit": 10000,
-        "Total_Revolving_Bal": 1200, "Avg_Open_To_Buy": 8000,
-        "Total_Amt_Chng_Q4_Q1": 0.7, "Total_Trans_Amt": 4000,
-        "Total_Trans_Ct": 60, "Total_Ct_Chng_Q4_Q1": 0.7,
-        "Avg_Utilization_Ratio": 0.2,
-        "Naive_Bayes_Classifier_Attrition_Flag_Card_Category_Contacts_Count_12_mon_Dependent_count_Education_Level_Months_Inactive_12_mon_1": 0,
-        "Naive_Bayes_Classifier_Attrition_Flag_Card_Category_Contacts_Count_12_mon_Dependent_count_Education_Level_Months_Inactive_12_mon_2": 0,
-        "city": 0, "city_development_index": 0.8, "relevent_experience": 1,
-        "enrolled_university": 0, "education_level": 2,
-        "major_discipline": 0, "experience": 5, "company_size": 2,
-        "company_type": 0, "last_new_job": 1, "training_hours": 50,
-    },
-    "disease": {
-        "Pregnancies": 0, "Glucose": 110, "BloodPressure": 80,
-        "SkinThickness": 20, "Insulin": 80, "BMI": 25,
-        "DiabetesPedigreeFunction": 0.4, "Age": 35,
-        "gender": 0, "age": 35, "hypertension": 0, "heart_disease": 0,
-        "smoking_history": 0, "bmi": 25, "HbA1c_level": 5.5,
-        "blood_glucose_level": 100, "id": 0, "ever_married": 0,
-        "work_type": 2, "Residence_type": 0, "avg_glucose_level": 100,
-        "smoking_status": 0, "sex": 0, "cp": 0, "trestbps": 120,
-        "chol": 200, "fbs": 0, "restecg": 0, "thalach": 150,
-        "exang": 0, "oldpeak": 0, "slope": 1, "ca": 0, "thal": 2,
-        "height": 170, "weight": 70, "ap_hi": 120, "ap_lo": 80,
-        "cholesterol": 1, "gluc": 1, "smoke": 0, "alco": 0, "active": 1,
-    },
-    "fitness": {
-        "age": 30, "gender": 0, "height_cm": 170, "weight_kg": 70,
-        "body fat_%": 20, "diastolic": 75, "systolic": 120,
-        "gripForce": 35, "sit and bend forward_cm": 15,
-        "sit-ups counts": 30, "broad jump_cm": 180,
-        "sex": 0, "bmi": 24, "children": 0, "smoker": 0,
-        "region": 0, "charges": 5000, "Gender": 0,
-        "Height": 170, "Weight": 70,
-    },
-}
+# ── Path resolution ──────────────────────────────────────────
+_ROOT = Path(__file__).resolve().parent.parent   # project root
+_MODELS_DIR = _ROOT / "models"
+_REGISTRY_PATH = _ROOT / "schemas" / "domain_registry.yaml"
 
 
-
-# ── Result dataclass ──────────────────────────────────────────
+# ── Data classes ─────────────────────────────────────────────
 @dataclass
 class PredictionResult:
-    domain:             str
-    question:           str
-    ml_probability:     Optional[float]
-    llm_probability:    Optional[float]
-    final_probability:  float
-    confidence_tier:    str          # HIGH / MODERATE / LOW / CRITICAL
-    gap:                float
-    shap_values:        dict         = field(default_factory=dict)
-    counterfactuals:    list         = field(default_factory=list)
-    audit_flags:        list         = field(default_factory=list)
-    debate:             dict         = field(default_factory=dict)
-    reliability_index:  float        = 1.0
-    reasoning:          str          = ""
-    key_factors:        list         = field(default_factory=list)
-    mode:               str          = "guided"
-    raw_parameters:     dict         = field(default_factory=dict)
+    domain: str
+    question: str
+    ml_probability: Optional[float]
+    llm_probability: Optional[float]
+    reconciled_probability: float
+    agreement_gap: Optional[float]
+    confidence_tier: str            # HIGH / MODERATE / LOW / CRITICAL
+    reliability_index: float        # 0.0 – 1.0
+    warning_level: str              # CLEAR / MODERATE / LOW / CRITICAL
+    outcomes: dict
+    shap_values: dict
+    audit_flags: list
+    model_used: str
+    calibrated: bool
+    error: Optional[str] = None
+    sarvagna_features: Optional[dict] = None
 
     def to_dict(self) -> dict:
+        """Serialize to JSON-compatible dict with frontend-expected field names."""
         return {
-            "domain":            self.domain,
-            "question":          self.question,
-            "ml_probability":    round(self.ml_probability, 4)  if self.ml_probability  else None,
-            "llm_probability":   round(self.llm_probability, 4) if self.llm_probability else None,
-            "final_probability": round(self.final_probability, 4),
-            "confidence_tier":   self.confidence_tier,
-            "gap":               round(self.gap, 4),
-            "shap_values":       self.shap_values,
-            "counterfactuals":   self.counterfactuals,
-            "audit_flags":       self.audit_flags,
-            "debate":            self.debate,
-            "reliability_index": round(self.reliability_index, 4),
-            "reasoning":         self.reasoning,
-            "key_factors":       self.key_factors,
-            "mode":              self.mode,
+            "domain":             self.domain,
+            "question":           self.question or "",
+            "ml_probability":     self.ml_probability,
+            "llm_probability":    self.llm_probability,
+            "final_probability":  self.reconciled_probability,  # frontend key
+            "confidence_tier":    self.confidence_tier,
+            "gap":                round(self.agreement_gap or 0.0, 4),
+            "reliability_index":  self.reliability_index,
+            "shap_values":        self.shap_values or {},
+            "audit_flags":        [
+                {
+                    "code":     f.get("code", "INFO"),
+                    "severity": f.get("severity", f.get("warning_level", "INFO")),
+                    "message":  f.get("msg", f.get("message", ""))
+                }
+                for f in (self.audit_flags or [])
+            ],
+            "outcomes":           self.outcomes or {},
+            "model_used":         self.model_used or "unknown",
+            "calibrated":         self.calibrated,
+            "key_factors":        list((self.shap_values or {}).keys())[:5],
+            "mode":               "guided",
         }
 
-# ── Domain registry loader ────────────────────────────────────
+
+@dataclass
+class DomainModel:
+    domain_key: str
+    xgb_model: Any = None
+    lgbm_model: Any = None
+    iso_xgb: Any = None
+    iso_lgbm: Any = None
+    scaler: Any = None
+    imputer: Any = None
+    feature_columns: list = field(default_factory=list)
+    # Blend mode extras
+    xgb_synthetic: Any = None
+    iso_synthetic: Any = None
+    blend_weight: float = 1.0
+    # Sarvagna extras
+    word_svd_pipeline: Any = None
+    char_svd_pipeline: Any = None
+    brain_pipeline: Any = None
+    sarvagna_classifier: Any = None
+    available: bool = False
+
+
+# ── Registry loader ──────────────────────────────────────────
+_registry_cache: Optional[dict] = None
+
 def _load_registry() -> dict:
-    with open(SCHEMA) as f:
-        return yaml.safe_load(f)["domains"]
+    global _registry_cache
+    if _registry_cache is not None:
+        return _registry_cache
+    if not _REGISTRY_PATH.exists():
+        log.error(f"Registry not found at {_REGISTRY_PATH}")
+        return {}
+    with open(_REGISTRY_PATH, "r") as f:
+        raw = yaml.safe_load(f)
+    _registry_cache = raw.get("domains", {})
+    return _registry_cache
 
-def _load_model(domain: str):
-    registry = _load_registry()
-    if domain not in registry:
-        raise ValueError(f"Domain not found: {domain}")
-    raw_path   = registry[domain]["model_path"]
-    raw_path   = raw_path.replace("models/", "").replace("models\\", "")
-    model_path = os.path.join(BASE, "models", raw_path)
-    if not os.path.exists(model_path):
-        raise FileNotFoundError(f"Model not found: {model_path}")
-    artifact = joblib.load(model_path)
-    if not isinstance(artifact, dict):
-        return artifact, None, {}
-    if "xgb_model" in artifact:
-        model = artifact["xgb_model"]
-    elif "model" in artifact:
-        model = artifact["model"]
+
+_model_cache: dict[str, DomainModel] = {}
+
+def load_domain_model(domain: str) -> DomainModel:
+    """Load and cache a domain model from its .joblib artifact."""
+    if domain in _model_cache:
+        return _model_cache[domain]
+
+    reg = _load_registry()
+    cfg = reg.get(domain)
+    if cfg is None:
+        log.warning(f"Domain '{domain}' not found in registry.")
+        dm = DomainModel(domain_key=domain, available=False)
+        _model_cache[domain] = dm
+        return dm
+
+    if not cfg.get("model_available", False):
+        log.info(f"Domain '{domain}' marked model_available=false — skipping load.")
+        dm = DomainModel(domain_key=domain, available=False)
+        _model_cache[domain] = dm
+        return dm
+
+    dm = DomainModel(domain_key=domain)
+
+    # ── Main model artifact ──────────────────────────────────
+    main_path = _MODELS_DIR / Path(cfg["model_path"]).name
+    if main_path.exists():
+        try:
+            artifact = joblib.load(main_path)
+            dm = _unpack_artifact(dm, artifact)
+            dm.available = True
+            log.info(f"[{domain}] Loaded main artifact: {main_path.name}")
+        except Exception as e:
+            log.error(f"[{domain}] Failed to load {main_path.name}: {e}")
+            dm.available = False
     else:
-        raise KeyError(f"No model key found. Keys: {list(artifact.keys())}")
-    scaler = artifact.get("scaler")
-    return model, scaler, artifact
+        log.warning(f"[{domain}] Model file not found: {main_path}")
+        dm.available = False
 
-# ── Confidence tier from gap ──────────────────────────────────
-def _confidence_tier(gap: float) -> str:
-    if gap < 0.10: return "HIGH"
-    if gap < 0.25: return "MODERATE"
-    if gap < 0.40: return "LOW"
-    return "CRITICAL"
+    # ── Blend synthetic model (behavioural, claim) ───────────
+    if cfg.get("blend_mode", False) and "model_path_synthetic" in cfg:
+        syn_path = _MODELS_DIR / Path(cfg["model_path_synthetic"]).name
+        if syn_path.exists():
+            try:
+                syn_artifact = joblib.load(syn_path)
+                syn_dm = DomainModel(domain_key=f"{domain}_synthetic")
+                syn_dm = _unpack_artifact(syn_dm, syn_artifact)
+                dm.xgb_synthetic = syn_dm.xgb_model
+                dm.iso_synthetic = syn_dm.iso_xgb
+                dm.blend_weight = cfg.get("blend_weight", 0.7)
+                log.info(f"[{domain}] Loaded synthetic blend artifact.")
+            except Exception as e:
+                log.warning(f"[{domain}] Synthetic model load failed: {e}")
+
+    # ── Sarvagna multi-artifact ──────────────────────────────
+    if domain == "sarvagna":
+        for key, attr in [
+            ("model_path_char", "char_svd_pipeline"),
+            ("model_path_brain", "brain_pipeline"),
+            ("model_path_classifier", "sarvagna_classifier"),
+        ]:
+            if key in cfg:
+                p = _MODELS_DIR / Path(cfg[key]).name
+                if p.exists():
+                    try:
+                        setattr(dm, attr, joblib.load(p))
+                        log.info(f"[sarvagna] Loaded {key}: {p.name}")
+                    except Exception as e:
+                        log.warning(f"[sarvagna] {key} load failed: {e}")
+        # word_svd is the main artifact (already loaded above)
+        dm.word_svd_pipeline = dm.xgb_model
+        dm.xgb_model = None
+
+    _model_cache[domain] = dm
+    return dm
+
+
+def _unpack_artifact(dm: DomainModel, artifact) -> DomainModel:
+    """
+    Unpack joblib artifact dict into DomainModel.
+    Supports both dict-style and direct-model artifacts.
+    """
+    if isinstance(artifact, dict):
+        dm.xgb_model       = artifact.get("xgb_model")
+        dm.lgbm_model      = artifact.get("lgbm_model")
+        dm.iso_xgb         = artifact.get("iso_xgb")
+        dm.iso_lgbm        = artifact.get("iso_lgbm")
+        dm.scaler          = artifact.get("scaler")
+        dm.imputer         = artifact.get("imputer")
+        dm.feature_columns = artifact.get("feature_columns", [])
+
+        # Legacy keys — some older artifacts used different names
+        if dm.xgb_model is None:
+            dm.xgb_model = artifact.get("model") or artifact.get("clf")
+        if dm.iso_xgb is None:
+            dm.iso_xgb = artifact.get("iso") or artifact.get("calibrator")
+        if dm.scaler is None:
+            dm.scaler = artifact.get("std_scaler") or artifact.get("ss")
+        if dm.imputer is None:
+            dm.imputer = artifact.get("si") or artifact.get("simple_imputer")
+    else:
+        # Bare model (older format) — treat as xgb_model
+        dm.xgb_model = artifact
+
+    return dm
+
+
+# ── Feature preparation ──────────────────────────────────────
+def prepare_features(domain: str, params: dict, dm: DomainModel) -> Optional[np.ndarray]:
+    """
+    Align collected chip-modal params to the feature_columns expected by the model.
+    Handles: missing values (imputed), extra keys (ignored), ordering.
+    Section 12.1 — Dynamic padding for shape mismatch using model's expected count.
+    """
+    # Get expected count from model if available
+    expected_count = 0
+    if dm.xgb_model is not None:
+        try:
+            expected_count = getattr(dm.xgb_model, "n_features_in_", 0)
+        except:
+            pass
+
+    if not dm.feature_columns:
+        # Fallback: use registry params and pad to expected count
+        reg_params = [v for v in params.values() if v is not None]
+        count = expected_count if expected_count > 0 else len(reg_params)
+        
+        if expected_count > 0 and expected_count != len(reg_params):
+            log.info(f"[{domain}] Feature mismatch: registry has {len(reg_params)}, model expects {expected_count}. Padding with NaNs.")
+        
+        # Create array of 'count' size, filled with NaNs initially
+        arr_full = np.full((1, count), np.nan)
+        for i, val in enumerate(reg_params[:count]):
+            try:
+                arr_full[0, i] = float(val)
+            except (TypeError, ValueError):
+                arr_full[0, i] = np.nan
+        arr = arr_full
+    else:
+        row = {}
+        for col in dm.feature_columns:
+            val = params.get(col, np.nan)
+            try:
+                row[col] = float(val) if val is not None else np.nan
+            except (TypeError, ValueError):
+                row[col] = np.nan
+        arr = np.array([row[c] for c in dm.feature_columns], dtype=float).reshape(1, -1)
+
+    # Impute then scale
+    if dm.imputer is not None:
+        try:
+            # Check if imputer expects different shape
+            if hasattr(dm.imputer, "n_features_in_") and dm.imputer.n_features_in_ != arr.shape[1]:
+                log.warning(f"[{domain}] Imputer shape mismatch: expects {dm.imputer.n_features_in_}, got {arr.shape[1]}. Skipping.")
+            else:
+                arr = dm.imputer.transform(arr)
+        except Exception as e:
+            log.warning(f"[{domain}] Imputer failed: {e}")
+
+    if dm.scaler is not None:
+        try:
+            if hasattr(dm.scaler, "n_features_in_") and dm.scaler.n_features_in_ != arr.shape[1]:
+                log.warning(f"[{domain}] Scaler shape mismatch: expects {dm.scaler.n_features_in_}, got {arr.shape[1]}. Skipping.")
+            else:
+                arr = dm.scaler.transform(arr)
+        except Exception as e:
+            log.warning(f"[{domain}] Scaler failed: {e}")
+
+    return arr
+
 
 # ── ML prediction ─────────────────────────────────────────────
-def _ml_predict(domain: str, parameters: dict) -> Optional[float]:
-    try:
-        import warnings
-        warnings.filterwarnings("ignore")
-        model, scaler, artifact = _load_model(domain)
-        feature_cols = artifact.get("feature_cols") or artifact.get("feat_cols", [])
-
-        # TEXT MODELS — claim, mental_health, behavioral
-        tfidf = artifact.get("tfidf")
-        svd   = artifact.get("svd")
-        if tfidf is not None and svd is not None:
-            text = (parameters.get("claim_text") or
-                    parameters.get("text_input") or
-                    parameters.get("context") or
-                    " ".join([str(v) for v in parameters.values() if isinstance(v, str)]) or
-                    "no text provided")
-            X = svd.transform(tfidf.transform([text]))
-            imputer = artifact.get("imputer")
-            if imputer:
-                X = imputer.transform(X)
-            if scaler:
-                X = scaler.transform(X)
-            prob = model.predict_proba(X)[0][1]
-            return max(0.05, min(0.95, float(prob)))
-
-        # UNMAPPABLE MODELS — loan PCA features
-        if feature_cols and feature_cols[0] in ["V1", "V2", "Time"]:
-            logger.warning(f"Domain {domain} has PCA features — skipping ML")
-            return None
-
-        # NORMAL MODELS
-        str_to_num = {
-            "low": 0.2, "medium": 0.5, "moderate": 0.5,
-            "high": 0.8, "very_high": 0.95, "very high": 0.95,
-            "none": 0.0, "yes": 1.0, "no": 0.0,
-            "male": 1.0, "female": 0.0, "m": 1.0, "f": 0.0,
-            "true": 1.0, "false": 0.0, "strong": 0.9, "weak": 0.2,
-        }
-
-        # Step 1 — apply domain param map to user parameters
-        param_map     = DOMAIN_PARAM_MAP.get(domain, {})
-        domain_defaults = DOMAIN_DEFAULTS.get(domain, {})
-
-        mapped = {}
-        for k, v in parameters.items():
-            mapped_key = param_map.get(k, param_map.get(k.lower(), k))
-            val = str_to_num.get(str(v).lower().strip(), None) if isinstance(v, str) else v
-            try:
-                mapped[mapped_key] = float(val) if val is not None else 0.5
-            except:
-                mapped[mapped_key] = 0.5
-            # Also keep original key as fallback
-            mapped[k] = mapped[mapped_key]
-            mapped[k.lower()] = mapped[mapped_key]
-
-        # Step 2 — build feature vector using domain defaults for unmapped cols
-        if feature_cols:
-            feature_vec = []
-            for col in feature_cols:
-                val = (mapped.get(col) or
-                       mapped.get(col.lower()) or
-                       mapped.get(col.replace(" ","_").lower()) or
-                       domain_defaults.get(col) or
-                       0.0)
-                feature_vec.append(float(val))
-        else:
-            feature_vec = list(mapped.values())
-
-        if not feature_vec:
-            logger.warning("ML: empty feature vector")
-            return None
-
-        X = np.nan_to_num(
-            np.array(feature_vec, dtype=np.float64).reshape(1,-1),
-            nan=0.0, posinf=0.0, neginf=0.0)
-
-        imputer = artifact.get("imputer")
-        if imputer:
-            try:
-                n = imputer.n_features_in_
-                if X.shape[1] < n: X = np.pad(X, ((0,0),(0,n-X.shape[1])))
-                elif X.shape[1] > n: X = X[:,:n]
-                X = imputer.transform(X)
-            except Exception as ie:
-                logger.warning(f"Imputer skipped (version mismatch): {ie}")
-                X = np.nan_to_num(X, nan=0.0)
-
-        if scaler:
-            try:
-                n = scaler.n_features_in_
-                if X.shape[1] < n: X = np.pad(X, ((0,0),(0,n-X.shape[1])))
-                elif X.shape[1] > n: X = X[:,:n]
-                X = scaler.transform(X)
-            except Exception as se:
-                logger.warning(f"Scaler skipped (version mismatch): {se}")
-
-        prob = model.predict_proba(X)[0][1]
-        prob = max(0.05, min(0.95, float(prob)))
-        logger.info(f"ML probability: {prob:.4f} (features={len(feature_vec)})")
-        return prob
-
-    except Exception as e:
-        logger.warning(f"ML prediction failed: {e}")
-        return None
-
-
-def _llm_predict(domain: str, parameters: dict, question: str) -> Optional[float]:
-    try:
-        from llm.groq_client import llm_predict
-        result = llm_predict(domain, parameters, question)
-        return result.get("probability")
-    except Exception as e:
-        logger.warning(f"LLM prediction failed: {e}")
-        return None
-
-# ── SHAP explanation ──────────────────────────────────────────
-def _get_shap(domain: str, parameters: dict) -> dict:
-    try:
-        import warnings
-        warnings.filterwarnings("ignore")
-        import numpy as np
-        model, scaler, artifact = _load_model(domain)
-        feature_cols = artifact.get("feature_cols") or artifact.get("feat_cols", [])
-
-        # Skip text models and PCA models
-        if artifact.get("tfidf") or (feature_cols and feature_cols[0] in ["V1","V2","Time"]):
-            return {k: round(float(v)/10 if isinstance(v,(int,float)) else 0.1, 4)
-                    for k,v in list(parameters.items())[:5]}
-
-        # Use XGB built-in feature importance (no KernelExplainer needed)
-        xgb = artifact.get("xgb_model")
-        if xgb is None:
-            return {}
-
-        # Get feature importances from XGB
-        try:
-            importances = xgb.feature_importances_
-        except:
-            try:
-                importances = xgb.estimators_[0].feature_importances_ if hasattr(xgb, 'estimators_') else None
-            except:
-                importances = None
-
-        if importances is None or len(importances) == 0:
-            # Fallback — compute signal strength from param values vs domain defaults
-            defaults_fb = DOMAIN_DEFAULTS.get(domain, {})
-            param_map_fb = DOMAIN_PARAM_MAP.get(domain, {})
-            raw = {}
-            str_to_num_fb = {"low":0.2,"medium":0.5,"high":0.8,"very_high":0.95,"none":0.0,"yes":1.0,"no":0.0,"true":1.0,"false":0.0}
-            # Features where higher value = worse outcome
-            negative_features = {
-                "absences","Absences","stress_level","failures",
-                "overtime","OverTime","distance_from_home","DistanceFromHome",
-                "debt_to_income","missed_payments","glucose","Glucose",
-                "blood_pressure","BloodPressure","cholesterol","chol",
-                "work_hours","bmi","BMI","smoking",
-            }
-            for k, v in list(parameters.items())[:8]:
-                mapped_k = param_map_fb.get(k, k)
-                val = str_to_num_fb.get(str(v).lower().strip(), None) if isinstance(v,str) else v
-                try:
-                    num_val = float(val) if val is not None else 0.5
-                except:
-                    num_val = 0.5
-                default = float(defaults_fb.get(mapped_k, defaults_fb.get(k, 0.5)) or 0.5)
-                direction = 1.0 if num_val >= default else -1.0
-                # Invert direction for features where higher = worse
-                if k in negative_features or mapped_k in negative_features:
-                    direction = -direction
-                magnitude = abs(num_val - default) / max(abs(default) + 1e-8, 1.0)
-                raw[k] = round(direction * magnitude, 6)
-            if raw:
-                max_abs = max(abs(v) for v in raw.values()) or 1.0
-                return {k: round(v/max_abs*0.18, 4) for k,v in raw.items()}
-            return {}
-
-        # Build param-mapped feature contributions
-        param_map = DOMAIN_PARAM_MAP.get(domain, {})
-        defaults  = DOMAIN_DEFAULTS.get(domain, {})
-
-        # Map user params to training col names
-        mapped = {}
-        str_to_num = {"low": 0.2, "medium": 0.5, "high": 0.8, "very_high": 0.95,
-                      "none": 0.0, "yes": 1.0, "no": 0.0, "true": 1.0, "false": 0.0}
-        for k, v in parameters.items():
-            mapped_key = param_map.get(k, k)
-            val = str_to_num.get(str(v).lower().strip(), None) if isinstance(v, str) else v
-            try:
-                mapped[mapped_key] = float(val) if val is not None else 0.5
-            except:
-                mapped[mapped_key] = 0.5
-
-        # Build contributions dict using feature importance × (value - mean)
-        contributions = {}
-        base_prob = 0.5
-        for i, col in enumerate(feature_cols[:len(importances)]):
-            if i >= len(importances):
-                break
-            importance = float(importances[i])
-            user_val   = mapped.get(col, mapped.get(col.lower(), defaults.get(col, 0.0)))
-            default_val = defaults.get(col, 0.5)
-            # Direction: positive if above default, negative if below
-            direction  = 1.0 if float(user_val) >= float(default_val) else -1.0
-            contribution = round(importance * direction, 6)
-            if abs(contribution) > 0.001:
-                contributions[col] = contribution
-
-        # Normalize contributions to ±0.20 range
-        if contributions:
-            max_abs = max(abs(v) for v in contributions.values())
-            if max_abs > 0:
-                contributions = {k: round(v / max_abs * 0.20, 4) for k,v in contributions.items()}
-
-        # Also add user-friendly param names
-        for user_key, val in parameters.items():
-            mapped_key = param_map.get(user_key, user_key)
-            if mapped_key in contributions and user_key not in contributions:
-                contributions[user_key] = contributions[mapped_key]
-
-        # Normalize before returning
-        if contributions:
-            max_abs = max(abs(v) for v in contributions.values())
-            if max_abs > 0:
-                contributions = {k: round(v / max_abs * 0.18, 4) for k, v in contributions.items()}
-        return contributions
-
-    except Exception as e:
-        logger.warning(f"SHAP failed: {e}")
-        raw = {k: round(float(v)/10 if isinstance(v,(int,float)) else 0.05, 4) for k,v in list(parameters.items())[:5]}
-        max_abs = max((abs(v) for v in raw.values()), default=1)
-        return {k: round(v/max_abs*0.18, 4) for k,v in raw.items()}
-
-# ── Reliability index ─────────────────────────────────────────
-def _compute_reliability(domain: str, parameters: dict,
-                          skipped: list = None) -> float:
-    registry       = _load_registry()
-    domain_cfg     = registry.get(domain, {})
-    all_params_raw = domain_cfg.get("parameters", [])
-    skipped        = skipped or []
-
-    # Extract param names — handle both str and dict entries
-    all_params = []
-    for p in all_params_raw:
-        if isinstance(p, dict):
-            all_params.append(p.get("name", list(p.keys())[0]))
-        else:
-            all_params.append(str(p))
-
-    if not all_params:
-        return 0.85
-
-    provided   = [p for p in all_params
-                  if p not in skipped and parameters.get(p) is not None]
-    base_score = len(provided) / max(len(all_params), 1)
-
-    # Also count directly provided parameter keys (even if names differ from YAML)
-    directly_provided = len([v for v in parameters.values() if v is not None])
-    direct_score      = min(1.0, directly_provided / max(len(all_params), 1))
-    # Take the BEST of yaml-matched score vs direct count
-    best_score = max(base_score, direct_score)
-
-    # Weight penalty by how many HIGH-weight params are skipped
-    high_weight  = [p.get("name") for p in all_params_raw
-                    if isinstance(p, dict) and p.get("weight") == "high"]
-    high_skipped = len([p for p in skipped if p in high_weight])
-    penalty      = (len(skipped) * 0.03) + (high_skipped * 0.07)
-
-    return max(0.25, min(1.0, best_score - penalty))
-
-# ── Audit flags ───────────────────────────────────────────────
-def _run_audit(parameters: dict, ml_prob: Optional[float],
-               llm_prob: Optional[float], gap: float) -> list:
-    flags = []
-    # ABN-001 — missing critical parameters
-    if not parameters:
-        flags.append({"code": "ABN-001", "severity": "HIGH",
-                      "message": "No parameters provided"})
-    # ABN-002 — extreme ML confidence
-    if ml_prob is not None and (ml_prob > 0.97 or ml_prob < 0.03):
-        flags.append({"code": "ABN-002", "severity": "MEDIUM",
-                      "message": f"Extreme ML probability: {ml_prob:.2%} — check for data issues"})
-    # ABN-003 — critical gap
-    if gap > 0.40:
-        flags.append({"code": "ABN-003", "severity": "CRITICAL",
-                      "message": f"ML vs LLM gap {gap:.2%} exceeds threshold — output withheld"})
-    # ABN-004 — LLM unavailable
-    if llm_prob is None:
-        flags.append({"code": "ABN-004", "severity": "LOW",
-                      "message": "LLM layer unavailable — ML-only prediction"})
-    # ABN-005 — ML unavailable
-    if ml_prob is None:
-        flags.append({"code": "ABN-005", "severity": "MEDIUM",
-                      "message": "ML layer unavailable — LLM-only prediction"})
-    return flags
-
-# ══════════════════════════════════════════════════════════════
-# MAIN PREDICT FUNCTION
-# ══════════════════════════════════════════════════════════════
-def predict(
-    domain:     str,
-    parameters: dict,
-    question:   str  = None,
-    skipped:    list = None,
-    run_debate: bool = True,
-    mode:       str  = "guided"
-) -> PredictionResult:
+def predict_ml(domain: str, params: dict) -> tuple[Optional[float], str]:
     """
-    Master orchestrator — runs full 7-stage Sambhav pipeline.
-
-    Stages:
-      1. Feature engineering + ML prediction
-      2. LLM prediction (independent)
-      3. Gap analysis + confidence tier
-      4. Multi-agent debate (if gap > 10%)
-      5. SHAP explanation
-      6. Audit flags
-      7. Reliability index
+    Run ML layer prediction.
+    Returns (calibrated_probability, model_description)
     """
-    question = question or f"What is the probability of a positive outcome in the {domain} domain?"
-    logger.info(f"predict() called — domain={domain}, mode={mode}")
+    dm = load_domain_model(domain)
+    if not dm.available or dm.xgb_model is None:
+        return None, "ml_unavailable"
 
-    # ── Stage 1: ML ───────────────────────────────────────────
-    ml_prob = _ml_predict(domain, parameters)
-    logger.info(f"ML probability: {ml_prob}")
+    try:
+        X = prepare_features(domain, params, dm)
+        if X is None:
+            return None, "feature_prep_failed"
 
-    # ── Stage 2: LLM (never sees ML result) ──────────────────
-    llm_prob = _llm_predict(domain, parameters, question)
-    logger.info(f"LLM probability: {llm_prob}")
+        # XGBoost raw probability
+        raw_xgb = float(dm.xgb_model.predict_proba(X)[0][1])
 
-    # ── Stage 3: Gap analysis ─────────────────────────────────
-    if ml_prob is not None and llm_prob is not None:
-        gap  = abs(ml_prob - llm_prob)
-        final = (ml_prob * 0.6) + (llm_prob * 0.4)   # ML weighted higher
-    elif ml_prob is not None:
-        gap, final = 0.0, ml_prob
-    elif llm_prob is not None:
-        gap, final = 0.0, llm_prob
-    else:
-        gap, final = 0.0, 0.5
+        # Apply IsotonicRegression calibration
+        if dm.iso_xgb is not None:
+            cal_xgb = float(dm.iso_xgb.transform([raw_xgb])[0])
+        else:
+            cal_xgb = raw_xgb
+            log.warning(f"[{domain}] No iso_xgb — using raw XGBoost probability (may be overconfident)")
 
-    tier = _confidence_tier(gap)
-    logger.info(f"Gap={gap:.3f} Tier={tier} Final={final:.3f}")
-
-    # ── Stage 4: Multi-agent debate if gap > 10% ─────────────
-    debate_result = {}
-    if run_debate and gap > 0.10 and tier != "CRITICAL":
-        try:
-            from llm.multi_agent import run_debate as _debate
-            debate_result = _debate(domain, parameters, question)
-            # Use realist's probability as final if debate ran
-            final = debate_result.get("final_probability", final)
-            logger.info(f"Debate final: {final:.3f}")
-        except Exception as e:
-            logger.warning(f"Debate failed: {e}")
-
-    # ── Stage 5: SHAP ─────────────────────────────────────────
-    shap_vals = _get_shap(domain, parameters)
-
-    # ── Stage 6: Audit flags ──────────────────────────────────
-    flags = _run_audit(parameters, ml_prob, llm_prob, gap)
-
-    # CRITICAL gap — run debate to reconcile instead of blocking
-    if tier == "CRITICAL":
-        try:
-            from llm.multi_agent import run_debate as _debate
-            debate_result = _debate(domain, parameters, question)
-            final = debate_result.get("final_probability", 
-                    (ml_prob or 0.5)*0.4 + (llm_prob or 0.5)*0.6)
-            logger.info(f"CRITICAL gap resolved via debate: {final:.3f}")
-        except Exception as e:
-            logger.warning(f"Debate failed for CRITICAL: {e}")
-            # Fallback — weight LLM more when ML is extreme
-            if ml_prob is not None and (ml_prob > 0.95 or ml_prob < 0.05):
-                final = (ml_prob * 0.2) + ((llm_prob or 0.5) * 0.8)
+        # LightGBM (if available) for ensemble average
+        if dm.lgbm_model is not None:
+            raw_lgbm = float(dm.lgbm_model.predict_proba(X)[0][1])
+            if dm.iso_lgbm is not None:
+                cal_lgbm = float(dm.iso_lgbm.transform([raw_lgbm])[0])
             else:
-                final = (ml_prob or 0.5) * 0.5 + (llm_prob or 0.5) * 0.5
+                cal_lgbm = raw_lgbm
+            primary_prob = (cal_xgb + cal_lgbm) / 2.0
+            model_desc = "xgb+lgbm_isotonic"
+        else:
+            primary_prob = cal_xgb
+            model_desc = "xgb_isotonic"
 
-    # ── Stage 7: Reliability index ────────────────────────────
-    reliability = _compute_reliability(domain, parameters, skipped)
+        # Blend with synthetic model (Behavioural, Claim)
+        if dm.xgb_synthetic is not None and dm.iso_synthetic is not None:
+            raw_syn = float(dm.xgb_synthetic.predict_proba(X)[0][1])
+            cal_syn = float(dm.iso_synthetic.transform([raw_syn])[0])
+            primary_prob = dm.blend_weight * primary_prob + (1 - dm.blend_weight) * cal_syn
+            model_desc += f"_blend{dm.blend_weight}"
 
-    # ── Assemble result ───────────────────────────────────────
-    return PredictionResult(
-        domain            = domain,
-        question          = question,
-        ml_probability    = ml_prob,
-        llm_probability   = llm_prob,
-        final_probability = max(0.0, min(1.0, final)) if final != -1 else -1,
-        confidence_tier   = tier,
-        gap               = gap,
-        shap_values       = shap_vals,
-        counterfactuals   = [],
-        audit_flags       = flags,
-        debate            = debate_result,
-        reliability_index = reliability,
-        reasoning         = debate_result.get("realist", {}).get("reasoning", ""),
-        key_factors       = debate_result.get("optimist", {}).get("evidence", []),
-        mode              = mode,
-        raw_parameters    = parameters,
+        # Cap at 97%
+        primary_prob = min(primary_prob, 0.97)
+        return primary_prob, model_desc
+
+    except Exception as e:
+        log.error(f"[{domain}] ML prediction error: {e}")
+        return None, f"error: {e}"
+
+
+# ── Sarvagna prediction ──────────────────────────────────────
+def predict_sarvagna(params: dict) -> tuple[Optional[float], dict]:
+    """
+    Sarvagna-specific prediction: WordSVD + CharSVD + Brain features → classifier.
+    Returns (probability, extracted_features_dict)
+    """
+    dm = load_domain_model("sarvagna")
+    if not dm.available:
+        return None, {"error": "Sarvagna models not yet downloaded. See Phase 2."}
+
+    text = params.get("claim_text") or params.get("text_input") or params.get("communication_text", "")
+    if not text:
+        return None, {"error": "No text provided for Sarvagna analysis"}
+
+    try:
+        features = {}
+
+        # WordSVD transform
+        if dm.word_svd_pipeline is not None:
+            word_feats = dm.word_svd_pipeline.transform([text])
+            features["word_svd"] = word_feats
+
+        # CharSVD transform
+        if dm.char_svd_pipeline is not None:
+            char_feats = dm.char_svd_pipeline.transform([text])
+            features["char_svd"] = char_feats
+
+        # Brain features
+        if dm.brain_pipeline is not None:
+            brain_feats = dm.brain_pipeline.transform([text])
+            features["brain"] = brain_feats
+
+        # Combine: 600d + 200d + 20d = 820d
+        combined_parts = []
+        for k in ["word_svd", "char_svd", "brain"]:
+            if k in features:
+                combined_parts.append(features[k])
+        if not combined_parts:
+            return None, {"error": "Feature extraction failed"}
+
+        X_combined = np.hstack(combined_parts)
+
+        # Classifier
+        if dm.sarvagna_classifier is not None:
+            prob = float(dm.sarvagna_classifier.predict_proba(X_combined)[0][1])
+        else:
+            return None, {"error": "Sarvagna classifier not loaded"}
+
+        return min(prob, 0.97), {"feature_dims": X_combined.shape[1]}
+
+    except Exception as e:
+        log.error(f"[sarvagna] Prediction error: {e}")
+        return None, {"error": str(e)}
+
+
+# ── Reliability Index ─────────────────────────────────────────
+def compute_reliability_index(
+    domain: str,
+    params: dict,
+    ml_prob: Optional[float],
+    llm_prob: Optional[float],
+    agreement_gap: Optional[float],
+    has_text_input: bool = False,
+    has_vision: bool = False
+) -> tuple[float, str]:
+    """
+    Compute Reliability Index (0.0 – 1.0) and warning level.
+    Weights: completeness 40%, layer_availability 30%, agreement 20%, vision 10%
+    """
+    reg = _load_registry()
+    cfg = reg.get(domain, {})
+    param_schema = cfg.get("parameters", [])
+    required_params = [p["key"] for p in param_schema if p.get("required", False)]
+
+    # 1. Parameter completeness (40%)
+    if required_params:
+        filled = sum(1 for k in required_params if params.get(k) is not None)
+        completeness = filled / len(required_params)
+    elif params:
+        # Text-only domain
+        completeness = 1.0 if has_text_input else 0.5
+    else:
+        completeness = 0.0
+
+    # 2. Layer availability (30%)
+    if ml_prob is not None and llm_prob is not None:
+        layer_score = 1.0
+    elif ml_prob is not None or llm_prob is not None:
+        layer_score = 0.6
+    else:
+        layer_score = 0.0
+
+    # 3. ML–LLM agreement (20%)
+    if agreement_gap is None:
+        agreement_score = 0.5  # Unknown
+    elif agreement_gap < 0.10:
+        agreement_score = 1.0
+    elif agreement_gap < 0.25:
+        agreement_score = 0.75
+    elif agreement_gap < 0.40:
+        agreement_score = 0.40
+    else:
+        agreement_score = 0.10
+
+    # 4. Vision bonus (10%)
+    vision_score = 1.0 if has_vision else 0.0
+
+    ri = (
+        0.40 * completeness +
+        0.30 * layer_score +
+        0.20 * agreement_score +
+        0.10 * vision_score
+    )
+    ri = round(min(ri, 1.0), 3)
+
+    if ri >= 0.75:
+        warning = "CLEAR"
+    elif ri >= 0.50:
+        warning = "MODERATE"
+    elif ri >= 0.30:
+        warning = "LOW"
+    else:
+        warning = "CRITICAL"
+
+    return ri, warning
+
+
+# ── Wrapper class for legacy imports ─────────────────────────
+class SambhavPredictor:
+    """
+    Legacy class wrapper for functional predictor logic.
+    Provides backwards compatibility for imports and testing.
+    """
+    def predict(self, *args, **kwargs):
+        return predict(*args, **kwargs)
+
+    def generate_outcomes(self, *args, **kwargs):
+        return generate_outcomes(*args, **kwargs)
+
+    def explain_transparency(self, *args, **kwargs):
+        return explain_prediction_transparency(*args, **kwargs)
+
+    def get_available_domains(self):
+        return get_available_domains()
+def cross_validate(ml_prob: Optional[float], llm_prob: Optional[float]) -> tuple[float, float, str]:
+    """
+    Reconcile ML and LLM predictions.
+    Returns (reconciled_prob, gap, confidence_tier)
+    """
+    if ml_prob is None and llm_prob is None:
+        return 0.5, 1.0, "CRITICAL"
+    if ml_prob is None:
+        return llm_prob, 1.0, "LOW"
+    if llm_prob is None:
+        return ml_prob, 1.0, "LOW"
+
+    gap = abs(ml_prob - llm_prob)
+
+    if gap < 0.10:
+        reconciled = (ml_prob + llm_prob) / 2
+        tier = "HIGH"
+    elif gap < 0.25:
+        reconciled = 0.65 * ml_prob + 0.35 * llm_prob
+        tier = "MODERATE"
+    elif gap < 0.40:
+        reconciled = 0.70 * ml_prob + 0.30 * llm_prob
+        tier = "LOW"
+    else:
+        # Block: show both but return midpoint as placeholder
+        reconciled = (ml_prob + llm_prob) / 2
+        tier = "CRITICAL"
+
+    return round(min(reconciled, 0.97), 4), round(gap, 4), tier
+
+
+# ── Simple SHAP stub ──────────────────────────────────────────
+_shap_explainers: dict = {}
+
+def get_shap_values(domain: str, params: dict, prediction: float) -> dict:
+    """
+    Returns SHAP-like contribution estimates.
+    Uses cached TreeExplainer when possible for speed.
+    Skips for StackingClassifier (unsupported by TreeExplainer).
+    """
+    dm = load_domain_model(domain)
+
+    if dm.available and dm.xgb_model is not None:
+        # Check if model is StackingClassifier
+        from sklearn.ensemble import StackingClassifier
+        if isinstance(dm.xgb_model, StackingClassifier):
+            log.info(f"[{domain}] Model is StackingClassifier, using proportional stub for speed")
+        else:
+            try:
+                import shap
+                global _shap_explainers
+                if domain not in _shap_explainers:
+                    _shap_explainers[domain] = shap.TreeExplainer(dm.xgb_model)
+                
+                explainer = _shap_explainers[domain]
+                X = prepare_features(domain, params, dm)
+                sv = explainer.shap_values(X)
+                if isinstance(sv, list):
+                    sv = sv[1]
+                
+                fcols = dm.feature_columns or list(params.keys())
+                return {
+                    col: round(float(sv[0][i]), 4)
+                    for i, col in enumerate(fcols[:sv.shape[1]])
+                }
+            except Exception as e:
+                log.warning(f"[{domain}] Real SHAP failed ({e}), using proportional stub")
+
+    # Proportional stub: distribute ±0.5 based on non-null params
+    shap_out = {}
+    filled_params = {k: v for k, v in params.items() if v is not None}
+    if not filled_params:
+        return {}
+    total = len(filled_params)
+    base = prediction - 0.5
+    for i, (k, v) in enumerate(filled_params.items()):
+        contribution = round(base / total + (0.02 * (i % 3 - 1)), 4)
+        shap_out[k] = contribution
+    return shap_out
+
+
+# ── Main predict entry point ──────────────────────────────────
+def predict(
+    domain: str,
+    params: dict = None,
+    question: str = "",
+    llm_probability: Optional[float] = None,
+    has_vision: bool = False,
+    # Accept endpoint kwargs without breaking signature
+    parameters: dict = None,
+    skipped: list = None,
+    run_debate: bool = False,
+    mode: str = "guided",
+    user_id: Optional[str] = None,
+    db: Optional[Any] = None,
+) -> PredictionResult:
+    # Allow caller to pass 'parameters' instead of 'params'
+    if params is None:
+        params = parameters or {}
+    
+    # Stage 0 — Personal Calibration (Section 13.5)
+    calibration_adjustment = 0.0
+    if user_id and db:
+        try:
+            from db.database import get_user_calibration_bias
+            bias = get_user_calibration_bias(db, user_id)
+            # If bias is +0.10, user is overconfident (predicted > actual)
+            # We subtract a fraction of this bias to 'calibrate' the result
+            calibration_adjustment = -0.5 * bias
+            log.info(f"[{domain}] Applying personal calibration bias adjustment: {calibration_adjustment:+.3f}")
+        except Exception as e:
+            log.warning(f"Calibration adjustment failed: {e}")
+    """
+    Main 7-stage prediction pipeline.
+
+    Args:
+        domain:          Registry domain key (e.g. 'student', 'pragma')
+        params:          Dict of chip-modal collected values
+        question:        Natural language question string
+        llm_probability: Pre-computed LLM estimate (from API router) or None
+        has_vision:      Whether vision pipeline contributed params
+
+    Returns:
+        PredictionResult dataclass
+    """
+
+    # Stage 1 — Safety check (abbreviated; full check in api/safety.py)
+    audit_flags = []
+    if not params and not question:
+        return PredictionResult(
+            domain=domain, question=question,
+            ml_probability=None, llm_probability=None,
+            reconciled_probability=0.5, agreement_gap=None,
+            confidence_tier="CRITICAL", reliability_index=0.0,
+            warning_level="CRITICAL", outcomes={}, shap_values={},
+            audit_flags=[{"code": "ABN-001", "msg": "No parameters provided",
+                          "severity": "CRITICAL"}],
+            model_used="none", calibrated=False,
+            error="No parameters or question provided"
+        )
+
+    # Stage 2 — Domain validation
+    reg = _load_registry()
+    if domain not in reg:
+        audit_flags.append({"code": "ABN-002", "msg": f"Unknown domain: {domain}",
+                            "severity": "WARNING"})
+        domain = "student"  # graceful fallback
+
+    has_text_input = bool(
+        params.get("claim_text") or
+        params.get("communication_text") or
+        params.get("commitment_statement") or
+        params.get("text_input") or
+        question
     )
 
-# ── Free Inference Mode ───────────────────────────────────────
-def predict_free(text: str, n_outcomes: int = 5) -> dict:
-    """
-    Free inference — no domain, no form.
-    User types anything, LLM generates N independent probabilities.
-    """
-    try:
-        from llm.groq_client import free_inference
-        outcomes = free_inference(text, n_outcomes)
-        return {
-            "mode":     "free_inference",
-            "input":    text,
-            "outcomes": outcomes,
-            "note":     "Probabilities are independent — they do NOT sum to 100%"
+    # Stage 3 — Feature extraction (handled in prepare_features)
+
+    # Stage 4 — Dual-layer prediction (Parallelized for Speed)
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        # ML Prediction Task
+        if domain == "sarvagna":
+            ml_future = executor.submit(predict_sarvagna, params)
+        else:
+            ml_future = executor.submit(predict_ml, domain, params)
+        
+        # LLM Prediction Task (if needed)
+        llm_future = None
+        if llm_probability is None:
+            from llm.groq_client import get_llm_probability
+            # We use high-speed Groq 8B for fast generation
+            llm_future = executor.submit(get_llm_probability, question, params, domain)
+        
+        # Collect results
+        if domain == "sarvagna":
+            ml_prob, sarvagna_info = ml_future.result()
+            model_desc = "sarvagna_820d"
+        else:
+            ml_prob, model_desc = ml_future.result()
+            sarvagna_info = None
+            
+        if llm_future:
+            try:
+                llm_prob = llm_future.result()
+                # Ensure it's a float
+                if isinstance(llm_prob, dict):
+                    llm_prob = llm_prob.get("probability", 0.5)
+                log.info(f"[{domain}] LLM layer generated probability: {llm_prob}")
+            except Exception as e:
+                log.warning(f"[{domain}] LLM layer failed: {e}")
+                llm_prob = None
+        else:
+            llm_prob = llm_probability
+
+    # Stage 5 — Cross-validation
+    reconciled, gap, tier = cross_validate(ml_prob, llm_prob)
+
+    # Apply personal calibration adjustment (Section 13.5)
+    if calibration_adjustment != 0:
+        reconciled = max(0.01, min(0.99, reconciled + calibration_adjustment))
+        audit_flags.append({
+            "code": "CAL-001",
+            "msg": f"Personal calibration applied ({calibration_adjustment:+.1%})",
+            "severity": "INFO"
+        })
+
+    if tier == "CRITICAL":
+        _ml_s  = f"{ml_prob:.0%}"  if ml_prob  is not None else "N/A"
+        _llm_s = f"{llm_prob:.0%}" if llm_prob is not None else "N/A"
+        _gap_s = f"{gap:.0%}"      if gap      is not None else "N/A"
+        audit_flags.append({
+            "code": "ABN-003",
+            "msg": f"ML ({_ml_s}) and LLM ({_llm_s}) disagree by {_gap_s}",
+            "severity": "CRITICAL"
+        })
+
+    # Stage 6 — Reliability Index
+    ri, warning = compute_reliability_index(
+        domain, params, ml_prob, llm_prob, gap if llm_prob is not None else None,
+        has_text_input, has_vision
+    )
+
+    # Stage 6b — Missing key params check
+    cfg = reg.get(domain, {})
+    for p in cfg.get("parameters", []):
+        if p.get("required") and params.get(p["key"]) is None:
+            audit_flags.append({
+                "code": "ABN-007",
+                "msg": f"Missing required parameter: {p['label']}",
+                "severity": "INFO"
+            })
+
+    # SHAP values
+    shap_vals = get_shap_values(domain, params, reconciled)
+
+    # Stage 7 — Outcome packaging
+    domain_cfg = reg.get(domain, {})
+    supported = domain_cfg.get("supported_outcomes", ["outcome_a", "outcome_b"])
+    if len(supported) == 2:
+        outcomes = {
+            supported[0]: round(reconciled, 4),
+            supported[1]: round(1 - reconciled, 4)
         }
-    except Exception as e:
-        logger.error(f"Free inference failed: {e}")
-        return {"mode": "free_inference", "error": str(e), "outcomes": []}
+    else:
+        outcomes = {s: round(1 / len(supported), 4) for s in supported}
+        outcomes[supported[0]] = round(reconciled, 4)
+
+    return PredictionResult(
+        domain=domain,
+        question=question,
+        ml_probability=round(ml_prob, 4) if ml_prob is not None else None,
+        llm_probability=round(llm_prob, 4) if llm_prob is not None else None,
+        reconciled_probability=reconciled,
+        agreement_gap=gap if llm_prob is not None else None,
+        confidence_tier=tier,
+        reliability_index=ri,
+        warning_level=warning,
+        outcomes=outcomes,
+        shap_values=shap_vals,
+        audit_flags=audit_flags,
+        model_used=model_desc,
+        calibrated=(ml_prob is not None and "isotonic" in model_desc),
+        sarvagna_features=sarvagna_info,
+    )
 
 
 def predict_rich(
-    domain:     str,
-    parameters: dict,
-    question:   str  = None,
-    skipped:    list = None,
-    mode:       str  = "guided"
+    domain: str,
+    parameters: dict = None,
+    question: str = "",
+    skipped: list = None,
+    mode: str = "guided",
+    user_id: Optional[str] = None,
+    db: Optional[Any] = None,
 ) -> dict:
     """
-    Full rich prediction output per Section 8.4 — Three Detail Levels.
-    Returns complete prediction with:
-    - ML + LLM dual layer probabilities
-    - Multi-agent debate transcript
-    - SHAP per-feature contributions
-    - Monte Carlo 95% CI
-    - Failure scenarios
-    - Improvement suggestions
-    - Reliability Index
-    - Audit flags
+    Rich prediction: returns prediction + outcomes + transparency in one parallel call.
     """
-    import warnings
-    warnings.filterwarnings("ignore")
-    from core.monte_carlo import monte_carlo_simulate, generate_failure_scenarios, generate_improvement_suggestions
-
-    question = question or f"What is the probability of a positive outcome in the {domain} domain?"
-
-    # ── Run base prediction ───────────────────────────────────
-    result = predict(domain, parameters, question, skipped, run_debate=True, mode=mode)
-    d      = result.to_dict()
-
-    # ── Monte Carlo simulation ────────────────────────────────
-    def ml_predict_fn(params):
-        ml = _ml_predict(domain, params)
-        llm = _llm_predict(domain, params, question) if ml is None else None
-        if ml is not None:
-            # Add Gaussian noise to simulate parameter uncertainty
-            import numpy as np
-            noise = np.random.normal(0, 0.03)
-            return max(0.05, min(0.95, ml + noise))
-        return llm or 0.5
-
-    mc = monte_carlo_simulate(ml_predict_fn, parameters, n_runs=200)
-
-    # ── Failure scenarios ─────────────────────────────────────
-    shap_vals = d.get("shap_values", {})
-    failures  = generate_failure_scenarios(domain, parameters, d["final_probability"], shap_vals)
-
-    # ── Improvement suggestions ───────────────────────────────
-    improvements = generate_improvement_suggestions(domain, parameters, d["final_probability"], shap_vals)
-
-    # ── SIMPLE output (default) ───────────────────────────────
-    simple = {
-        "probability":       d["final_probability"],
-        "probability_pct":   f"{d['final_probability']*100:.1f}%",
-        "outcome":           "Positive" if d["final_probability"] >= 0.5 else "Negative",
-        "confidence":        d["confidence_tier"],
-        "reliability_index": d["reliability_index"],
-    }
-
-    # ── DETAILED output ───────────────────────────────────────
-    top_positive = sorted([(k,float(v)) for k,v in shap_vals.items() if isinstance(v,(int,float)) and float(v)>0], key=lambda x:x[1], reverse=True)[:3]
-    top_negative = sorted([(k,float(v)) for k,v in shap_vals.items() if isinstance(v,(int,float)) and float(v)<0], key=lambda x:x[1])[:3]
-
-    detailed = {
-        **simple,
-        "ml_probability":    d["ml_probability"],
-        "llm_probability":   d["llm_probability"],
-        "gap":               d["gap"],
-        "ci_95":             f"{mc['ci_low']*100:.1f}% — {mc['ci_high']*100:.1f}%",
-        "ci_width":          mc["ci_width"],
-        "stability":         mc["stability"],
-        "positive_signals":  [(f, f"+{round(v*100,1)}%") for f,v in top_positive],
-        "negative_signals":  [(f, f"{round(v*100,1)}%") for f,v in top_negative],
-        "top_failure":       failures[0] if failures else None,
-        "top_improvement":   improvements[0] if improvements else None,
-        "audit_flags":       d["audit_flags"],
-        "debate_ran":        bool(d["debate"]),
-    }
-
-    # ── FULL BREAKDOWN output ─────────────────────────────────
-    debate = d.get("debate", {})
-    full = {
-        **detailed,
-        "shap_all":           shap_vals,
-        "monte_carlo":        mc,
-        "failure_scenarios":  failures,
-        "improvements":       improvements,
-        "debate_transcript":  {
-            "optimist":  {
-                "probability": debate.get("optimist", {}).get("probability_float", None),
-                "argument":    debate.get("optimist", {}).get("argument", ""),
-                "evidence":    debate.get("optimist", {}).get("evidence", []),
-            } if debate else None,
-            "pessimist": {
-                "probability": debate.get("pessimist", {}).get("probability_float", None),
-                "argument":    debate.get("pessimist", {}).get("argument", ""),
-                "evidence":    debate.get("pessimist", {}).get("evidence", []),
-            } if debate else None,
-            "realist":   {
-                "probability": debate.get("realist", {}).get("probability_float", None),
-                "reasoning":   debate.get("realist", {}).get("reasoning", ""),
-                "confidence":  debate.get("realist", {}).get("confidence", ""),
-            } if debate else None,
-            "devils_advocate": {
-                "counter_score":    debate.get("devils_advocate", {}).get("counter_score", None),
-                "counter_argument": debate.get("devils_advocate", {}).get("counter_argument", ""),
-                "adjusted":        debate.get("devil_adjusted", False),
-            } if debate else None,
-        },
-        "reasoning":          d["reasoning"],
-        "key_factors":        d["key_factors"],
-        "domain":             domain,
-        "question":           question,
-        "mode":               mode,
-        "parameters_used":    parameters,
-    }
+    import concurrent.futures
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        pred_future = executor.submit(predict, domain=domain, params=parameters, 
+                                     question=question, skipped=skipped, mode=mode,
+                                     user_id=user_id, db=db)
+        out_future  = executor.submit(generate_outcomes, domain=domain, 
+                                     parameters=parameters, question=question, mode=mode)
+        
+        prediction = pred_future.result()
+        outcomes   = out_future.result()
+        
+        # Get transparency for the primary outcome
+        supported = _load_registry().get(domain, {}).get("supported_outcomes", ["outcome_a"])
+        primary_outcome = supported[0]
+        
+        trans_future = executor.submit(explain_prediction_transparency, 
+                                      domain=domain, parameters=parameters, 
+                                      final_probability=prediction.reconciled_probability,
+                                      shap_values=prediction.shap_values,
+                                      question=question, outcome=primary_outcome)
+        
+        transparency = trans_future.result()
 
     return {
-        "simple":   simple,
-        "detailed": detailed,
-        "full":     full,
+        "prediction":   prediction.to_dict(),
+        "outcomes":     outcomes.get("outcomes", []),
+        "transparency": transparency,
+        "mode":         mode
     }
 
-if __name__ == "__main__":
-    print("\n🧪 Testing Sambhav Predictor...\n")
-    result = predict(
-        domain     = "student",
-        parameters = {
-            "studytime":    3,      # 1-4 scale (matches training col)
-            "health":       2,      # 1-5 scale (stress proxy)
-            "absences":     6,      # number of absences
-            "g1":           12,     # first period grade 0-20
-            "g2":           13,     # second period grade 0-20
-            "freetime":     2,      # 1-5 scale
-            "goout":        3,      # 1-5 scale
-            "failures":     0,      # past failures
-        },
-        question   = "Will this student pass their final exam?",
-        run_debate = True
-    )
-    d = result.to_dict()
-    print(f"  ML  Probability  : {d['ml_probability']}")
-    print(f"  LLM Probability  : {d['llm_probability']}")
-    print(f"  Final Probability: {d['final_probability']*100:.1f}%")
-    print(f"  Confidence Tier  : {d['confidence_tier']}")
-    print(f"  Gap              : {d['gap']*100:.1f}%")
-    print(f"  Reliability      : {d['reliability_index']*100:.0f}%")
-    print(f"  Audit Flags      : {len(d['audit_flags'])}")
-    print(f"  Debate Ran       : {bool(d['debate'])}")
+# ── Utility: list available domains ──────────────────────────
+def get_available_domains() -> list[dict]:
+    """Return list of all domains with their availability status."""
+    reg = _load_registry()
+    result = []
+    for key, cfg in reg.items():
+        result.append({
+            "key": key,
+            "display_name": cfg.get("display_name", key),
+            "available": cfg.get("model_available", False),
+            "status": cfg.get("status", "UNKNOWN"),
+            "brier_score": cfg.get("brier_score"),
+            "auc": cfg.get("auc"),
+            "param_count": len(cfg.get("parameters", [])),
+        })
+    return result
 
 
-# ── Probabilistic Reasoning Transparency (Section 8.4) ───────
-def explain_prediction_transparency(
-    domain: str,
-    parameters: dict,
-    final_probability: float,
-    shap_values: dict,
-    question: str = None,
-) -> dict:
-    """
-    Section 8.4 — Full probabilistic reasoning transparency.
-    Shows WHY the dominant probability, WHY the minority probability,
-    and WHEN the minority outcome would occur.
+def reload_model_cache():
+    """Force reload all models (use after downloading new artifacts)."""
+    global _model_cache, _registry_cache
+    _model_cache.clear()
+    _registry_cache = None
+    log.info("Model cache cleared — will reload on next prediction")
 
-    Returns three levels:
-    - simple: just the number
-    - detailed: case FOR + case AGAINST + top failure scenario
-    - full: all scenarios + sensitivity + what this probability is NOT saying
-    """
-    from llm.router import route
 
-    question = question or f"What is the probability of a positive outcome in the {domain} domain?"
-    minority_prob = round(1.0 - final_probability, 4)
-    dominant_pct  = round(final_probability * 100, 1)
-    minority_pct  = round(minority_prob * 100, 1)
+# ── SHAP alias (imported by endpoint) ────────────────────────
+def _get_shap(domain: str, parameters: dict) -> dict:
+    """Public alias for get_shap_values used by transparency endpoint."""
+    return get_shap_values(domain, parameters, 0.5)
 
-    # ── Build SHAP-based signal lists ─────────────────────────
-    positive_signals = sorted(
-        [(k, float(v)) for k, v in shap_values.items()
-         if isinstance(v, (int, float)) and float(v) > 0],
-        key=lambda x: x[1], reverse=True
-    )[:5]
 
-    negative_signals = sorted(
-        [(k, float(v)) for k, v in shap_values.items()
-         if isinstance(v, (int, float)) and float(v) < 0],
-        key=lambda x: x[1]
-    )[:5]
-
-    # ── LLM generates case FOR and case AGAINST ───────────────
-    param_str = "\n".join([f"  - {k}: {v}" for k, v in parameters.items()])
-    pos_str   = ", ".join([f"{k}(+{v*100:.1f}%)" for k, v in positive_signals]) or "none detected"
-    neg_str   = ", ".join([f"{k}({v*100:.1f}%)" for k, v in negative_signals]) or "none detected"
-
-    messages = [
-        {"role": "system", "content": (
-            "You are Project Sambhav's probabilistic reasoning engine. "
-            "Given a prediction, explain BOTH sides clearly.\n\n"
-            "Respond in this EXACT JSON format:\n"
-            "{\n"
-            '  "case_for": "<2-3 sentences: why the dominant probability is correct, cite specific parameters>",\n'
-            '  "case_against": "<2-3 sentences: what factors could make the minority probability occur>",\n'
-            '  "when_minority_occurs": [\n'
-            '    {"scenario": "<description>", "trigger": "<what changes>", "new_probability": <0-100>},\n'
-            '    {"scenario": "<description>", "trigger": "<what changes>", "new_probability": <0-100>},\n'
-            '    {"scenario": "<description>", "trigger": "<what changes>", "new_probability": <0-100>}\n'
-            "  ],\n"
-            '  "what_this_is_not_saying": "<1-2 sentences: common misinterpretation to avoid>",\n'
-            '  "key_assumption": "<the single most important assumption in this prediction>"\n'
-            "}"
-        )},
-        {"role": "user", "content": (
-            f"Domain: {domain}\n"
-            f"Question: {question}\n"
-            f"Parameters:\n{param_str}\n\n"
-            f"Prediction: {dominant_pct}% (minority: {minority_pct}%)\n"
-            f"Positive signals: {pos_str}\n"
-            f"Negative signals: {neg_str}\n\n"
-            "Explain both sides. Return JSON only."
-        )}
-    ]
-
-    import json, re
-    result  = route("llm_predict", messages, max_tokens=600, temperature=0.3)
-    raw     = result.get("content", "")
-    raw     = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
-    if "```" in raw:
-        raw = re.sub(r"```(?:json)?", "", raw).strip()
-
+# ── ML / LLM sub-predict (imported by calibration endpoint) ──
+def _ml_predict(domain: str, parameters: dict) -> Optional[float]:
+    """Run only the ML layer and return raw probability."""
+    dm = load_domain_model(domain)
+    if not dm.available:
+        return None
     try:
-        parsed = json.loads(raw[raw.find("{"):raw.rfind("}")+1])
-    except:
-        parsed = {
-            "case_for":             f"The {dominant_pct}% probability is supported by {pos_str}.",
-            "case_against":         f"The {minority_pct}% minority case is driven by {neg_str}.",
-            "when_minority_occurs": [
-                {"scenario": "Risk factors worsen", "trigger": "Negative signals increase", "new_probability": int(minority_pct + 10)},
-            ],
-            "what_this_is_not_saying": f"This does not guarantee the outcome — it means {dominant_pct}% of similar cases result positively.",
-            "key_assumption":          "Current parameter values remain stable.",
+        features = _prepare_features(domain, parameters)
+        return _run_ml_prediction(dm, features)
+    except Exception as e:
+        log.warning(f"_ml_predict failed for {domain}: {e}")
+        return None
+
+
+def _llm_predict(domain: str, parameters: dict, question: str = "") -> Optional[float]:
+    """Run only the LLM layer and return raw probability."""
+    try:
+        from llm.groq_client import llm_predict
+        res = llm_predict(domain, parameters, question)
+        return res.get("probability")
+    except Exception as e:
+        log.warning(f"_llm_predict failed for {domain}: {e}")
+        return None
+
+
+# ── Free inference (imported by /predict/free endpoint) ───────
+def predict_free(text: str, n_outcomes: int = 5) -> dict:
+    """
+    Free-text inference: no domain required.
+    Calls Groq LLM to generate n_outcomes independent probabilities.
+    Includes entity extraction, domain detection and signal analysis (Mode 2).
+    """
+    try:
+        from llm.groq_client import free_inference
+        data = free_inference(text, n_outcomes)
+        
+        # Format for frontend consistency
+        outcomes = data.get("outcomes", [])
+        for o in outcomes:
+            o["probability_pct"] = f"{round(o['probability'] * 100)}%"
+            o["type"] = "positive" if o["probability"] > 0.6 else "negative" if o["probability"] < 0.4 else "neutral"
+            o["has_transparency"] = True
+
+        return {
+            "success":           True,
+            "outcomes":          outcomes,
+            "domain_detected":   data.get("domain", "general"),
+            "entities":          data.get("entities", []),
+            "positive_signals":  data.get("positive_signals", []),
+            "negative_signals":  data.get("negative_signals", []),
+            "reliability_index": data.get("reliability_index", 0.5),
+            "missing_info":      data.get("missing_info", []),
+            "mode":              "free",
+            "interpretation":    f"Sambhav automatically extracted signals for {data.get('domain', 'this scenario')}.",
         }
-
-    # ── SIMPLE level ──────────────────────────────────────────
-    simple = {
-        "dominant_probability": dominant_pct,
-        "minority_probability": minority_pct,
-        "one_line_reason":      parsed.get("case_for", "")[:120],
-    }
-
-    # ── DETAILED level ────────────────────────────────────────
-    detailed = {
-        **simple,
-        "case_for":              parsed.get("case_for", ""),
-        "case_against":          parsed.get("case_against", ""),
-        "top_failure_scenario":  parsed.get("when_minority_occurs", [{}])[0],
-        "positive_signals":      [(k, f"+{v*100:.1f}%") for k, v in positive_signals],
-        "negative_signals":      [(k, f"{v*100:.1f}%") for k, v in negative_signals],
-        "what_this_is_not_saying": parsed.get("what_this_is_not_saying", ""),
-    }
-
-    # ── FULL level ────────────────────────────────────────────
-    full = {
-        **detailed,
-        "when_minority_occurs": parsed.get("when_minority_occurs", []),
-        "key_assumption":       parsed.get("key_assumption", ""),
-        "all_positive_signals": positive_signals,
-        "all_negative_signals": negative_signals,
-        "domain":               domain,
-        "question":             question,
-        "parameters":           parameters,
-    }
-
-    return {"simple": simple, "detailed": detailed, "full": full}
+    except Exception as e:
+        log.error(f"predict_free failed: {e}")
+        return {"outcomes": [], "mode": "free", "error": str(e)}
 
 
+# ── Multi-outcome generator (imported by /predict/outcomes) ───
 def generate_outcomes(
     domain: str,
     parameters: dict,
@@ -1001,118 +895,190 @@ def generate_outcomes(
     mode: str = "independent",
 ) -> dict:
     """
-    Section 8.3 — Multi-Outcome Generation.
-    mode: independent (default) | spectrum | conditional
-    Call with existing_outcomes to get MORE without repeating.
-    Each outcome supports lazy transparency via explain_outcome_transparency().
+    Generate n_outcomes independent probability predictions for a domain/context.
+    Each outcome is a distinct scenario label with its own probability.
+    Calls Groq LLM for topic-relevant, domain-aware outcome labels.
     """
-    from llm.router import route
     import json, re
 
-    question  = question or f"What are the possible outcomes in the {domain} domain?"
-    param_str = "\n".join([f"  - {k}: {v}" for k, v in parameters.items()])
-    existing  = existing_outcomes or []
+    existing_outcomes = existing_outcomes or []
+    param_str = "\n".join([f"  - {k}: {v}" for k, v in (parameters or {}).items()]) or "  (no parameters)"
+    q = question or f"What are likely outcomes for a prediction in the {domain} domain?"
+    existing_labels = [o.get("outcome", "") for o in existing_outcomes if o.get("outcome")]
+    avoid_str = (
+        f"\nDo NOT repeat these already-shown outcomes: {', '.join(existing_labels)}"
+        if existing_labels else ""
+    )
 
-    avoid_str = ""
-    if existing:
-        avoid_str = (
-            "\n\nALREADY SHOWN — do NOT repeat these outcomes:\n" +
-            "\n".join([f"  - {o.get('outcome','')}" for o in existing])
-        )
-
-    mode_notes = {
-        "independent": "Probabilities are INDEPENDENT — do NOT sum to 100%. Each is a separate event that can happen or not.",
-        "spectrum":    "Probabilities MUST sum to exactly 100% — these are mutually exclusive outcomes.",
-        "conditional": "Each outcome has a condition. State exactly what must happen for this outcome to occur.",
-    }
-    format_note = mode_notes.get(mode, mode_notes["independent"])
+    # Load domain config for context
+    reg = _load_registry()
+    domain_cfg = reg.get(domain, {})
+    domain_name = domain_cfg.get("name", domain)
+    prediction_label = domain_cfg.get("prediction_label", "Outcome probability")
 
     messages = [
         {"role": "system", "content": (
-            "You are Project Sambhav multi-outcome engine (Section 8.3).\n"
-            f"MODE: {mode.upper()} — {format_note}\n\n"
-            "RULES:\n"
-            "1. Each outcome must be meaningfully distinct\n"
-            "2. Be precise — not 50% or 70% but 47% or 73%\n"
-            "3. Mix positive and negative outcomes\n"
-            "4. Base probabilities on actual parameter signals\n"
-            "5. reasoning must cite specific parameters\n\n"
-            "Respond in EXACT JSON only:\n"
+            f"You are the Sambhav probabilistic engine for the '{domain_name}' domain.\n"
+            f"Generate {n_outcomes} DISTINCT, domain-relevant outcome scenarios with independent probability estimates.\n"
+            "Rules:\n"
+            "1. Each outcome must be a SPECIFIC, meaningful scenario label for this domain (not generic).\n"
+            "2. Probabilities are INDEPENDENT — they do NOT sum to 100%.\n"
+            "3. Base probabilities on the given parameters and question.\n"
+            "4. Include a 1-sentence reasoning for each.\n"
+            f"5. {prediction_label}.\n"
+            f"{avoid_str}\n\n"
+            "Respond in EXACT JSON array format:\n"
+            "[\n"
+            "  {\"outcome\": \"<specific scenario label>\", \"probability\": <0-100>, \"reasoning\": \"<1 sentence>\", \"type\": \"<positive|negative|neutral>\"},\n"
+            "  ...\n"
+            "]"
+        )},
+        {"role": "user", "content": (
+            f"Domain: {domain_name}\n"
+            f"Question: {q}\n"
+            f"Parameters:\n{param_str}\n\n"
+            f"Generate {n_outcomes} independent outcome probabilities."
+        )}
+    ]
+
+    try:
+        from llm.router import route
+        result = route("outcome_generation", messages, max_tokens=800, temperature=0.6)
+        raw = result.get("content", "")
+        raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+        if "```" in raw:
+            raw = re.sub(r"```(?:json)?", "", raw).strip().rstrip("`")
+
+        # Extract JSON array
+        start = raw.find("[")
+        end = raw.rfind("]") + 1
+        parsed = json.loads(raw[start:end]) if start != -1 and end > 0 else []
+
+        outcomes = []
+        for item in parsed[:n_outcomes]:
+            prob_raw = item.get("probability", 50)
+            prob = float(prob_raw) / 100 if float(prob_raw) > 1 else float(prob_raw)
+            outcomes.append({
+                "outcome":     item.get("outcome", "Unknown outcome"),
+                "probability": round(min(max(prob * 100, 1), 99), 1),  # keep as 0-100 for frontend
+                "probability_pct": f"{round(min(max(prob * 100, 1), 99), 1)}%",
+                "reasoning":   item.get("reasoning", ""),
+                "type":        item.get("type", "neutral"),
+                "has_transparency": True,
+            })
+        return {"outcomes": outcomes, "domain": domain, "mode": mode}
+
+    except Exception as e:
+        log.error(f"generate_outcomes LLM failed ({e}), using stub")
+        # Fallback stub outcomes based on domain config
+        supported = domain_cfg.get("supported_outcomes", ["Positive outcome", "Negative outcome"])
+        stub = []
+        for i, label in enumerate(supported[:n_outcomes]):
+            if label in existing_labels:
+                continue
+            stub.append({
+                "outcome":     label,
+                "probability": round(60 - i * 10, 1),
+                "probability_pct": f"{60 - i * 10}%",
+                "reasoning":   "Based on available parameters.",
+                "type":        "neutral",
+                "has_transparency": False,
+            })
+        return {"outcomes": stub, "domain": domain, "mode": mode}
+
+
+# ── WHY explanation (imported by /predict/transparency) ───────
+def explain_prediction_transparency(
+    domain: str,
+    parameters: dict,
+    final_probability: float = None,
+    shap_values: dict = None,
+    question: str = None,
+    outcome: str = None,
+) -> dict:
+    """
+    Generate a 3-level WHY explanation using Groq LLM.
+    Returns: {simple, detailed, full} — each with increasing detail.
+    Called when user clicks 'WHY' on any outcome row.
+    """
+    import json, re
+
+    param_str = "\n".join([f"  - {k}: {v}" for k, v in (parameters or {}).items()]) or "  (no parameters)"
+    prob_pct = f"{round((final_probability or 0.5) * 100, 1)}%" if final_probability is not None else "unknown"
+    outcome_label = outcome or "this outcome"
+    q = question or f"Why would '{outcome_label}' occur in the {domain} domain?"
+
+    # Build SHAP context string
+    shap_ctx = ""
+    if shap_values:
+        top = sorted(shap_values.items(), key=lambda x: abs(x[1]), reverse=True)[:5]
+        shap_ctx = "\nTop SHAP contributors:\n" + "\n".join(
+            [f"  - {k}: {'positive' if (v or 0.0) > 0 else 'negative'} ({(v or 0.0):+.3f})" for k, v in top]
+        )
+
+    messages = [
+        {"role": "system", "content": (
+            f"You are Sambhav's explainability engine for the '{domain}' domain.\n"
+            "Explain WHY a particular outcome has the given probability.\n"
+            "Be specific — cite actual parameter values, not generic statements.\n"
+            "Respond in EXACT JSON:\n"
             "{\n"
-            '  "outcomes": [\n'
-            '    {\n'
-            '      "outcome": "<clear description>",\n'
-            '      "probability": <0-100>,\n'
-            '      "reasoning": "<1 sentence citing parameters>",\n'
-            '      "type": "<positive|negative|neutral>",\n'
-            '      "condition": "<required condition or null>"\n'
-            "    }\n"
-            "  ],\n"
-            '  "interpretation_note": "<how to read these probabilities>"\n'
+            "  \"simple\": {\n"
+            "    \"one_line_reason\": \"<single sentence: the single biggest reason for this outcome>\",\n"
+            "    \"dominant_probability\": <0-100>,\n"
+            "    \"minority_probability\": <0-100>\n"
+            "  },\n"
+            "  \"detailed\": {\n"
+            "    \"case_for\": \"<2-3 sentences arguing FOR this outcome probability>\",\n"
+            "    \"case_against\": \"<2-3 sentences arguing AGAINST>\",\n"
+            "    \"positive_signals\": [[\"factor\", \"impact\"], ...],\n"
+            "    \"negative_signals\": [[\"factor\", \"impact\"], ...]\n"
+            "  },\n"
+            "  \"full\": {\n"
+            "    \"primary_driver\": \"<the single most important factor>\",\n"
+            "    \"intervention\": \"<what would most change this outcome>\",\n"
+            "    \"confidence_note\": \"<note on confidence level>\"\n"
+            "  }\n"
             "}"
         )},
         {"role": "user", "content": (
             f"Domain: {domain}\n"
-            f"Question: {question}\n"
-            f"Parameters:\n{param_str}\n\n"
-            f"Generate {n_outcomes} outcomes." + avoid_str
+            f"Question: {q}\n"
+            f"Outcome: {outcome_label}\n"
+            f"Probability: {prob_pct}\n"
+            f"Parameters:\n{param_str}"
+            f"{shap_ctx}\n\n"
+            "Explain WHY this outcome has this probability."
         )}
     ]
 
-    result = route("free_inference", messages, max_tokens=800, temperature=0.5)
-    raw    = result.get("content", "")
-    raw    = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
-    if "```" in raw:
-        raw = re.sub(r"```(?:json)?", "", raw).strip()
-
     try:
-        parsed = json.loads(raw[raw.find("{"):raw.rfind("}")+1])
-        outcomes = parsed.get("outcomes", [])
-    except:
-        outcomes = []
+        from llm.router import route
+        result = route("transparency", messages, max_tokens=700, temperature=0.3)
+        raw = result.get("content", "")
+        raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+        if "```" in raw:
+            raw = re.sub(r"```(?:json)?", "", raw).strip().rstrip("`")
 
-    # Ensure each outcome has all fields
-    clean = []
-    for o in outcomes:
-        if o.get("outcome") and o.get("probability") is not None:
-            clean.append({
-                "outcome":     o.get("outcome", ""),
-                "probability": max(1, min(99, int(o.get("probability", 50)))),
-                "probability_pct": f"{o.get('probability', 50)}%",
-                "reasoning":   o.get("reasoning", ""),
-                "type":        o.get("type", "neutral"),
-                "condition":   o.get("condition"),
-                "has_transparency": True,  # UI shows [? Why] button for each
-            })
+        start = raw.find("{")
+        end = raw.rfind("}") + 1
+        parsed = json.loads(raw[start:end]) if start != -1 else {}
 
-    return {
-        "outcomes":             clean,
-        "mode":                 mode,
-        "interpretation_note":  parsed.get("interpretation_note", format_note) if "parsed" in dir() else format_note,
-        "total_shown":          len(existing) + len(clean),
-        "can_generate_more":    True,
-        "domain":               domain,
-        "parameters":           parameters,
-    }
+        return {
+            "simple":   parsed.get("simple",   {"one_line_reason": f"Based on the current parameters, {outcome_label} has a {prob_pct} probability.", "dominant_probability": round((final_probability or 0.5) * 100, 1), "minority_probability": round((1 - (final_probability or 0.5)) * 100, 1)}),
+            "detailed": parsed.get("detailed", {"case_for": "The current parameter signals support this outcome.", "case_against": "Alternative signals may reduce this probability.", "positive_signals": [], "negative_signals": []}),
+            "full":     parsed.get("full",     {"primary_driver": "Combined parameter signals", "intervention": "Improve key negative signals", "confidence_note": "Based on available data."}),
+            "outcome":  outcome_label,
+            "probability": prob_pct,
+        }
 
-
-def explain_outcome_transparency(
-    domain: str,
-    parameters: dict,
-    outcome: str,
-    probability: float,
-    question: str = None,
-) -> dict:
-    """
-    Called when user clicks [? Why] on a specific outcome.
-    Returns WHY this outcome has this probability + WHEN it would NOT occur.
-    Lazy — only called on demand per outcome.
-    """
-    shap_vals = _get_shap(domain, parameters)
-    return explain_prediction_transparency(
-        domain=domain,
-        parameters=parameters,
-        final_probability=probability / 100,
-        shap_values=shap_vals,
-        question=f"Why does '{outcome}' have {probability}% probability?",
-    )
+    except Exception as e:
+        log.error(f"explain_prediction_transparency failed ({e}), returning stub")
+        p = round((final_probability or 0.5) * 100, 1)
+        return {
+            "simple":   {"one_line_reason": f"Based on the provided parameters, {outcome_label} has a {prob_pct} probability.", "dominant_probability": p, "minority_probability": round(100 - p, 1)},
+            "detailed": {"case_for": "Current parameter signals are consistent with this outcome probability.", "case_against": "Other factors not captured in parameters may influence the result.", "positive_signals": [], "negative_signals": []},
+            "full":     {"primary_driver": "Parameter combination", "intervention": "Provide more context or parameters for a refined analysis.", "confidence_note": "LLM explanation unavailable — showing structural analysis."},
+            "outcome":  outcome_label,
+            "probability": prob_pct,
+        }

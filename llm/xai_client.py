@@ -18,7 +18,7 @@ def fact_check_with_grok(claim: str) -> dict:
         if keys:
             client = OpenAI(api_key=keys[0], base_url="https://api.x.ai/v1")
             resp = client.chat.completions.create(
-                model="grok-3-mini",
+                model="grok-2-1212",
                 messages=[
                     {"role":"system","content":(
                         "You are a real-time fact checker. "

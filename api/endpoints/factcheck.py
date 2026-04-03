@@ -16,6 +16,17 @@ class BatchRequest(BaseModel):
     text:      str           = Field(..., example="Full article or speech text here...")
     max_claims:Optional[int] = Field(10, ge=1, le=15)
 
+# ── GET /fact-check ───────────────────────────────────────────
+@router.get("")
+async def fact_check_info():
+    """Information about the Fact-Check API."""
+    return {
+        "name":      "Sambhav Fact-Check Engine",
+        "methods":   ["POST"],
+        "usage":     "POST a JSON with 'claim' to this endpoint.",
+        "endpoints": ["/api/fact-check", "/api/fact-check/verify", "/api/fact-check/batch"]
+    }
+
 # ── POST /fact-check ──────────────────────────────────────────
 @router.post("")
 async def fact_check_endpoint(req: SingleClaimRequest):
@@ -42,6 +53,11 @@ async def fact_check_endpoint(req: SingleClaimRequest):
     except Exception as e:
         logger.error(f"Fact-check error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/verify")
+async def verify_endpoint(req: SingleClaimRequest):
+    """Alias for /fact-check for consistency."""
+    return await fact_check_endpoint(req)
 
 # ── POST /fact-check/batch ────────────────────────────────────
 @router.post("/batch")

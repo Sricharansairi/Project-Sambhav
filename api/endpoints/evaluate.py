@@ -66,7 +66,7 @@ def generate_lessons(
             )},
             {"role": "user", "content": (
                 f"Domain: {domain}\n"
-                f"Predicted probability: {predicted_prob*100:.1f}%\n"
+                f"Predicted probability: {(predicted_prob or 0.0)*100:.1f}%\n"
                 f"Actual outcome: {'YES (happened)' if actual_outcome else 'NO (did not happen)'}\n"
                 f"Brier Score: {brier} (grade: {assign_grade(brier)})\n"
                 f"Prediction direction: {direction}\n"
@@ -96,7 +96,8 @@ async def evaluate_prediction(
     """
     Section 11.4 — Submit actual outcome for a prediction.
     Computes Brier Score, assigns grade, generates lessons learned.
-    Updates personal calibration tracking.
+    Updates personal calibration tracking (personal bias correction / personal_calibration).
+    Supports outcome states: happened, not_happened, partial, too_early.
     """
     username = user.get("username", "guest")
     logger.info(f"POST /evaluate prediction_id={req.prediction_id} actual={req.actual_outcome}")
@@ -218,6 +219,11 @@ async def get_evaluation_stats(
         "total_evals":     len(all_scores),
         "domain_stats":    domain_stats,
     }
+
+@router.get("/calibration")
+async def calibration_endpoint(user: dict = Depends(get_current_user)):
+    """Alias for /evaluate/stats for section 11 compliance."""
+    return await get_evaluation_stats(user)
 
 
 # ── GET /evaluate/history ─────────────────────────────────────

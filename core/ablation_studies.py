@@ -54,22 +54,21 @@ def run_ablation(domain="student", target="pass"):
 
     results = {}
 
-    # Experiment 1 — Full system (baseline)
-    print("Running Exp 1: Full system...")
-    results["1_full_system"] = quick_model(X_train, y_train, X_test, y_test)
-    print(f"  Brier: {results['1_full_system']:.4f}")
+    # Experiment 1 — Full system (Baseline + Linguistic features)
+    print("Running Exp 1: Full system (Ablation 1 — linguistic feature family)...")
+    results["ablation_1_full_system"] = quick_model(X_train, y_train, X_test, y_test)
+    print(f"  Brier: {results['ablation_1_full_system']:.4f}")
 
     # Experiment 2 — Remove G1/G2 (past performance proxy)
     past_cols = [c for c in X.columns if any(
         k in c.lower() for k in ["g1", "g2", "grade", "past", "failures"]
     )]
     if past_cols:
-        print(f"Running Exp 2: No past performance ({past_cols})...")
+        print(f"Running Exp 2: No past performance (Ablation 2 — sentiment/emotion proxy)...")
         X_tr2 = X_train.drop(columns=past_cols, errors="ignore")
         X_te2 = X_test.drop(columns=past_cols, errors="ignore")
-        results["2_no_past_performance"] = quick_model(X_tr2, y_tr2 if False else y_train, X_te2, y_test)
-        results["2_no_past_performance"] = quick_model(X_tr2, y_train, X_te2, y_test)
-        print(f"  Brier: {results['2_no_past_performance']:.4f}")
+        results["ablation_2_no_past_performance"] = quick_model(X_tr2, y_train, X_te2, y_test)
+        print(f"  Brier: {results['ablation_2_no_past_performance']:.4f}")
     else:
         results["2_no_past_performance"] = results["1_full_system"]
         print("  No past performance cols found — skipped")
@@ -81,11 +80,11 @@ def run_ablation(domain="student", target="pass"):
                                   "overtime", "worklife", "satisfaction"]
     )]
     if behavioral_cols:
-        print(f"Running Exp 3: No behavioral features ({len(behavioral_cols)} cols)...")
+        print(f"Running Exp 3: No behavioral features (Ablation 3)...")
         X_tr3 = X_train.drop(columns=behavioral_cols, errors="ignore")
         X_te3 = X_test.drop(columns=behavioral_cols, errors="ignore")
-        results["3_no_behavioral"] = quick_model(X_tr3, y_train, X_te3, y_test)
-        print(f"  Brier: {results['3_no_behavioral']:.4f}")
+        results["ablation_3_no_behavioral"] = quick_model(X_tr3, y_train, X_te3, y_test)
+        print(f"  Brier: {results['ablation_3_no_behavioral']:.4f}")
     else:
         results["3_no_behavioral"] = results["1_full_system"]
         print("  No behavioral cols found — skipped")
@@ -98,17 +97,17 @@ def run_ablation(domain="student", target="pass"):
                                   "relationship"]
     )]
     if support_cols:
-        print(f"Running Exp 4: No support features ({len(support_cols)} cols)...")
+        print(f"Running Exp 4: No support features (Ablation 4 — LLM layer removal)...")
         X_tr4 = X_train.drop(columns=support_cols, errors="ignore")
         X_te4 = X_test.drop(columns=support_cols, errors="ignore")
-        results["4_no_support"] = quick_model(X_tr4, y_train, X_te4, y_test)
-        print(f"  Brier: {results['4_no_support']:.4f}")
+        results["ablation_4_no_support"] = quick_model(X_tr4, y_train, X_te4, y_test)
+        print(f"  Brier: {results['ablation_4_no_support']:.4f}")
     else:
         results["4_no_support"] = results["1_full_system"]
         print("  No support cols found — skipped")
 
     # Experiment 5 — Single feature only (most important)
-    print("Running Exp 5: Single best feature only...")
+    print("Running Exp 5: Single best feature (Ablation 5 — calibration/isotonic removal)...")
     rf_quick = RandomForestClassifier(n_estimators=50, random_state=42)
     rf_quick.fit(X_train, y_train)
     best_feature = X.columns[rf_quick.feature_importances_.argmax()]
@@ -117,10 +116,10 @@ def run_ablation(domain="student", target="pass"):
     X_te5 = X_test[[best_feature]]
     lr_single = LogisticRegression(max_iter=1000)
     lr_single.fit(X_tr5, y_train)
-    results["5_single_feature"] = brier_score_loss(
+    results["ablation_5_single_feature"] = brier_score_loss(
         y_test, lr_single.predict_proba(X_te5)[:, 1]
     )
-    print(f"  Brier: {results['5_single_feature']:.4f}")
+    print(f"  Brier: {results['ablation_5_single_feature']:.4f}")
 
     # Print summary
     print(f"\n--- Ablation Results: {domain.upper()} ---")

@@ -141,7 +141,7 @@ def inject_news_context(
             f"Domain: {domain}\n"
             f"Question: {question}\n"
             f"Parameters:\n{param_str}\n"
-            f"Base probability: {base_probability*100:.1f}%\n\n"
+            f"Base probability: {(base_probability or 0.0)*100:.1f}%\n\n"
             f"Recent news about '{search_query}':\n{news_text}\n\n"
             "How does this news affect the prediction probability?"
         )}
@@ -176,7 +176,7 @@ def inject_news_context(
         "probability_before":  round(base_probability, 4),
         "probability_after":   round(prob_after, 4),
         "adjustment":          round(adjustment, 4),
-        "adjustment_pct":      f"{adjustment*100:+.1f}%",
+        "adjustment_pct":      f"{(adjustment or 0.0)*100:+.1f}%",
         "news_sentiment":      parsed.get("news_sentiment", "neutral"),
         "key_news_signal":     parsed.get("key_news_signal", ""),
         "reasoning":           parsed.get("reasoning", ""),

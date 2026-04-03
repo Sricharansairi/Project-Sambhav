@@ -1,364 +1,854 @@
+# ============================================================
+# Project Sambhav — Domain Registry v2.1
+# ALL 11 DOMAINS — Updated April 2026
+# ============================================================
+# Blend strategy: behavioural + claim use real + synthetic blend
+# Sarvagna: TF-IDF/SVD pipeline, different architecture
+# Trophy models: pragma, loan, mental_health — NEVER RETRAIN
+# ============================================================
+
 domains:
-  behavioral:
-    dataset: data/processed/behavioral_final.csv
-    description: Predicts behavioral outcome probability
-    model_path: models/behavioral_minilm_v1.joblib
-    name: Behavioral Choice
-    parameters:
-    - name: text_input
-      type: text
-      weight: high
-    - name: context
-      type: text
-      weight: medium
-    - name: past_behavior
-      options:
-      - consistent
-      - inconsistent
-      - unknown
-      type: categorical
-      weight: medium
-    prediction_label: Deceptive probability
-    target_column: deceptive
-  claim:
-    dataset: data/processed/claim_final.csv
-    description: Predicts probability a claim is credible
-    model_path: models/claim_stacking_v8.joblib
-    name: Claim Credibility
-    parameters:
-    - name: claim_text
-      type: text
-      weight: high
-    - name: source_type
-      options:
-      - news
-      - social_media
-      - official
-      - blog
-      - unknown
-      type: categorical
-      weight: high
-    - name: has_citations
-      options:
-      - true
-      - false
-      type: categorical
-      weight: medium
-    prediction_label: Credibility probability
-    target_column: credible
-  disease:
-    dataset: data/raw/medical/heart.csv
-    description: Predicts risk of heart disease or diabetes
-    model_path: models/disease_stacking_v3.joblib
-    name: Disease Risk
-    parameters:
-    - name: age
-      range:
-      - 18
-      - 80
-      type: numeric
-      weight: high
-    - name: cholesterol
-      range:
-      - 0
-      - 600
-      type: numeric
-      weight: high
-    - name: blood_pressure
-      range:
-      - 60
-      - 200
-      type: numeric
-      weight: high
-    - name: bmi
-      range:
-      - 10
-      - 60
-      type: numeric
-      weight: high
-    - name: smoking
-      options:
-      - true
-      - false
-      type: categorical
-      weight: medium
-    - name: exercise
-      options:
-      - none
-      - light
-      - moderate
-      - heavy
-      type: categorical
-      weight: medium
-    prediction_label: Disease risk probability
-    target_column: disease
-  fitness:
-    dataset: data/raw/fitness/bodyPerformance.csv
-    description: Predicts fitness level achievement probability
-    model_path: models/fitness_stacking_v8.joblib
-    name: Fitness and Body Performance
-    parameters:
-    - name: age
-      range:
-      - 15
-      - 80
-      type: numeric
-      weight: medium
-    - name: weight_kg
-      range:
-      - 30
-      - 200
-      type: numeric
-      weight: high
-    - name: body_fat_pct
-      range:
-      - 3
-      - 60
-      type: numeric
-      weight: high
-    - name: sit_ups
-      range:
-      - 0
-      - 80
-      type: numeric
-      weight: high
-    - name: broad_jump
-      range:
-      - 0
-      - 300
-      type: numeric
-      weight: high
-    prediction_label: Fitness goal probability
-    target_column: fit
-  higher_education:
-    dataset: data/processed/student_dropout_final.csv
-    description: Predicts student graduation or dropout probability
-    model_path: models/student_dropout_stacking_v8.joblib
-    name: Higher Education Outcome
-    parameters:
-    - name: age_at_enrollment
-      range:
-      - 17
-      - 70
-      type: numeric
-      weight: low
-    - name: admission_grade
-      range:
-      - 0
-      - 200
-      type: numeric
-      weight: high
-    - name: scholarship_holder
-      options:
-      - true
-      - false
-      type: categorical
-      weight: medium
-    - name: tuition_fees_up_to_date
-      options:
-      - true
-      - false
-      type: categorical
-      weight: high
-    - name: debtor
-      options:
-      - true
-      - false
-      type: categorical
-      weight: medium
-    prediction_label: Graduation probability
-    target_column: pass
-  hr:
-    dataset: data/processed/hr_final.csv
-    description: Predicts employee attrition probability
-    model_path: models/hr_stacking_v8.joblib
-    name: HR Attrition
-    parameters:
-    - name: age
-      range:
-      - 18
-      - 60
-      type: numeric
-      weight: medium
-    - name: job_satisfaction
-      range:
-      - 1
-      - 4
-      type: numeric
-      weight: high
-    - name: monthly_income
-      range:
-      - 1000
-      - 20000
-      type: numeric
-      weight: high
-    - name: overtime
-      options:
-      - true
-      - false
-      type: categorical
-      weight: high
-    - name: years_at_company
-      range:
-      - 0
-      - 40
-      type: numeric
-      weight: medium
-    - name: work_life_balance
-      range:
-      - 1
-      - 4
-      type: numeric
-      weight: high
-    - name: distance_from_home
-      range:
-      - 1
-      - 30
-      type: numeric
-      weight: low
-    prediction_label: Attrition probability
-    target_column: attrition
-  loan:
-    dataset: data/raw/finance/loan_synthetic.csv
-    description: Predicts probability of loan default
-    model_path: models/loan_stacking_v5.joblib
-    name: Loan Default Risk
-    parameters:
-    - name: credit_score
-      range:
-      - 300
-      - 850
-      type: numeric
-      weight: high
-    - name: income
-      range:
-      - 0
-      - 500000
-      type: numeric
-      weight: high
-    - name: loan_amount
-      range:
-      - 1000
-      - 100000
-      type: numeric
-      weight: high
-    - name: debt_to_income
-      range:
-      - 0
-      - 1
-      type: numeric
-      weight: high
-    - name: missed_payments
-      range:
-      - 0
-      - 20
-      type: numeric
-      weight: high
-    - name: employment_years
-      range:
-      - 0
-      - 40
-      type: numeric
-      weight: medium
-    prediction_label: Default probability
-    target_column: default
-  mental_health:
-    dataset: data/raw/mental_health/Mental Health Dataset.csv
-    description: Predicts risk of burnout or depression
-    model_path: models/mental_health_stacking_v8.joblib
-    name: Mental Health Risk
-    parameters:
-    - name: work_hours_per_week
-      range:
-      - 0
-      - 80
-      type: numeric
-      weight: high
-    - name: sleep_hours
-      range:
-      - 0
-      - 12
-      type: numeric
-      weight: high
-    - name: stress_level
-      options:
-      - low
-      - medium
-      - high
-      - very_high
-      type: categorical
-      weight: high
-    - name: social_support
-      options:
-      - strong
-      - moderate
-      - weak
-      - none
-      type: categorical
-      weight: high
-    - name: family_history
-      options:
-      - true
-      - false
-      type: categorical
-      weight: medium
-    prediction_label: Mental health risk probability
-    target_column: treatment
+
+  # ── DOMAIN 1: Student Performance ───────────────────────────
   student:
-    dataset: data/processed/student_final.csv
-    description: Predicts academic pass/fail probability
-    model_path: models/student_stacking_v8.joblib
-    name: Student Performance
+    display_name: "Student Performance"
+    emoji_icon: "📚"
+    model_path: "models/student_v14_xgb.joblib"
+    brier_score: 0.0639
+    auc: 0.8753
+    accuracy: 0.842
+    status: TROPHY
+    model_available: true
+    blend_mode: false
+    supported_outcomes: ["pass", "fail"]
+    question_template: "Will this student pass their exams?"
     parameters:
-    - name: study_hours_per_day
-      range:
-      - 0
-      - 16
-      type: numeric
-      weight: high
-    - name: attendance_pct
-      range:
-      - 0
-      - 100
-      type: numeric
-      weight: high
-    - name: sleep_hours
-      range:
-      - 0
-      - 12
-      type: numeric
-      weight: medium
-    - name: stress_level
-      options:
-      - low
-      - medium
-      - high
-      - very_high
-      type: categorical
-      weight: high
-    - name: motivation
-      range:
-      - 1
-      - 5
-      type: numeric
-      weight: medium
-    - name: past_score
-      range:
-      - 0
-      - 100
-      type: numeric
-      weight: high
-    - name: part_time_job
-      options:
-      - true
-      - false
-      type: categorical
-      weight: low
-    - name: extracurricular
-      options:
-      - true
-      - false
-      type: categorical
-      weight: low
-    prediction_label: Pass probability
-    target_column: pass
+      - key: study_hours
+        label: "How many hours does the student study per day?"
+        description: "Average daily study time"
+        type: chips
+        required: true
+        options:
+          - { label: "0 – 1 hr",   value: 0.5 }
+          - { label: "1 – 2 hrs",  value: 1.5 }
+          - { label: "2 – 4 hrs",  value: 3.0 }
+          - { label: "4 – 6 hrs",  value: 5.0 }
+          - { label: "6 – 9 hrs",  value: 7.5 }
+          - { label: "9+ hrs",     value: 10.0 }
+
+      - key: sleep_hours
+        label: "How many hours does the student sleep per night?"
+        description: "Average nightly sleep duration"
+        type: chips
+        required: true
+        options:
+          - { label: "< 4 hrs",   value: 3.0 }
+          - { label: "4 – 5 hrs", value: 4.5 }
+          - { label: "5 – 6 hrs", value: 5.5 }
+          - { label: "6 – 7 hrs", value: 6.5 }
+          - { label: "7 – 8 hrs", value: 7.5 }
+          - { label: "8 – 9 hrs", value: 8.5 }
+          - { label: "9+ hrs",    value: 9.5 }
+
+      - key: attendance_pct
+        label: "What is the student's attendance percentage?"
+        description: "Classes attended out of total classes"
+        type: number
+        min: 0
+        max: 100
+        default: 75
+        required: true
+
+      - key: stress_level
+        label: "What is the student's current stress level?"
+        description: "Self-reported or observed stress"
+        type: chips
+        required: true
+        options:
+          - { label: "Low",     value: 0 }
+          - { label: "Medium",  value: 1 }
+          - { label: "High",    value: 2 }
+          - { label: "Extreme", value: 3 }
+
+      - key: past_score
+        label: "What was the student's last exam score? (0–100)"
+        description: "Most recent examination result"
+        type: number
+        min: 0
+        max: 100
+        default: 60
+        required: true
+
+      - key: motivation
+        label: "How motivated is the student? (1 = very low, 5 = very high)"
+        description: "Intrinsic motivation level"
+        type: chips
+        required: false
+        options:
+          - { label: "1 – Very Low", value: 1 }
+          - { label: "2 – Low",      value: 2 }
+          - { label: "3 – Medium",   value: 3 }
+          - { label: "4 – High",     value: 4 }
+          - { label: "5 – Very High",value: 5 }
+
+      - key: preparation_days
+        label: "How many days before the exam did they start preparing?"
+        description: "Lead time for exam preparation"
+        type: chips
+        required: false
+        options:
+          - { label: "0 – 2 days",  value: 1 }
+          - { label: "3 – 7 days",  value: 5 }
+          - { label: "8 – 14 days", value: 11 }
+          - { label: "15+ days",    value: 20 }
+
+      - key: project_complexity
+        label: "What is the project's complexity level?"
+        description: "How difficult or multifaceted is the current project?"
+        type: chips
+        required: false
+        options:
+          - { label: "Low",    value: 1 }
+          - { label: "Medium", value: 2 }
+          - { label: "High",   value: 3 }
+
+      - key: project_progress
+        label: "What is the current project progress (%)?"
+        description: "Completion status of the project"
+        type: number
+        min: 0
+        max: 100
+        default: 0
+        required: false
+
+  # ── DOMAIN 2: High School Outcomes ──────────────────────────
+  high_school:
+    display_name: "High School"
+    emoji_icon: "🎓"
+    model_path: "models/higher_ed_v14_xgb.joblib"
+    brier_score: 0.0879
+    auc: 0.9387
+    accuracy: 0.856
+    status: GOOD
+    model_available: true
+    blend_mode: false
+    supported_outcomes: ["graduate", "dropout"]
+    question_template: "Will this student graduate or drop out?"
+    parameters:
+      - key: enrollment_age
+        label: "What was the student's age at enrollment?"
+        type: chips
+        required: true
+        options:
+          - { label: "17 – 19", value: 18 }
+          - { label: "20 – 23", value: 21 }
+          - { label: "24 – 27", value: 25 }
+          - { label: "28 – 35", value: 31 }
+          - { label: "36+",     value: 40 }
+
+      - key: prev_qualification_grade
+        label: "Previous qualification grade (0–200 scale)?"
+        type: number
+        min: 0
+        max: 200
+        default: 130
+        required: true
+
+      - key: scholarship
+        label: "Is the student a scholarship holder?"
+        type: chips
+        required: true
+        options:
+          - { label: "Yes", value: 1 }
+          - { label: "No",  value: 0 }
+
+      - key: tuition_up_to_date
+        label: "Are tuition fees up to date?"
+        type: chips
+        required: true
+        options:
+          - { label: "Yes — fully paid", value: 1 }
+          - { label: "No — in arrears",  value: 0 }
+
+      - key: curricular_units_approved
+        label: "How many curricular units approved in 1st semester?"
+        type: chips
+        required: true
+        options:
+          - { label: "0",      value: 0 }
+          - { label: "1 – 3",  value: 2 }
+          - { label: "4 – 6",  value: 5 }
+          - { label: "7 – 9",  value: 8 }
+          - { label: "10+",    value: 11 }
+
+      - key: displaced
+        label: "Is the student a displaced person?"
+        type: chips
+        required: false
+        options:
+          - { label: "Yes", value: 1 }
+          - { label: "No",  value: 0 }
+
+  # ── DOMAIN 3: Job Life (Career & Workplace) ───────────────────
+  job_life:
+    display_name: "Job Life"
+    emoji_icon: "👥"
+    model_path: "models/hr_v18_xgb.joblib"
+    brier_score: 0.0700
+    auc: 0.9139
+    accuracy: 0.874
+    status: GREAT
+    model_available: true
+    blend_mode: false
+    supported_outcomes: ["stability", "transition"]
+    question_template: "Will this professional scenario lead to career stability or a job transition?"
+    parameters:
+      - key: role_satisfaction
+        label: "How satisfied is the individual with their current role?"
+        type: chips
+        required: true
+        options:
+          - { label: "1 – Very Unsatisfied", value: 1 }
+          - { label: "2 – Unsatisfied",       value: 2 }
+          - { label: "3 – Neutral",           value: 3 }
+          - { label: "4 – Satisfied",         value: 4 }
+          - { label: "5 – Very Satisfied",    value: 5 }
+
+      - key: lifestyle_balance
+        label: "How is their work-life or lifestyle balance?"
+        type: chips
+        required: true
+        options:
+          - { label: "1 – Very Poor", value: 1 }
+          - { label: "2 – Poor",      value: 2 }
+          - { label: "3 – Fair",      value: 3 }
+          - { label: "4 – Good",      value: 4 }
+          - { label: "5 – Excellent", value: 5 }
+
+      - key: tenure_duration
+        label: "How long has the individual been in their current position?"
+        type: chips
+        required: true
+        options:
+          - { label: "< 1 year",  value: 0.5 }
+          - { label: "1 – 2 yrs", value: 1.5 }
+          - { label: "3 – 5 yrs", value: 4 }
+          - { label: "6 – 10 yrs",value: 8 }
+          - { label: "10+ yrs",   value: 13 }
+
+      - key: growth_opportunity
+        label: "How do they perceive their current growth opportunities?"
+        type: chips
+        required: true
+        options:
+          - { label: "None / Stagnant",  value: 0 }
+          - { label: "Limited",          value: 1 }
+          - { label: "Moderate",         value: 2 }
+          - { label: "Significant",      value: 3 }
+          - { label: "Exceptional",      value: 4 }
+
+      - key: workplace_culture
+        label: "How would they rate their workplace culture or environment?"
+        type: chips
+        required: true
+        options:
+          - { label: "Toxic",     value: 0 }
+          - { label: "Neutral",   value: 1 }
+          - { label: "Positive",  value: 2 }
+          - { label: "Excellent", value: 3 }
+
+      - key: future_visibility
+        label: "How clear is their vision for their professional future here?"
+        type: chips
+        required: false
+        options:
+          - { label: "1 – Completely Unclear",  value: 1 }
+          - { label: "2 – Vague",               value: 2 }
+          - { label: "3 – Somewhat clear",      value: 3 }
+          - { label: "4 – Clear",               value: 4 }
+          - { label: "5 – Highly Defined",      value: 5 }
+
+  # ── DOMAIN 4: Health (Wellness & Diagnosis) ──────────────────
+  health:
+    display_name: "Health"
+    emoji_icon: "🏥"
+    model_path: "models/medico_v19.joblib"
+    brier_score: 0.0578
+    auc: 0.8468
+    accuracy: 0.925
+    status: TROPHY
+    model_available: true
+    blend_mode: false
+    supported_outcomes: ["low_risk", "high_risk"]
+    question_template: "What is this person's health risk level?"
+    disclaimer: "This is NOT a medical diagnosis. Always consult a qualified healthcare professional."
+    parameters:
+      - key: age
+        label: "What is the patient's age?"
+        description: "Patient's chronological age"
+        type: chips
+        required: true
+        options:
+          - { label: "< 30",    value: 25 }
+          - { label: "30 – 40", value: 35 }
+          - { label: "41 – 50", value: 45 }
+          - { label: "51 – 60", value: 55 }
+          - { label: "61 – 70", value: 65 }
+          - { label: "71+",     value: 75 }
+
+      - key: glucose
+        label: "Glucose level (mg/dL)?"
+        description: "Fasting blood glucose"
+        type: chips
+        required: true
+        options:
+          - { label: "< 70 (Low)",         value: 65 }
+          - { label: "70 – 99 (Normal)",    value: 85 }
+          - { label: "100 – 125 (PreDM)",   value: 112 }
+          - { label: "126 – 199 (High)",    value: 150 }
+          - { label: "200+ (Very High)",    value: 220 }
+
+      - key: bmi
+        label: "What is the BMI?"
+        type: chips
+        required: true
+        options:
+          - { label: "< 18.5 (Underweight)", value: 17 }
+          - { label: "18.5 – 24.9 (Normal)", value: 22 }
+          - { label: "25 – 29.9 (Overweight)",value: 27 }
+          - { label: "30 – 34.9 (Obese I)",  value: 32 }
+          - { label: "35+ (Obese II/III)",    value: 38 }
+
+      - key: blood_pressure
+        label: "Diastolic blood pressure (mmHg)?"
+        type: chips
+        required: true
+        options:
+          - { label: "< 60 (Low)",       value: 55 }
+          - { label: "60 – 79 (Normal)", value: 70 }
+          - { label: "80 – 89 (High)",   value: 85 }
+          - { label: "90+ (Very High)",  value: 95 }
+
+      - key: smoking_history
+        label: "Smoking history?"
+        type: chips
+        required: false
+        options:
+          - { label: "Never",          value: 0 }
+          - { label: "Former smoker",  value: 1 }
+          - { label: "Current smoker", value: 2 }
+
+      - key: heart_disease
+        label: "Any known heart disease or condition?"
+        type: chips
+        required: false
+        options:
+          - { label: "No",           value: 0 }
+          - { label: "Yes — mild",   value: 1 }
+          - { label: "Yes — serious",value: 2 }
+
+  # ── DOMAIN 5: Fitness Performance ───────────────────────────
+  fitness:
+    display_name: "Fitness"
+    emoji_icon: "💪"
+    model_path: "models/fitness_v16_xgb.joblib"
+    brier_score: 0.0709
+    auc: 0.9052
+    accuracy: 0.881
+    status: GREAT
+    model_available: true
+    blend_mode: false
+    supported_outcomes: ["achieves_goal", "does_not_achieve"]
+    question_template: "Will this person achieve their fitness goal?"
+    parameters:
+      - key: age
+        label: "What is the person's age?"
+        type: chips
+        required: true
+        options:
+          - { label: "< 20",    value: 18 }
+          - { label: "20 – 30", value: 25 }
+          - { label: "31 – 40", value: 35 }
+          - { label: "41 – 55", value: 47 }
+          - { label: "55+",     value: 62 }
+
+      - key: bmi
+        label: "Current BMI?"
+        type: chips
+        required: true
+        options:
+          - { label: "< 18.5",       value: 17 }
+          - { label: "18.5 – 24.9",  value: 22 }
+          - { label: "25 – 29.9",    value: 27 }
+          - { label: "30 – 34.9",    value: 32 }
+          - { label: "35+",          value: 38 }
+
+      - key: sit_ups
+        label: "How many sit-ups can they do in 1 minute?"
+        type: chips
+        required: true
+        options:
+          - { label: "< 10",    value: 5 }
+          - { label: "10 – 20", value: 15 }
+          - { label: "21 – 35", value: 28 }
+          - { label: "36 – 50", value: 43 }
+          - { label: "51 – 70", value: 60 }
+          - { label: "70+",     value: 80 }
+
+      - key: broad_jump_cm
+        label: "Standing broad jump distance (cm)?"
+        type: chips
+        required: false
+        options:
+          - { label: "< 100 cm",     value: 80 }
+          - { label: "100 – 150 cm", value: 125 }
+          - { label: "150 – 200 cm", value: 175 }
+          - { label: "200 – 240 cm", value: 220 }
+          - { label: "240+ cm",      value: 260 }
+
+      - key: body_fat_pct
+        label: "Estimated body fat percentage?"
+        type: chips
+        required: false
+        options:
+          - { label: "< 10%",    value: 8 }
+          - { label: "10 – 18%", value: 14 }
+          - { label: "19 – 25%", value: 22 }
+          - { label: "26 – 32%", value: 29 }
+          - { label: "32%+",     value: 36 }
+
+  # ── DOMAIN 6: Financial Assessment ──────────────────────────
+  financial:
+    display_name: "Financial"
+    emoji_icon: "💳"
+    model_path: "models/loan_stacking_v5.joblib"
+    brier_score: 0.0337
+    auc: 0.9184
+    accuracy: 0.863
+    status: PUBLICATION_GRADE
+    model_available: true
+    blend_mode: false
+    retrain_locked: true  # NEVER RETRAIN — publication grade
+    supported_outcomes: ["positive_outcome", "negative_outcome"]
+    question_template: "Will this financial scenario result in a stable or risky outcome?"
+    disclaimer: "Not a substitute for professional financial or credit assessment."
+    parameters:
+      - key: transaction_amount
+        label: "Total amount involved in this financial scenario?"
+        type: chips
+        required: true
+        options:
+          - { label: "< ₹1 lakh",     value: 50000 }
+          - { label: "₹1 – 5 lakh",   value: 250000 }
+          - { label: "₹5 – 10 lakh",  value: 750000 }
+          - { label: "₹10 – 25 lakh", value: 1750000 }
+          - { label: "₹25 lakh+",     value: 3500000 }
+
+      - key: annual_income
+        label: "Annual income or revenue of the primary entity?"
+        type: chips
+        required: true
+        options:
+          - { label: "< ₹3 lakh",       value: 200000 }
+          - { label: "₹3 – 6 lakh",     value: 450000 }
+          - { label: "₹6 – 12 lakh",    value: 900000 }
+          - { label: "₹12 – 25 lakh",   value: 1800000 }
+          - { label: "₹25 lakh+",       value: 3500000 }
+
+      - key: stability_duration
+        label: "Duration of current financial/employment stability?"
+        type: chips
+        required: true
+        options:
+          - { label: "Unstable / None", value: 0 }
+          - { label: "< 1 year",      value: 0.5 }
+          - { label: "1 – 3 years",   value: 2 }
+          - { label: "3 – 7 years",   value: 5 }
+          - { label: "7 – 15 years",  value: 10 }
+          - { label: "15+ years",     value: 18 }
+
+      - key: financial_score
+        label: "Financial health or credit score (e.g. CIBIL)?"
+        type: chips
+        required: true
+        options:
+          - { label: "< 580 (Poor)",        value: 550 }
+          - { label: "580 – 669 (Fair)",     value: 625 }
+          - { label: "670 – 739 (Good)",     value: 705 }
+          - { label: "740 – 799 (Very Good)",value: 769 }
+          - { label: "800+ (Exceptional)",   value: 820 }
+
+      - key: asset_ownership
+        label: "Current asset or home ownership status?"
+        type: chips
+        required: false
+        options:
+          - { label: "None / Renting",    value: 0 }
+          - { label: "Owns primary asset",value: 1 }
+          - { label: "Encumbered / Mortgaged", value: 2 }
+          - { label: "Diverse portfolio", value: 3 }
+
+      - key: financial_purpose
+        label: "Primary purpose of this financial activity?"
+        type: chips
+        required: false
+        options:
+          - { label: "Personal / Medical", value: 0 }
+          - { label: "Education / Growth", value: 1 }
+          - { label: "Business / Investment", value: 2 }
+          - { label: "Debt Management", value: 4 }
+
+  # ── DOMAIN 7: Mental Health Risk ────────────────────────────
+  mental_health:
+    display_name: "Mental Health"
+    emoji_icon: "🧠"
+    model_path: "models/mental_health_stacking_v8.joblib"
+    brier_score: 0.0359
+    auc: 0.9912
+    accuracy: 0.951
+    status: PUBLICATION_GRADE
+    model_available: true
+    blend_mode: false
+    retrain_locked: true  # NEVER RETRAIN — publication grade
+    supported_outcomes: ["low_risk", "elevated_risk"]
+    question_template: "What is this person's mental health risk level?"
+    disclaimer: "Not a psychological diagnosis. Consult a qualified mental health professional. Crisis? Call iCall: 9152987821."
+    parameters:
+      - key: sleep_quality
+        label: "How is the person's sleep quality?"
+        type: chips
+        required: true
+        options:
+          - { label: "Very poor — < 4 hrs",    value: 0 }
+          - { label: "Poor — 4 – 5 hrs",        value: 1 }
+          - { label: "Fair — 5 – 6 hrs",        value: 2 }
+          - { label: "Good — 6 – 8 hrs",        value: 3 }
+          - { label: "Excellent — 8+ hrs",      value: 4 }
+
+      - key: social_support
+        label: "Level of social support and connection?"
+        type: chips
+        required: true
+        options:
+          - { label: "Isolated — no support",  value: 0 }
+          - { label: "Minimal support",         value: 1 }
+          - { label: "Some support",            value: 2 }
+          - { label: "Good support network",    value: 3 }
+          - { label: "Strong support network",  value: 4 }
+
+      - key: work_stress
+        label: "Current work or academic stress level?"
+        type: chips
+        required: true
+        options:
+          - { label: "None",     value: 0 }
+          - { label: "Low",      value: 1 }
+          - { label: "Moderate", value: 2 }
+          - { label: "High",     value: 3 }
+          - { label: "Extreme",  value: 4 }
+
+      - key: physical_activity
+        label: "Physical activity frequency?"
+        type: chips
+        required: true
+        options:
+          - { label: "None",          value: 0 }
+          - { label: "Rarely",        value: 1 }
+          - { label: "1 – 2×/week",   value: 2 }
+          - { label: "3 – 4×/week",   value: 3 }
+          - { label: "Daily",         value: 4 }
+
+      - key: anxiety_level
+        label: "Self-reported anxiety level?"
+        type: chips
+        required: true
+        options:
+          - { label: "None",          value: 0 }
+          - { label: "Mild",          value: 1 }
+          - { label: "Moderate",      value: 2 }
+          - { label: "Severe",        value: 3 }
+          - { label: "Very severe",   value: 4 }
+
+      - key: age
+        label: "Age group?"
+        type: chips
+        required: false
+        options:
+          - { label: "13 – 17", value: 15 }
+          - { label: "18 – 25", value: 21 }
+          - { label: "26 – 35", value: 30 }
+          - { label: "36 – 50", value: 43 }
+          - { label: "51 – 65", value: 57 }
+          - { label: "65+",     value: 70 }
+
+  # ── DOMAIN 8: Claim Credibility ─────────────────────────────
+  claim:
+    display_name: "Claim Credibility"
+    emoji_icon: "🔍"
+    model_path: "models/claim_v17_xgb.joblib"
+    model_path_synthetic: "models/claim_v17_synthetic.joblib"
+    blend_weight: 0.72          # 72% real-data model, 28% synthetic
+    brier_score: 0.1211
+    auc: 0.8949
+    accuracy: 0.768
+    status: ACCEPTABLE
+    model_available: true
+    blend_mode: true
+    supported_outcomes: ["credible", "not_credible"]
+    question_template: "How credible is this claim?"
+    parameters:
+      - key: claim_text
+        label: "Paste the claim or statement to analyse"
+        description: "The exact text of the factual claim"
+        type: textarea
+        required: true
+        placeholder: "e.g. India passed Article 360 in 2022"
+
+      - key: source_type
+        label: "Where did this claim come from?"
+        type: chips
+        required: true
+        options:
+          - { label: "Social media",   value: 0 }
+          - { label: "Blog / website", value: 1 }
+          - { label: "News outlet",    value: 2 }
+          - { label: "Government",     value: 3 }
+          - { label: "Academic paper", value: 4 }
+
+      - key: source_reliability
+        label: "How reliable is the source generally? (1 = very low, 5 = very high)"
+        type: chips
+        required: true
+        options:
+          - { label: "1 – Unknown/unreliable", value: 1 }
+          - { label: "2 – Sometimes reliable", value: 2 }
+          - { label: "3 – Usually reliable",   value: 3 }
+          - { label: "4 – Reliable",           value: 4 }
+          - { label: "5 – Highly reliable",    value: 5 }
+
+      - key: corroborating_sources
+        label: "How many other sources confirm this claim?"
+        type: chips
+        required: false
+        options:
+          - { label: "None",   value: 0 }
+          - { label: "1 – 2",  value: 1 }
+          - { label: "3 – 5",  value: 4 }
+          - { label: "5 – 10", value: 7 }
+          - { label: "10+",    value: 15 }
+
+      - key: emotional_language
+        label: "Does the claim use highly emotional language?"
+        type: chips
+        required: false
+        options:
+          - { label: "No — neutral tone",          value: 0 }
+          - { label: "Somewhat emotional",          value: 1 }
+          - { label: "Yes — strong emotional push", value: 2 }
+
+  # ── DOMAIN 9: Behavioral Intent ────────────────────────────
+  behavioral:
+    display_name: "Behavioral"
+    emoji_icon: "🧩"
+    model_path: "models/behavioral_v14_xgb.joblib"
+    model_path_synthetic: "models/behavioral_v14_synthetic.joblib"
+    blend_weight: 0.68          # 68% real-data model, 32% synthetic
+    brier_score: 0.0841
+    auc: 0.9234
+    accuracy: 0.827
+    status: GOOD
+    model_available: true
+    blend_mode: true
+    supported_outcomes: ["follows_through", "does_not_follow_through"]
+    question_template: "Will this person follow through on their stated intention?"
+    parameters:
+      - key: commitment_statement
+        label: "What is the person's stated commitment?"
+        description: "Paste or type their exact words of intention"
+        type: textarea
+        required: true
+        placeholder: "e.g. I'm going to start exercising every day from Monday"
+
+      - key: motivation_level
+        label: "How motivated do they appear?"
+        type: chips
+        required: true
+        options:
+          - { label: "Very low — no conviction",  value: 0 }
+          - { label: "Low — vague intention",      value: 1 }
+          - { label: "Medium — genuine desire",    value: 2 }
+          - { label: "High — strong commitment",   value: 3 }
+          - { label: "Very high — driven to act",  value: 4 }
+
+      - key: past_behavior
+        label: "How consistent has their past behavior been?"
+        type: chips
+        required: true
+        options:
+          - { label: "Always fails to follow through",  value: 0 }
+          - { label: "Usually fails",                    value: 1 }
+          - { label: "Mixed record",                     value: 2 }
+          - { label: "Usually follows through",          value: 3 }
+          - { label: "Always keeps commitments",         value: 4 }
+
+      - key: obstacles_acknowledged
+        label: "Did they acknowledge real obstacles?"
+        description: "Realistic plans mention specific challenges"
+        type: chips
+        required: false
+        options:
+          - { label: "No — pure optimism", value: 0 }
+          - { label: "Vaguely mentioned",   value: 1 }
+          - { label: "Specific obstacles",  value: 2 }
+          - { label: "Plus solutions",      value: 3 }
+
+      - key: social_accountability
+        label: "Have they told specific people about this commitment?"
+        type: chips
+        required: false
+        options:
+          - { label: "No one",            value: 0 }
+          - { label: "Vague mention",     value: 1 }
+          - { label: "1 – 2 close people",value: 2 }
+          - { label: "Public commitment", value: 3 }
+
+      - key: timeline_specificity
+        label: "How specific is their timeline?"
+        type: chips
+        required: false
+        options:
+          - { label: "Vague — someday",      value: 0 }
+          - { label: "General — this month", value: 1 }
+          - { label: "This week",            value: 2 }
+          - { label: "Exact date / time",    value: 3 }
+
+  # ── DOMAIN 10: PRAGMA (Forensic Psychological Profiling) ─────
+  pragma:
+    display_name: "PRAGMA"
+    emoji_icon: "🔬"
+    model_path: "models/pragma_v17_xgb.joblib"
+    brier_score: 0.0179
+    auc: 0.9960
+    accuracy: 0.975
+    status: PUBLICATION_GRADE
+    model_available: true
+    blend_mode: false
+    retrain_locked: true  # NEVER RETRAIN
+    supported_outcomes: ["genuine", "deceptive"]
+    question_template: "Analyse this communication for psychological markers and deception."
+    disclaimer: "PRAGMA is a research-grade forensic psychological profiling tool. Outputs are probabilistic, not definitive verdicts."
+    parameters:
+      - key: communication_text
+        label: "Paste the communication to analyse"
+        description: "Statement, email, message, or verbal transcript"
+        type: textarea
+        required: true
+        placeholder: "Paste the full communication here for forensic analysis..."
+
+      - key: context_type
+        label: "What is the context of this communication?"
+        type: chips
+        required: true
+        options:
+          - { label: "Personal / social",     value: 0 }
+          - { label: "Professional / work",   value: 1 }
+          - { label: "Legal / formal",        value: 2 }
+          - { label: "Negotiation",           value: 3 }
+          - { label: "Crisis / high-stakes",  value: 4 }
+
+      - key: stakes_level
+        label: "What are the stakes of this communication?"
+        type: chips
+        required: true
+        options:
+          - { label: "Low — casual",          value: 0 }
+          - { label: "Medium — important",    value: 1 }
+          - { label: "High — significant",    value: 2 }
+          - { label: "Critical — very high",  value: 3 }
+
+      - key: speaker_role
+        label: "What is the speaker's role?"
+        type: chips
+        required: false
+        options:
+          - { label: "Individual / private",  value: 0 }
+          - { label: "Employee / staff",      value: 1 }
+          - { label: "Manager / executive",   value: 2 }
+          - { label: "Public figure",         value: 3 }
+          - { label: "Organisation",          value: 4 }
+
+      - key: baseline_available
+        label: "Do you have a baseline of their normal communication style?"
+        type: chips
+        required: false
+        options:
+          - { label: "No baseline",              value: 0 }
+          - { label: "Yes — some examples",      value: 1 }
+          - { label: "Yes — extensive baseline", value: 2 }
+
+  # ── DOMAIN 11: Sarvagna (Life Decision Model) ───────────────
+  sarvagna:
+    display_name: "Sarvagna"
+    emoji_icon: "🌐"
+    model_path: "models/sarvagna_wordsvd.joblib"
+    model_path_char: "models/sarvagna_charsvd.joblib"
+    model_path_brain: "models/sarvagna_brain.joblib"
+    model_path_classifier: "models/sarvagna_classifier.joblib"
+    # Architecture: WordSVD 600d + CharSVD 200d + Brain 20d = 820 features
+    feature_dims:
+      word_svd: 600
+      char_svd: 200
+      brain: 20
+      total: 820
+    brier_score: null      # Model pending download — see Phase 2
+    auc: null
+    accuracy: null
+    status: PENDING_DOWNLOAD
+    model_available: false  # SET TO TRUE after downloading
+    blend_mode: false
+    supported_outcomes: ["verified", "unverified", "uncertain"]
+    question_template: "Analyse this life decision context for multi-dimensional insights."
+    parameters:
+      - key: text_input
+        label: "Paste the text for Sarvagna to analyse"
+        description: "News article, statement, social media post, etc."
+        type: textarea
+        required: true
+        placeholder: "Paste full text here for deep NLP analysis..."
+
+      - key: domain_context
+        label: "What domain does this text belong to?"
+        type: chips
+        required: true
+        options:
+          - { label: "News / journalism",   value: 0 }
+          - { label: "Social media",        value: 1 }
+          - { label: "Academic / research", value: 2 }
+          - { label: "Legal / official",    value: 3 }
+          - { label: "Medical / health",    value: 4 }
+          - { label: "General",             value: 5 }
+
+      - key: verification_depth
+        label: "Analysis depth required?"
+        type: chips
+        required: false
+        options:
+          - { label: "Quick — surface scan",  value: 0 }
+          - { label: "Standard analysis",      value: 1 }
+          - { label: "Deep investigation",     value: 2 }
+
+# ── Global Settings ──────────────────────────────────────────
+settings:
+  default_mode: guided
+  probability_cap: 0.97         # Never show > 97%
+  critical_gap_threshold: 0.40  # Block if ML–LLM gap > 40%
+  high_gap_threshold: 0.25
+  moderate_gap_threshold: 0.10
+  monte_carlo_runs: 200
+  shap_background_samples: 50
+  reliability_index_weights:
+    parameter_completeness: 0.40
+    layer_availability: 0.30
+    ml_llm_agreement: 0.20
+    vision_bonus: 0.10
+  api_base_url: "http://localhost:8000"   # Override in .env: SAMBHAV_API_URL
