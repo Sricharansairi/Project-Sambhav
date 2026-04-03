@@ -82,9 +82,6 @@ figma
 eval_reports/
 alembic.ini
 alembic/
-api/endpoints/export.py
-api/endpoints/modes.py
-api/endpoints/reports.py
 master_prediction_framework.py
 
 # IDE

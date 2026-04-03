@@ -15,7 +15,12 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 EXPORTS_DIR = os.getenv("EXPORTS_DIR", "/tmp/sambhav_exports")
-os.makedirs(EXPORTS_DIR, exist_ok=True)
+try:
+    os.makedirs(EXPORTS_DIR, exist_ok=True)
+except PermissionError:
+    # Fallback for restricted environments like HuggingFace Spaces
+    EXPORTS_DIR = "/tmp"
+    logger.warning(f"Permission denied for exports directory. Falling back to {EXPORTS_DIR}")
 
 BASE_URL = os.getenv("FASTAPI_URL", "http://localhost:8000")
 
