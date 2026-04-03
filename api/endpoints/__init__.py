@@ -1,9 +1,1 @@
-from . import auth
-from . import evaluate
-from . import export
-from . import factcheck
-from . import history
-from . import modes
-from . import predict
-from . import reports
-from . import vision
+# ── Empty __init__.py to avoid circular imports ──
