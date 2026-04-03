@@ -1,3 +1,12 @@
+---
+title: Project Sambhav
+emoji: 🌌
+colorFrom: indigo
+colorTo: blue
+sdk: docker
+pinned: false
+---
+
 # 🌌 Project Sambhav: The Unified Multi-Modal Probabilistic Inference Ecosystem
 
 > **Uncertainty, Quantified. Complexity, Calibrated.**
