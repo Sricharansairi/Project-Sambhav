@@ -4,6 +4,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from slowapi import Limiter, _rate_limit_exceeded_handler
+
+# ── Bulk Env Loading (HF Secret Support) ──────────────────────
+load_dotenv()
+# If ENV_FILE is set as a secret, write it to a temporary .env and reload
+env_file_content = os.getenv("ENV_FILE")
+if env_file_content:
+    with open(".env.hf", "w") as f:
+        f.write(env_file_content)
+    load_dotenv(".env.hf", override=True)
+    os.remove(".env.hf")
+# ─────────────────────────────────────────────────────────────
+
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
