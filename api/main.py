@@ -73,15 +73,15 @@ async def health():
     }
 from api.endpoints import predict, factcheck, vision, history, auth, evaluate, export, modes, reports
 
-app.include_router(predict.router,   prefix="/api/predict",    tags=["Prediction"])
-app.include_router(modes.router,     prefix="/api/modes",      tags=["Operating Modes"])
-app.include_router(factcheck.router, prefix="/api/fact-check", tags=["Fact Check"])
-app.include_router(vision.router,    prefix="/api/vision",     tags=["Vision"])
-app.include_router(history.router,   prefix="/api/history",    tags=["History"])
-app.include_router(auth.router,      prefix="/api/auth",       tags=["Auth"])
-app.include_router(evaluate.router,  prefix="/api/evaluate",   tags=["Evaluation"])
-app.include_router(reports.router,   prefix="/api/v1",         tags=["Reports"])
-app.include_router(export.router,    prefix="/api/export",     tags=["Export"])
+app.include_router(predict.router,   prefix="/predict",    tags=["Prediction"])
+app.include_router(modes.router,     prefix="/modes",      tags=["Operating Modes"])
+app.include_router(factcheck.router, prefix="/fact-check", tags=["Fact Check"])
+app.include_router(vision.router,    prefix="/vision",     tags=["Vision"])
+app.include_router(history.router,   prefix="/history",    tags=["History"])
+app.include_router(auth.router,      prefix="/auth",       tags=["Auth"])
+app.include_router(evaluate.router,  prefix="/evaluate",   tags=["Evaluation"])
+app.include_router(reports.router,   prefix="/v1",         tags=["Reports"])
+app.include_router(export.router,    prefix="/export",     tags=["Export"])
 from fastapi import APIRouter
 config_router = APIRouter()
 @config_router.get("/registry")
