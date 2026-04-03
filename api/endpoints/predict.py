@@ -19,6 +19,77 @@ VALID_DOMAINS = [
     "financial", "mental_health", "pragma", "behavioral", "claim", "sarvagna"
 ]
 
+# ── Registry loader ──────────────────────────────────────────
+@router.get("/domains")
+async def get_domains():
+    """
+    Returns all 11 registered domains with their full parameter schemas.
+    Used by the frontend ChipParameterModal to build dynamic parameter collection.
+    """
+    try:
+        from core.predictor import _load_registry
+        registry = _load_registry()
+        result = {}
+        
+        # Log registry size for debugging
+        logger.info(f"Loaded registry with {len(registry)} domains")
+        
+        for domain_key, cfg in registry.items():
+            # If VALID_DOMAINS is empty or contains the key, process it
+            if VALID_DOMAINS and domain_key not in VALID_DOMAINS:
+                continue
+
+            params_raw = cfg.get("parameters", [])
+            params_out = {}
+
+            for p in params_raw:
+                if not isinstance(p, dict):
+                    continue
+
+                param_key = p.get("key") or p.get("name") or ""
+                if not param_key:
+                    continue
+
+                raw_options = p.get("options", [])
+                normalised_options = []
+                for opt in raw_options:
+                    if isinstance(opt, dict):
+                        normalised_options.append({
+                            "label": str(opt.get("label", opt.get("value", ""))),
+                            "value": opt.get("value", opt.get("label", "")),
+                        })
+                    else:
+                        normalised_options.append({"label": str(opt), "value": opt})
+
+                params_out[param_key] = {
+                    "type":        p.get("type", "categorical"),
+                    "label":       p.get("label", param_key.replace("_", " ").title()),
+                    "description": p.get("description", ""),
+                    "options":     normalised_options,
+                    "range":       p.get("range", []),
+                    "weight":      p.get("weight", "medium"),
+                    "required":    p.get("required", False),
+                    "placeholder": p.get("placeholder", ""),
+                }
+
+            result[domain_key] = {
+                "name":              cfg.get("display_name", cfg.get("name", domain_key)),
+                "description":       cfg.get("description", ""),
+                "prediction_label":  cfg.get("prediction_label", "Probability"),
+                "disclaimer":        cfg.get("disclaimer"),
+                "brier_score":       cfg.get("brier_score"),
+                "auc":               cfg.get("auc"),
+                "status":            cfg.get("status", "ACTIVE"),
+                "parameters":        params_out,
+            }
+        
+        logger.info(f"Returning {len(result)} domains to frontend")
+        return result
+    except Exception as e:
+        logger.error(f"get_domains failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ── Input quality gate ────────────────────────────────────────
 def _validate_input_quality(question: Optional[str], parameters: dict, domain: str) -> tuple[bool, str]:
     if not question and not parameters:
@@ -85,80 +156,6 @@ class ConversationalAnswerRequest(BaseModel):
 class BatchPredictRequest(BaseModel):
     domain:     str        = Field(..., example="student")
     batch_data: list[dict] = Field(..., example=[{"study_hours": 3}])
-
-
-# ── GET /predict/domains ──────────────────────────────────────
-@router.get("/domains")
-async def get_domains():
-    """
-    Returns all 11 registered domains with their full parameter schemas.
-    Used by the frontend ChipParameterModal to build dynamic parameter collection.
-
-    FIX: Previously read p.get("name","") — YAML uses 'key', not 'name'.
-    FIX: Previously passed raw options list — chips were showing [object Object].
-         Now returns options as [{label, value}] for correct chip rendering.
-    FIX: Added 'values' array alongside 'options' for clean value lookup.
-    """
-    try:
-        registry = _load_registry()
-        result = {}
-        for domain_key, cfg in registry.items():
-            if domain_key not in VALID_DOMAINS:
-                continue
-
-            params_raw = cfg.get("parameters", [])
-            params_out = {}
-
-            for p in params_raw:
-                if not isinstance(p, dict):
-                    continue
-
-                # ── FIX BUG 1: YAML uses 'key', not 'name' ───────────────
-                param_key = p.get("key") or p.get("name") or ""
-                if not param_key:
-                    continue   # skip malformed entries
-
-                # Build options — YAML options are [{label: "...", value: ...}]
-                # We return them as-is so ChipParameterModal can display label + submit value
-                raw_options = p.get("options", [])
-
-                # Normalise to [{label, value}] regardless of source format
-                normalised_options = []
-                for opt in raw_options:
-                    if isinstance(opt, dict):
-                        normalised_options.append({
-                            "label": str(opt.get("label", opt.get("value", ""))),
-                            "value": opt.get("value", opt.get("label", "")),
-                        })
-                    else:
-                        normalised_options.append({"label": str(opt), "value": opt})
-
-                params_out[param_key] = {
-                    "type":        p.get("type", "categorical"),
-                    # ── FIX: use explicit label from YAML, not generated from key ──
-                    "label":       p.get("label", param_key.replace("_", " ").title()),
-                    "description": p.get("description", ""),
-                    "options":     normalised_options,   # [{label, value}] for ChipParameterModal
-                    "range":       p.get("range", []),
-                    "weight":      p.get("weight", "medium"),
-                    "required":    p.get("required", False),
-                    "placeholder": p.get("placeholder", ""),
-                }
-
-            result[domain_key] = {
-                "name":              cfg.get("display_name", cfg.get("name", domain_key)),
-                "description":       cfg.get("description", ""),
-                "prediction_label":  cfg.get("prediction_label", "Probability"),
-                "disclaimer":        cfg.get("disclaimer"),
-                "brier_score":       cfg.get("brier_score"),
-                "auc":               cfg.get("auc"),
-                "status":            cfg.get("status", "ACTIVE"),
-                "parameters":        params_out,
-            }
-        return result
-    except Exception as e:
-        logger.error(f"get_domains failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ── POST /predict ─────────────────────────────────────────────
