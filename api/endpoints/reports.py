@@ -9,7 +9,7 @@ from db.database import get_prediction_by_id
 # ── Import internal report generators ───────────────────────────
 from reports.pdf_generator import generate_pdf
 from reports.docx_generator import generate_docx
-from reports.excel_generator import generate_excel
+from reports.excel_generator import generate_xlsx
 from reports.pptx_generator import generate_pptx
 
 router = APIRouter()
@@ -105,7 +105,7 @@ async def generate_report(
         elif target_fmt == "docx":
             generate_docx(data, filepath)
         elif target_fmt == "xlsx":
-            generate_excel(data, filepath)
+            generate_xlsx(data, filepath)
         elif target_fmt == "pptx":
             generate_pptx(data, filepath)
         else:
