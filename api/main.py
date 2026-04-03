@@ -39,6 +39,7 @@ app.add_middleware(SlowAPIMiddleware)
 # ── CORS ────────────────────────────────────────────────────────
 # In production, ALLOW_ORIGINS should be restricted to your Vercel domain.
 # e.g. ["https://sambhav.vercel.app"]
+# We also include common Vercel preview URL patterns.
 ALLOW_ORIGINS = os.getenv("ALLOW_ORIGINS", "*").split(",")
 
 app.add_middleware(
@@ -47,6 +48,7 @@ app.add_middleware(
     allow_credentials = True,
     allow_methods     = ["*"],
     allow_headers     = ["*"],
+    expose_headers    = ["*"],
 )
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
