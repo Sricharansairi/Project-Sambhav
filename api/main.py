@@ -7,13 +7,15 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 
 # ── Bulk Env Loading (HF Secret Support) ──────────────────────
 load_dotenv()
-# If ENV_FILE is set as a secret, write it to a temporary .env and reload
+# If ENV_FILE is set as a secret, parse it directly into os.environ
 env_file_content = os.getenv("ENV_FILE")
 if env_file_content:
-    with open(".env.hf", "w") as f:
-        f.write(env_file_content)
-    load_dotenv(".env.hf", override=True)
-    os.remove(".env.hf")
+    for line in env_file_content.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ[key.strip()] = value.strip().strip('"').strip("'")
 # ─────────────────────────────────────────────────────────────
 
 from slowapi.util import get_remote_address
