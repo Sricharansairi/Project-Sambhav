@@ -125,19 +125,30 @@ Every prediction is screened for:
 
 ## 🚦 Installation & Deployment
 
-### Backend Setup
-1.  Create a virtual environment: `python -m venv venv`
-2.  Install dependencies: `pip install -r requirements.txt`
-3.  Configure `.env` with:
-    - `GROQ_API_KEY`
-    - `NVIDIA_API_KEY`
-    - `DATABASE_URL`
-4.  Run the server: `python api/main.py`
+### 1. Backend: HuggingFace Spaces (Docker SDK)
+- **Host**: HuggingFace Spaces (Private/Public repo with Docker SDK).
+- **Setup**: 
+    1.  Create a new Space with the **Docker SDK**.
+    2.  Set these **Secrets** in the Space settings:
+        - `GROQ_API_KEY`: For fast inference.
+        - `NVIDIA_API_KEY`: For large-context document analysis.
+        - `DATABASE_URL`: Your Supabase PostgreSQL connection string.
+        - `ALLOW_ORIGINS`: Your Vercel domain (e.g., `https://sambhav.vercel.app`).
+    3.  Push the project code. HF will build using the root `Dockerfile`.
 
-### Frontend Setup
-1.  Navigate to `frontend/`
-2.  Install packages: `npm install`
-3.  Start development: `npm run dev`
+### 2. Frontend: Vercel (React + Vite)
+- **Host**: Vercel.
+- **Setup**:
+    1.  Connect your GitHub repository to Vercel.
+    2.  Set **Root Directory** to `frontend/`.
+    3.  Set **Framework Preset** to `Vite`.
+    4.  Set **Environment Variables**:
+        - `VITE_API_URL`: The URL of your HuggingFace Space (e.g., `https://sricharansairi-project-sambhav.hf.space/api`).
+    5.  Deploy. Vercel will handle the rest with zero-config using the `frontend/vercel.json` for SPA routing.
+
+### 3. Database: Supabase PostgreSQL
+- **Host**: Supabase (Free Tier).
+- **Setup**: Use the `alembic` migrations in the `db/` folder to set up your production schema.
 
 ---
 

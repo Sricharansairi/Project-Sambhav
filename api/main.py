@@ -22,9 +22,14 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
+# ── CORS ────────────────────────────────────────────────────────
+# In production, ALLOW_ORIGINS should be restricted to your Vercel domain.
+# e.g. ["https://sambhav.vercel.app"]
+ALLOW_ORIGINS = os.getenv("ALLOW_ORIGINS", "*").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins     = ["*"],
+    allow_origins     = ALLOW_ORIGINS,
     allow_credentials = True,
     allow_methods     = ["*"],
     allow_headers     = ["*"],
