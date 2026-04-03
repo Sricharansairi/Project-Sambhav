@@ -2,13 +2,18 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pathlib import Path
 from api.endpoints.auth import get_current_user
-from sambhav_exports_v3 import run_exports
 import os
 from db.models import get_db
 from db.database import get_prediction_by_id
 
+# ── Import internal report generators ───────────────────────────
+from reports.pdf_generator import generate_pdf
+from reports.docx_generator import generate_docx
+from reports.excel_generator import generate_excel
+from reports.pptx_generator import generate_pptx
+
 router = APIRouter()
-EXPORTS_DIR = os.getenv("EXPORTS_DIR", "exports")
+EXPORTS_DIR = os.getenv("EXPORTS_DIR", "/tmp")
 
 def pred_to_dict(pred) -> dict:
     """Map PredictionResponse ORM object → export dict."""
@@ -63,25 +68,19 @@ def pred_to_dict(pred) -> dict:
     }
 
 FMT_MAP = {
-    "pdf_simple":   ["1"],
-    "pdf_detailed": ["2"],
-    "pdf_full":     ["3"],
-    "docx":         ["4"],
-    "xlsx":         ["5"],
-    "pptx":         ["6"],
-    "json":         ["7"],
-    "txt":          ["8"],
-    "all":          list("12345678"),
+    "pdf_simple":   "pdf",
+    "pdf_detailed": "pdf",
+    "pdf_full":     "pdf",
+    "docx":         "docx",
+    "xlsx":         "xlsx",
+    "pptx":         "pptx",
 }
+
 MIME_MAP = {
-    "pdf_simple":   "application/pdf",
-    "pdf_detailed": "application/pdf",
-    "pdf_full":     "application/pdf",
+    "pdf":          "application/pdf",
     "docx":         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "xlsx":         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "pptx":         "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    "json":         "application/json",
-    "txt":          "text/plain",
 }
 
 @router.post("/generate-report/{prediction_id}")
@@ -94,26 +93,29 @@ async def generate_report(
     pred = get_prediction_by_id(db, prediction_id)
     if not pred:
         raise HTTPException(404, "Prediction not found")
+    
     data = pred_to_dict(pred)
-    out_dir = f"{EXPORTS_DIR}/{prediction_id}"
-    os.makedirs(out_dir, exist_ok=True)
-    
-    outputs = run_exports(data=data, output_dir=out_dir,
-                          formats=FMT_MAP.get(fmt, ["3"]))
-    
-    key_mapping = {
-        "1":"pdf_simple","2":"pdf_detailed","3":"pdf_full",
-        "4":"docx","5":"xlsx","6":"pptx","7":"json","8":"txt"
-    }
-    requested_formats = FMT_MAP.get(fmt, ["3"])
-    first_choice = requested_formats[0]
-    
-    file_path = outputs.get(key_mapping.get(first_choice)) or (list(outputs.values())[0] if outputs else None)
-    
-    if not file_path or not os.path.exists(file_path):
-        raise HTTPException(500, "Failed to generate report")
-        
-    mime = MIME_MAP.get(fmt, "application/pdf")
-    ext  = Path(file_path).suffix
-    return FileResponse(file_path, media_type=mime,
-                        filename=f"{prediction_id}_report{ext}")
+    target_fmt = FMT_MAP.get(fmt, "pdf")
+    filename = f"sambhav_report_{prediction_id}.{target_fmt}"
+    filepath = os.path.join(EXPORTS_DIR, filename)
+
+    try:
+        if target_fmt == "pdf":
+            generate_pdf(data, filepath)
+        elif target_fmt == "docx":
+            generate_docx(data, filepath)
+        elif target_fmt == "xlsx":
+            generate_excel(data, filepath)
+        elif target_fmt == "pptx":
+            generate_pptx(data, filepath)
+        else:
+            raise HTTPException(400, f"Unsupported format: {fmt}")
+
+        return FileResponse(
+            path=filepath,
+            filename=filename,
+            media_type=MIME_MAP.get(target_fmt)
+        )
+    except Exception as e:
+        logger.error(f"Report generation failed: {e}")
+        raise HTTPException(500, f"Failed to generate report: {str(e)}")
