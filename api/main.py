@@ -5,6 +5,9 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from slowapi import Limiter, _rate_limit_exceeded_handler
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # ── Bulk Env Loading (HF Secret Support) ──────────────────────
 load_dotenv()
 # Force log all env vars starting with BYPASS for debugging
@@ -44,9 +47,6 @@ from slowapi.middleware import SlowAPIMiddleware
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(
     title       = "Project Sambhav API",
