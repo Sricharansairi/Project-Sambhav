@@ -23,7 +23,20 @@ if not DATABASE_URL:
 
 # Supabase / PostgreSQL database configuration (U.08)
 # Optimization: Added pool_pre_ping=True to handle disconnected connections gracefully
-# Optimization: Added pool_size and max_overflow for high-concurrency HF deployment
+# Optimization: Added connect_args to force IPv4 and set specific timeout/keepalives
+connect_args = {
+    "connect_timeout": 10,
+    "keepalives": 1,
+    "keepalives_idle": 30,
+    "keepalives_interval": 10,
+    "keepalives_count": 5,
+}
+
+# If we are in production (Hugging Face), we try to force IPv4
+# by adding gssencmode=disable which sometimes helps with psycopg2 connection issues in containers
+if os.getenv("DEPLOY_ENV") == "production":
+    connect_args["gssencmode"] = "disable"
+
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
@@ -31,6 +44,7 @@ engine = create_engine(
     max_overflow=20,
     pool_timeout=30,
     pool_recycle=1800,
+    connect_args=connect_args
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
