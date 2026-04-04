@@ -46,6 +46,7 @@ class PredictionResult:
     audit_flags: list
     model_used: str
     calibrated: bool
+    reasoning: Optional[str] = None
     error: Optional[str] = None
     sarvagna_features: Optional[dict] = None
 
@@ -60,6 +61,7 @@ class PredictionResult:
             "confidence_tier":    self.confidence_tier,
             "gap":                round(self.agreement_gap or 0.0, 4),
             "reliability_index":  self.reliability_index,
+            "reasoning":          self.reasoning,
             "shap_values":        self.shap_values or {},
             "audit_flags":        [
                 {
@@ -673,27 +675,34 @@ def predict(
         # LLM Prediction Task (if needed)
         llm_future = None
         if llm_probability is None:
-            from llm.groq_client import get_llm_probability
+            from llm.groq_client import llm_predict
             # We use high-speed Groq 8B for fast generation
-            llm_future = executor.submit(get_llm_probability, question, params, domain)
+            llm_future = executor.submit(llm_predict, domain, params, question)
         
         # Collect results
-        if domain == "sarvagna":
-            ml_prob, sarvagna_info = ml_future.result()
-            model_desc = "sarvagna_820d"
-        else:
-            ml_prob, model_desc = ml_future.result()
-            sarvagna_info = None
+        try:
+            if domain == "sarvagna":
+                ml_prob, sarvagna_info = ml_future.result()
+                model_desc = "sarvagna_820d"
+            else:
+                ml_prob, model_desc = ml_future.result()
+                sarvagna_info = None
+        except Exception as e:
+            log.warning(f"[{domain}] ML layer future failed: {e}")
+            ml_prob, model_desc, sarvagna_info = None, "ml_error", None
             
+        llm_reasoning = None
         if llm_future:
             try:
-                llm_prob = llm_future.result()
-                # Ensure it's a float
-                if isinstance(llm_prob, dict):
-                    llm_prob = llm_prob.get("probability", 0.5)
+                llm_res = llm_future.result()
+                if isinstance(llm_res, dict):
+                    llm_prob = llm_res.get("probability", 0.5)
+                    llm_reasoning = llm_res.get("reasoning")
+                else:
+                    llm_prob = float(llm_res)
                 log.info(f"[{domain}] LLM layer generated probability: {llm_prob}")
             except Exception as e:
-                log.warning(f"[{domain}] LLM layer failed: {e}")
+                log.warning(f"[{domain}] LLM layer future failed: {e}")
                 llm_prob = None
         else:
             llm_prob = llm_probability
@@ -766,6 +775,7 @@ def predict(
         audit_flags=audit_flags,
         model_used=model_desc,
         calibrated=(ml_prob is not None and "isotonic" in model_desc),
+        reasoning=llm_reasoning,
         sarvagna_features=sarvagna_info,
     )
 

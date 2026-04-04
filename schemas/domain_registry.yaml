@@ -154,7 +154,7 @@ domains:
   job_life:
     display_name: "Job Life"
     emoji_icon: "👥"
-    model_path: "models/hr_v18_xgb.joblib"
+    model_path: "models/hr_v14_xgb.joblib"
     brier_score: 0.0700
     auc: 0.9139
     accuracy: 0.874
@@ -312,7 +312,7 @@ domains:
   fitness:
     display_name: "Fitness & Body"
     emoji_icon: "💪"
-    model_path: "models/fitness_v16_xgb.joblib"
+    model_path: "models/fitness_v14_xgb.joblib"
     brier_score: 0.0709
     auc: 0.9052
     accuracy: 0.881
@@ -538,8 +538,8 @@ domains:
   claim:
     display_name: "Claim Credibility"
     emoji_icon: "🔍"
-    model_path: "models/claim_v17_xgb.joblib"
-    model_path_synthetic: "models/claim_v17_synthetic.joblib"
+    model_path: "models/claim_v14_xgb.joblib"
+    model_path_synthetic: "models/claim_v14_synthetic.joblib"
     blend_weight: 0.72          # 72% real-data model, 28% synthetic
     brier_score: 0.1211
     auc: 0.8949

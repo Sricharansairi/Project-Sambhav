@@ -78,15 +78,29 @@ def llm_predict(domain: str, parameters: dict, question: str = None) -> dict:
 
     # Few-shot calibration examples per domain
     few_shots = {
+        "fitness": [
+            {"role": "user",      "content": "Domain: fitness | Q: Am I obese? | weight_kg:110, height_cm:170, activity_level:0"},
+            {"role": "assistant", "content": "PROBABILITY: 88.5\nCONFIDENCE: HIGH\nREASONING: Weight of 110kg at 170cm results in a BMI of 38.0 (Class II Obesity). Sedentary activity level further compounds the risk.\nKEY_FACTORS: bmi(+35%), weight_kg(+20%), activity_level(+5%)"},
+            {"role": "user",      "content": "Domain: fitness | Q: Am I fit? | weight_kg:70, height_cm:180, activity_level:3"},
+            {"role": "assistant", "content": "PROBABILITY: 12.0\nCONFIDENCE: HIGH\nREASONING: BMI is 21.6 (Healthy range) and daily activity level indicates high cardiovascular health. Risk of obesity is minimal.\nKEY_FACTORS: activity_level(-15%), bmi(-10%), weight_kg(-5%)"},
+        ],
         "student": [
-            {"role": "user",      "content": "Domain: student | Q: Will this student pass? | study_hours:1, attendance:40, stress:very high, past_score:30"},
-            {"role": "assistant", "content": "PROBABILITY: 22\nCONFIDENCE: HIGH\nREASONING: Three simultaneous failures: 40% attendance, score of 30, 1hr study. All three are critical negatives far below thresholds.\nKEY_FACTORS: attendance(-20%), past_score(-15%), study_hours(-8%)"},
-            {"role": "user",      "content": "Domain: student | Q: Will this student pass? | study_hours:3, attendance:70, stress:medium, past_score:55"},
-            {"role": "assistant", "content": "PROBABILITY: 53\nCONFIDENCE: MODERATE\nREASONING: Mixed moderate signals. No strong positives. Past score slightly below average pulls below 65% base rate.\nKEY_FACTORS: attendance(neutral), past_score(-5%), stress(neutral)"},
-            {"role": "user",      "content": "Domain: student | Q: Will this student pass? | study_hours:2, attendance:50, stress:high, past_score:42"},
-            {"role": "assistant", "content": "PROBABILITY: 35\nCONFIDENCE: MODERATE\nREASONING: Below average attendance, high stress and low past score are three compounding negatives. Only 2 study hours insufficient to offset.\nKEY_FACTORS: attendance(-15%), past_score(-10%), stress(-5%)"},
-            {"role": "user",      "content": "Domain: student | Q: Will this student pass? | study_hours:3, attendance:70, stress:medium, past_score:55"},
-            {"role": "assistant", "content": "PROBABILITY: 53\nCONFIDENCE: MODERATE\nREASONING: Attendance at 70% is acceptable but not strong. Past score of 55 is below average. Medium stress is neutral. No signal is strongly positive — sits just below 65% base rate at 53%.\nKEY_FACTORS: attendance(-5%), past_score(-7%), stress(neutral)"},
+            {"role": "user",      "content": "Domain: student | Q: Am I eligible for Infosys? | cgpa:8.5, technical_skills:3, internships_done:2, backlogs:0"},
+            {"role": "assistant", "content": "PROBABILITY: 92.4\nCONFIDENCE: HIGH\nREASONING: High CGPA (8.5) exceeds most eligibility cutoffs (usually 6.0-7.0). 2 internships and advanced skills make for a highly competitive profile.\nKEY_FACTORS: cgpa(+25%), internships_done(+15%), backlogs(cleared)"},
+            {"role": "user",      "content": "Domain: student | Q: Can I get into a top company? | cgpa:5.5, technical_skills:1, internships_done:0, backlogs:2"},
+            {"role": "assistant", "content": "PROBABILITY: 14.8\nCONFIDENCE: HIGH\nREASONING: CGPA of 5.5 is below the standard 60% threshold for top-tier companies. Active backlogs and lack of internships are significant blockers.\nKEY_FACTORS: backlogs(-30%), cgpa(-20%), technical_skills(-10%)"},
+        ],
+        "financial": [
+            {"role": "user",      "content": "Domain: financial | Q: Will this investment yield returns? | annual_income:1200000, transaction_amount:500000, stability_duration:5"},
+            {"role": "assistant", "content": "PROBABILITY: 74.2\nCONFIDENCE: MODERATE\nREASONING: Strong income-to-transaction ratio and 5 years of stability provide a solid buffer. High probability of success based on capital liquidity.\nKEY_FACTORS: stability_duration(+15%), annual_income(+10%), capital_ratio(+5%)"},
+        ],
+        "job_life": [
+            {"role": "user",      "content": "Domain: job_life | Q: Will I get promoted? | role_satisfaction:4, tenure_duration:3, growth_opportunity:3"},
+            {"role": "assistant", "content": "PROBABILITY: 68.5\nCONFIDENCE: MODERATE\nREASONING: Moderate tenure and positive role satisfaction are good signals. Growth opportunities are present but not guaranteed.\nKEY_FACTORS: tenure_duration(+10%), role_satisfaction(+8%), growth_opportunity(+5%)"},
+        ],
+        "health": [
+            {"role": "user",      "content": "Domain: health | Q: Am I at risk of diabetes? | glucose:140, age:45, health_habits:1"},
+            {"role": "assistant", "content": "PROBABILITY: 62.8\nCONFIDENCE: HIGH\nREASONING: Elevated glucose (140 mg/dL) and poor health habits in a 45-year-old indicate significant risk. Immediate lifestyle change recommended.\nKEY_FACTORS: glucose(+25%), health_habits(+15%), age(+5%)"},
         ],
         "hr": [
             {"role": "user",      "content": "Domain: hr | Q: Will this employee leave? | job_satisfaction:very low, overtime:yes, work_life_balance:bad"},
@@ -140,24 +154,45 @@ def llm_predict(domain: str, parameters: dict, question: str = None) -> dict:
     }
     messages = [system_msg] + shots + [user_msg]
 
-    # Using 8B for speed in probability estimation (Section 6.1)
-    raw = call_groq(messages, temperature=0.1, max_tokens=150, model="llama-3.1-8b-instant")
+    # Use high-speed Groq 8B for fast generation
+    raw = call_groq(messages, temperature=0.1, max_tokens=250, model="llama-3.1-8b-instant")
 
-    # Parse response
+    # Robust parsing logic
     result = {"raw": raw, "probability": None, "confidence": "MODERATE",
               "reasoning": "", "key_factors": []}
-    for line in raw.split("\n"):
-        if line.startswith("PROBABILITY:"):
-            try:
-                result["probability"] = float(line.split(":")[1].strip()) / 100
-            except:
-                pass
-        elif line.startswith("CONFIDENCE:"):
-            result["confidence"] = line.split(":")[1].strip()
-        elif line.startswith("REASONING:"):
-            result["reasoning"] = line.split(":", 1)[1].strip()
-        elif line.startswith("KEY_FACTORS:"):
-            result["key_factors"] = [f.strip() for f in line.split(":",1)[1].split(",")]
+    
+    # Extract PROBABILITY
+    prob_match = re.search(r"PROBABILITY:\s*([\d\.]+)", raw)
+    if prob_match:
+        try:
+            result["probability"] = float(prob_match.group(1)) / 100
+        except: pass
+        
+    # Extract CONFIDENCE
+    conf_match = re.search(r"CONFIDENCE:\s*(HIGH|MODERATE|LOW|CRITICAL)", raw)
+    if conf_match:
+        result["confidence"] = conf_match.group(1)
+        
+    # Extract REASONING
+    reason_match = re.search(r"REASONING:\s*(.*?)(?:\n|$|KEY_FACTORS)", raw, re.DOTALL)
+    if reason_match:
+        result["reasoning"] = reason_match.group(1).strip()
+        
+    # Extract KEY_FACTORS
+    factors_match = re.search(r"KEY_FACTORS:\s*(.*?)(?:\n|$)", raw)
+    if factors_match:
+        result["key_factors"] = [f.strip() for f in factors_match.group(1).split(",")]
+
+    # Safety Fallback: If parsing fails, use regex for any number
+    if result["probability"] is None:
+        numbers = re.findall(r"\d+\.?\d*", raw)
+        if numbers:
+            # Assume first number > 1 and < 100 is the probability
+            for n in numbers:
+                val = float(n)
+                if 0 < val <= 100:
+                    result["probability"] = val / 100
+                    break
 
     return result
 
