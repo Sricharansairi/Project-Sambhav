@@ -7,6 +7,11 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 
 # ── Bulk Env Loading (HF Secret Support) ──────────────────────
 load_dotenv()
+# Force log all env vars starting with BYPASS for debugging
+for k, v in os.environ.items():
+    if k.startswith("BYPASS"):
+        logger.info(f"System ENV check: {k}={v}")
+
 # If ENV_FILE is set as a secret, parse it directly into os.environ
 env_file_content = os.getenv("ENV_FILE")
 if env_file_content:
@@ -22,9 +27,13 @@ if env_file_content:
             os.environ[key] = value
             # Re-load into dotenv if possible
             if key == "SECRET_KEY": logger.info(f"Loaded SECRET_KEY from ENV_FILE")
-            if key == "BYPASS_AUTH": logger.info(f"Loaded BYPASS_AUTH={value} from ENV_FILE")
+            if "BYPASS" in key: logger.info(f"Loaded {key}={value} from ENV_FILE")
         except Exception as e:
             logger.warning(f"Failed to parse line in ENV_FILE: {line} - {e}")
+
+# Final explicit override check
+if os.getenv("BYPASS_AUTH") == "true":
+    logger.info("CRITICAL: BYPASS_AUTH is confirmed TRUE in final environment")
 # ─────────────────────────────────────────────────────────────
 
 from slowapi.util import get_remote_address
