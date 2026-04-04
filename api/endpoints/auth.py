@@ -85,19 +85,25 @@ class LoginRequest(BaseModel):
 async def register(req: RegisterRequest, db: Session = Depends(get_db)):
     # Check if email exists
     email = req.email.lower().strip()
+    logger.info(f"Attempting to register user: {email}")
     if get_user_by_email(db, email):
+        logger.warning(f"Registration failed: Email {email} already exists")
         raise HTTPException(status_code=400, detail="Email already registered")
         
-    # Postgres handles gen_random_uuid internally
-    user = create_user(
-        db=db, 
-        email=email, 
-        password_hash=_hash_password(req.password),
-        tier="registered"
-    )
+    try:
+        # Postgres handles gen_random_uuid internally
+        user = create_user(
+            db=db, 
+            email=email, 
+            password_hash=_hash_password(req.password),
+            tier="registered"
+        )
+        logger.info(f"Successfully created user in DB: {email}")
+    except Exception as e:
+        logger.error(f"Database error during registration for {email}: {e}")
+        raise HTTPException(status_code=500, detail="Database registration failed. Please try again.")
     
     token = _create_token(str(user.user_id), user.email)
-    logger.info(f"New user registered in Supabase: {user.email}")
     
     # Log audit event
     log_event(db, "registration", user_id=str(user.user_id), details={"email": user.email})
@@ -108,17 +114,21 @@ async def register(req: RegisterRequest, db: Session = Depends(get_db)):
 @router.post("/login")
 async def login(req: LoginRequest, db: Session = Depends(get_db)):
     email = req.email.lower().strip()
+    logger.info(f"Login attempt for: {email}")
     user = get_user_by_email(db, email)
     
     if not user:
+        logger.warning(f"Login failed: User {email} not found in database")
         log_event(db, "failed_login_user_not_found", details={"email": email})
         raise HTTPException(status_code=401, detail="User not found or disabled")
         
     if not _verify_password(req.password, user.password_hash):
+        logger.warning(f"Login failed: Incorrect password for {email}")
         log_event(db, "failed_login_wrong_password", details={"email": email})
         raise HTTPException(status_code=401, detail="Invalid email or password")
         
     if not user.is_active:
+        logger.warning(f"Login failed: Account {email} is disabled")
         log_event(db, "failed_login_disabled", user_id=str(user.user_id))
         raise HTTPException(status_code=401, detail="User not found or disabled")
         
