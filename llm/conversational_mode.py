@@ -150,6 +150,18 @@ class ConversationalSession:
 
         if resp.get("ready_to_predict") or resp.get("reliability", 0) >= 75:
             self.complete = True
+            # Even if ready, return the message as final feedback if any
+            if not self.history: # First turn
+                 return {
+                    "step":        1,
+                    "total_steps": self.max_steps,
+                    "param_key":   resp.get("asking_for") or "context",
+                    "question":    resp.get("message"),
+                    "options":     resp.get("suggested_options", []),
+                    "progress":    "1 of dynamic",
+                    "reliability": round(resp.get("reliability", 0), 1),
+                    "can_skip":    True,
+                }
             return None
 
         self.reliability = resp.get("reliability", 0) / 100.0
