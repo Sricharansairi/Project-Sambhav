@@ -16,9 +16,12 @@ from passlib.context import CryptContext
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-SECRET_KEY         = os.getenv("SECRET_KEY", "sambhav_secret_key_2026")
 ALGORITHM          = "HS256"
 TOKEN_EXPIRE_HOURS = 24
+
+def get_secret_key() -> str:
+    """Dynamically fetch SECRET_KEY to ensure it's up-to-date with HF secrets."""
+    return os.getenv("SECRET_KEY", "sambhav_secret_key_2026")
 
 security = HTTPBearer(auto_error=False)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -33,12 +36,17 @@ def _verify_password(password: str, hashed: str) -> bool:
 def _create_token(user_id: str, email: str, tier: str = "registered") -> str:
     expire  = datetime.utcnow() + timedelta(hours=TOKEN_EXPIRE_HOURS)
     payload = {"sub": email, "user_id": user_id, "tier": tier, "exp": expire}
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(payload, get_secret_key(), algorithm=ALGORITHM)
 
 def _decode_token(token: str) -> dict:
     try:
-        # First try HS256 (the standard HS256 algorithm)
-        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        # HS256 verification with aud check disabled for maximum compatibility (Section 5.2.1)
+        return jwt.decode(
+            token, 
+            get_secret_key(), 
+            algorithms=[ALGORITHM],
+            options={"verify_aud": False}
+        )
     except JWTError as e:
         # If HS256 fails, it might be an older session or a transient issue
         logger.warning(f"Token decoding failed: {e}")

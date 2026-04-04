@@ -30,6 +30,10 @@ async function _post(path: string, body: object) {
     headers: authHeaders(),
     body:    JSON.stringify(body),
   });
+  if (res.status === 401) {
+    clearToken();
+    window.location.href = '/auth';
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new SambhavAPIError(res.status, err.detail || err.error || JSON.stringify(err));
@@ -39,6 +43,10 @@ async function _post(path: string, body: object) {
 
 async function _get(path: string) {
   const res = await fetch(`${API_BASE}${path}`, { headers: authHeaders() });
+  if (res.status === 401) {
+    clearToken();
+    window.location.href = '/auth';
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new SambhavAPIError(res.status, err.detail || JSON.stringify(err));
@@ -52,6 +60,10 @@ async function _postBlob(path: string, body: object): Promise<Blob> {
     headers: authHeaders(),
     body:    JSON.stringify(body),
   });
+  if (res.status === 401) {
+    clearToken();
+    window.location.href = '/auth';
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new SambhavAPIError(res.status, err.detail || JSON.stringify(err));
