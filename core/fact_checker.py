@@ -118,11 +118,14 @@ def search_web(query: str) -> list:
     # Step 3 — Semantic Filtering (Section 9.4)
     # Filter out results that don't mention key terms from the query
     keywords = [w.lower() for w in query.split() if len(w) > 3]
+    if not keywords:
+        keywords = [w.lower() for w in query.split()]
+        
     filtered = []
     for r in valid_results:
-        text = (r["title"] + " " + r["snippet"]).lower()
-        # If at least one keyword matches or it's from a high-authority source
-        if any(k in text for k in keywords) or r["source"] == "The Guardian":
+        text = (r["title"] + " " + (r.get("snippet") or "")).lower()
+        # MUST match at least one keyword, no exceptions for source name
+        if any(k in text for k in keywords):
             filtered.append(r)
             
     return filtered[:6]
