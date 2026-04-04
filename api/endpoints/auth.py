@@ -89,6 +89,11 @@ class LoginRequest(BaseModel):
 
 @router.post("/register")
 async def register(req: RegisterRequest, db: Session = Depends(get_db)):
+    # ── BYPASS AUTH (GOD MODE) ────────────────────────────────
+    if os.getenv("BYPASS_AUTH") == "true":
+        token = _create_token("00000000-0000-0000-0000-000000000001", "admin@sambhav.ai", "power")
+        return {"success": True, "token": token, "email": "admin@sambhav.ai", "tier": "power", "user_id": "admin"}
+
     # Check if email exists
     email = req.email.lower().strip()
     logger.info(f"Attempting to register user: {email}")
@@ -134,6 +139,11 @@ async def guest_login():
 
 @router.post("/login")
 async def login(req: LoginRequest, db: Session = Depends(get_db)):
+    # ── BYPASS AUTH (GOD MODE) ────────────────────────────────
+    if os.getenv("BYPASS_AUTH") == "true":
+        token = _create_token("00000000-0000-0000-0000-000000000001", "admin@sambhav.ai", "power")
+        return {"success": True, "token": token, "email": "admin@sambhav.ai", "tier": "power", "user_id": "admin"}
+
     email = req.email.lower().strip()
     logger.info(f"Login attempt for: {email}")
     user = get_user_by_email(db, email)
