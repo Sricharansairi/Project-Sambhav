@@ -132,10 +132,16 @@ export function Prediction() {
       console.log('Available domains:', Object.keys(all));
       if (all[selectedDomain]) {
         setDomainInfo(all[selectedDomain]);
+        // RESET parameters when domain changes to ensure chips are dynamic
+        setParameters({});
+        setDynamicParams([]);
       } else {
         console.warn(`Domain ${selectedDomain} not found in registry`);
-        // Fallback to student if selected is invalid to prevent UI break
-        if (all['student']) setDomainInfo(all['student']);
+        if (all['student']) {
+          setDomainInfo(all['student']);
+          setParameters({});
+          setDynamicParams([]);
+        }
       }
     })
       .catch(err => {

@@ -23,10 +23,10 @@ warnings.filterwarnings('ignore')
 # ─────────────────────────────────────────────────
 # PATHS — adjust if needed
 # ─────────────────────────────────────────────────
-BASE     = os.path.expanduser("~/Desktop/Sri_Coding/Project Sambhav")
+BASE     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODELS   = os.path.join(BASE, "models")
 DATA     = os.path.join(BASE, "data/processed")
-REPORTS  = os.path.join(BASE, "eval_reports")
+REPORTS  = os.path.join(os.getenv("EXPORTS_DIR", "/tmp"), "eval_reports")
 os.makedirs(REPORTS, exist_ok=True)
 
 CLAIM_MODEL   = os.path.join(MODELS, "claim_model_v2-2.pkl")

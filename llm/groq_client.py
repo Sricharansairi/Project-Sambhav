@@ -9,20 +9,27 @@ logger = logging.getLogger(__name__)
 # ── Load all Groq keys ────────────────────────────────────────
 def _load_keys():
     keys = []
-    for i in range(1, 10):
-        k = os.getenv(f"GROQ_API_KEY_{i}") or os.getenv("GROQ_API_KEY")
+    # Check numbered keys
+    for i in range(1, 15):
+        k = os.getenv(f"GROQ_API_KEY_{i}")
         if k and k not in keys:
             keys.append(k)
+    # Check default key if no numbered keys found
     if not keys:
-        raise ValueError("No Groq API keys found in .env")
+        k = os.getenv("GROQ_API_KEY")
+        if k: keys.append(k)
     return keys
 
+# Pre-load keys but don't crash if empty (Section 12.4 Resilience)
 GROQ_KEYS  = _load_keys()
 _key_index = 0
 
 def _get_client():
     global _key_index
-    key = GROQ_KEYS[_key_index % len(GROQ_KEYS)]
+    current_keys = _load_keys() if not GROQ_KEYS else GROQ_KEYS
+    if not current_keys:
+        raise ValueError("No Groq API keys found in .env or environment")
+    key = current_keys[_key_index % len(current_keys)]
     _key_index += 1
     return Groq(api_key=key)
 

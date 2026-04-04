@@ -10,19 +10,31 @@ load_dotenv()
 # If ENV_FILE is set as a secret, parse it directly into os.environ
 env_file_content = os.getenv("ENV_FILE")
 if env_file_content:
+    logger.info("Found ENV_FILE secret, parsing...")
     for line in env_file_content.splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
-        key, value = line.split("=", 1)
-        os.environ[key.strip()] = value.strip().strip('"').strip("'")
+        try:
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            os.environ[key] = value
+            # Re-load into dotenv if possible
+            if key == "SECRET_KEY": logger.info(f"Loaded SECRET_KEY from ENV_FILE")
+        except Exception as e:
+            logger.warning(f"Failed to parse line in ENV_FILE: {line} - {e}")
 # ─────────────────────────────────────────────────────────────
 
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-load_dotenv()
-sys.path.insert(0, os.path.expanduser("~/Desktop/Sri_Coding/Project Sambhav"))
+
+# Get absolute path of project root
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)

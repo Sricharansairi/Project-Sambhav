@@ -15,7 +15,7 @@ try:
 except:
     HAS_CATBOOST = False
 
-BASE = os.path.expanduser("~/Desktop/Sri_Coding/Project Sambhav")
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def grade(b):
     if   b < 0.05: return "🔥🔥 GODTIER"

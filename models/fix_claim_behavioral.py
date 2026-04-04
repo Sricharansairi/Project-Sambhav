@@ -12,7 +12,7 @@ from imblearn.over_sampling import SMOTE
 import xgboost as xgb
 import lightgbm as lgb
 
-BASE = os.path.expanduser("~/Desktop/Sri_Coding/Project Sambhav")
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def grade(b):
     if   b < 0.05: return "🔥🔥 GODTIER"

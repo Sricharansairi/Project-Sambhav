@@ -1,7 +1,10 @@
 import os, sys, warnings
 warnings.filterwarnings('ignore')
-os.chdir(os.path.expanduser('~/Desktop/Sri_Coding/Project Sambhav'))
-sys.path.insert(0, os.path.expanduser('~/Desktop/Sri_Coding/Project Sambhav'))
+# Get project root
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+os.chdir(PROJECT_ROOT)
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 import joblib, numpy as np, pandas as pd
 from sklearn.metrics import brier_score_loss, roc_auc_score, accuracy_score
 from sklearn.calibration import calibration_curve

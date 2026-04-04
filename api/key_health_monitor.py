@@ -2,12 +2,17 @@ import os, sys, time, logging, json
 from datetime import datetime
 from dotenv import load_dotenv
 
-sys.path.insert(0, os.path.expanduser("~/Desktop/Sri_Coding/Project Sambhav"))
+# Get absolute path of project root
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-BASE = os.path.expanduser("~/Desktop/Sri_Coding/Project Sambhav")
-LOG_FILE = f"{BASE}/api/key_health_log.json"
+# Use /tmp for logs in production, project root in dev
+BASE = PROJECT_ROOT
+LOG_FILE = os.path.join(os.getenv("EXPORTS_DIR", "/tmp"), "key_health_log.json")
 
 # ── Load health log ───────────────────────────────────────────
 def load_log() -> dict:

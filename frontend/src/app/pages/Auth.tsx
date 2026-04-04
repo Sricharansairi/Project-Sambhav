@@ -93,22 +93,21 @@ export function Auth() {
   const handleGuest = async () => {
     setIsLoading(true); setError(null);
     try {
-      const data = await auth.guest();
-      if (data.success) {
-        localStorage.setItem('sambhav_user', JSON.stringify({
-          email: 'guest',
-          tier: 'guest',
-          user_id: 'guest',
-        }));
+      // Use the new /auth/guest endpoint for a secure token
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/guest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (data.token) {
+        auth.setToken(data.token);
+        auth.setUser({ email: 'guest', tier: 'guest' });
         navigate('/dashboard');
       } else {
-        // Guest fallback — navigate even if API fails
-        localStorage.setItem('sambhav_user', JSON.stringify({ email: 'guest', tier: 'guest' }));
-        navigate('/dashboard');
+        throw new Error('Guest login failed');
       }
-    } catch {
-      localStorage.setItem('sambhav_user', JSON.stringify({ email: 'guest', tier: 'guest' }));
-      navigate('/dashboard');
+    } catch (err: any) {
+      setError(err.message || 'Guest entry failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
