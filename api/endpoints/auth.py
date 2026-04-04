@@ -136,9 +136,13 @@ async def get_me(user: dict = Depends(get_current_user), db: Session = Depends(g
     if user.get("email") == "guest":
         return {"success": True, "user": user, "stats": {}}
         
-    db_user = get_user_by_email(db, user.get("email"))
+    db_user = get_user_by_email(db, user.get("sub") or user.get("email"))
     if not db_user:
-        raise HTTPException(status_code=404, detail="User not found")
+        # Instead of 404, fallback to guest mode if the DB record is missing
+        # This prevents breaking the UI if a user is deleted but has a valid token
+        logger.warning(f"User {user.get('email')} has valid token but not found in DB. Falling back to guest.")
+        guest_payload = {"sub": "guest", "email": "guest", "tier": "guest", "user_id": None}
+        return {"success": True, "user": guest_payload, "stats": {}}
         
     # Return safe user profile
     profile = {
