@@ -111,6 +111,21 @@ async def register(req: RegisterRequest, db: Session = Depends(get_db)):
     return {"success": True, "token": token,
             "email": user.email, "tier": "registered", "user_id": str(user.user_id)}
 
+# ── Guest Entry ──────────────────────────────────────────────
+@router.post("/guest")
+async def guest_login():
+    """Returns a hardcoded guest token for seamless entry."""
+    # Ensure guest token uses the same structure and dynamic secret key
+    token = _create_token(user_id="guest", email="guest", tier="guest")
+    return {
+        "success": True, 
+        "token": token, 
+        "email": "guest", 
+        "tier": "guest",
+        "user_id": "guest",
+        "note": "Guest predictions limited to 10/day"
+    }
+
 @router.post("/login")
 async def login(req: LoginRequest, db: Session = Depends(get_db)):
     email = req.email.lower().strip()
@@ -122,10 +137,15 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)):
         log_event(db, "failed_login_user_not_found", details={"email": email})
         raise HTTPException(status_code=401, detail="User not found or disabled")
         
-    if not _verify_password(req.password, user.password_hash):
-        logger.warning(f"Login failed: Incorrect password for {email}")
-        log_event(db, "failed_login_wrong_password", details={"email": email})
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+    try:
+        if not _verify_password(req.password, user.password_hash):
+            logger.warning(f"Login failed: Incorrect password for {email}")
+            log_event(db, "failed_login_wrong_password", details={"email": email})
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+    except Exception as e:
+        logger.error(f"Password verification error for {email}: {e}")
+        # If hash identification fails, it's likely an old/incompatible hash format
+        raise HTTPException(status_code=401, detail="Invalid account format. Please reset your password.")
         
     if not user.is_active:
         logger.warning(f"Login failed: Account {email} is disabled")
@@ -141,14 +161,6 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)):
     
     return {"success": True, "token": token,
             "email": user.email, "tier": user.tier, "user_id": str(user.user_id)}
-
-@router.post("/guest")
-async def guest_login():
-    """Returns a hardcoded guest token for seamless entry."""
-    # Note: user_id is None for guests
-    token = _create_token(user_id="guest", email="guest", tier="guest")
-    return {"success": True, "token": token, "email": "guest", "tier": "guest",
-            "note": "Guest predictions limited to 10/day"}
 
 @router.get("/me")
 async def get_me(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
