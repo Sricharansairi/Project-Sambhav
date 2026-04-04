@@ -83,10 +83,12 @@ export function Prediction() {
   const [hybridLoading,   setHybridLoading]   = useState(false);
 
   // Document
+  const [docFile, setDocFile] = useState<File | null>(null);
   const [docLoading, setDocLoading] = useState(false);
   const [docResult,  setDocResult]  = useState<any>(null);
 
   // Voice
+  const [voiceFile, setVoiceFile] = useState<File | null>(null);
   const [voiceLoading, setVoiceLoading] = useState(false);
   const [voiceResult,  setVoiceResult]  = useState<any>(null);
 
@@ -320,6 +322,51 @@ export function Prediction() {
         setShowResults(true); setTimeout(() => setIsAnimating(true), 100); return;
       }
 
+      if (selectedMode === 'document') {
+        if (!docFile) { setApiError('Please select a document first.'); return; }
+        setDocLoading(true); setDocResult(null); setInsufficientInfo(null);
+        try {
+          const res = await analyzeDocument(docFile, selectedDomain, inputText || undefined);
+          if (res.insufficient_info) {
+            setInsufficientInfo({ reason: res.reason, missing: res.missing_info });
+          } else {
+            setDocResult(res);
+            if (res.prediction) setPredResult(res.prediction);
+            if (res.outcomes) { setOutcomes(res.outcomes); setShowResults(true); setTimeout(() => setIsAnimating(true), 20); }
+          }
+        } catch (e: any) { setApiError(e.message || 'Document analysis failed'); } 
+        finally { setDocLoading(false); }
+        return;
+      }
+
+      if (selectedMode === 'voice') {
+        if (!voiceFile) { setApiError('Please select an audio file first.'); return; }
+        setVoiceLoading(true); setVoiceResult(null); setInsufficientInfo(null);
+        try {
+          const BASE = (import.meta as any).env?.VITE_API_BASE ?? 'http://localhost:8000';
+          const fd = new FormData(); fd.append('file', voiceFile); fd.append('domain', selectedDomain);
+          const resp = await fetch(`${BASE}/vision/voice`, { method: 'POST', body: fd });
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.insufficient_info) {
+              setInsufficientInfo({ reason: data.reason });
+            } else {
+              setVoiceResult(data);
+              if (data.prediction) {
+                setPredResult(data.prediction);
+                if (data.outcomes) setOutcomes(data.outcomes);
+                setShowResults(true); setTimeout(() => setIsAnimating(true), 20);
+              }
+            }
+          } else {
+            const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+            throw new Error(err.detail || 'Voice analysis failed');
+          }
+        } catch (e: any) { setApiError(e.message || 'Voice analysis failed'); } 
+        finally { setVoiceLoading(false); }
+        return;
+      }
+
       if (selectedMode === 'adversarial') {
         const preset = ADVERSARIAL_PRESETS[selectedDomain] || ADVERSARIAL_PRESETS.default;
         const res = await runAdversarial({ domain: selectedDomain, parameters: preset, question: inputText || undefined });
@@ -531,19 +578,8 @@ export function Prediction() {
         placeholder="What should Sambhav predict from this document?" value={inputText} onChange={e => setInputText(e.target.value)} />
       <div className={docLoading ? 'opacity-20 pointer-events-none' : ''}>
         <FileUploadZone accept="*" maxSize={50}
-          onFileSelect={async (files) => {
-            if (!files.length) return;
-            setDocLoading(true); setDocResult(null); setInsufficientInfo(null); setApiError(null);
-            try {
-              const res = await analyzeDocument(files[0], selectedDomain, inputText || undefined);
-              if (res.insufficient_info) {
-                setInsufficientInfo({ reason: res.reason, missing: res.missing_info });
-              } else {
-                setDocResult(res);
-                if (res.prediction) setPredResult(res.prediction);
-                if (res.outcomes) { setOutcomes(res.outcomes); setShowResults(true); setTimeout(() => setIsAnimating(true), 20); }
-              }
-            } catch (e: any) { setApiError(e.message || 'Document analysis failed'); } finally { setDocLoading(false); }
+          onFileSelect={(files) => {
+            if (files.length) setDocFile(files[0]);
           }} />
       </div>
       {docLoading && <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin" /><span>Analysing document…</span></div>}
@@ -761,27 +797,8 @@ export function Prediction() {
         placeholder="What should Sambhav listen for?" value={inputText} onChange={e => setInputText(e.target.value)} />
       <div className={voiceLoading ? 'opacity-20 pointer-events-none' : ''}>
         <FileUploadZone accept="audio/*" maxSize={20}
-          onFileSelect={async (files) => {
-            if (!files.length) return;
-            setVoiceLoading(true); setVoiceResult(null); setInsufficientInfo(null); setApiError(null);
-            try {
-              const BASE = (import.meta as any).env?.VITE_API_BASE ?? 'http://localhost:8000';
-              const fd = new FormData(); fd.append('file', files[0]); fd.append('domain', selectedDomain);
-              const resp = await fetch(`${BASE}/vision/voice`, { method: 'POST', body: fd });
-              if (resp.ok) {
-                const data = await resp.json();
-                if (data.insufficient_info) {
-                  setInsufficientInfo({ reason: data.reason });
-                } else {
-                  setVoiceResult(data);
-                  if (data.prediction) {
-                    setPredResult(data.prediction);
-                    setOutcomes(data.outcomes || []);
-                    setShowResults(true); setTimeout(() => setIsAnimating(true), 20);
-                  }
-                }
-              }
-            } catch (e: any) { setApiError(e.message || 'Voice analysis failed'); } finally { setVoiceLoading(false); }
+          onFileSelect={(files) => {
+            if (files.length) setVoiceFile(files[0]);
           }} />
       </div>
       {voiceLoading && <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin" /><span>Transcribing audio…</span></div>}
@@ -1255,7 +1272,7 @@ export function Prediction() {
     );
   };
 
-  const hideGenBtn  = selectedMode === 'document' || selectedMode === 'voice';
+  const hideGenBtn = false;
   const genLabel: Record<string, string> = {
     adversarial: 'Run Adversarial Test', whatif: 'Generate Scenario Tree',
     comparative: 'Compare Scenarios', expert: 'Run Expert Debate',
