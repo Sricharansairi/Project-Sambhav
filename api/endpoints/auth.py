@@ -84,13 +84,14 @@ class LoginRequest(BaseModel):
 @router.post("/register")
 async def register(req: RegisterRequest, db: Session = Depends(get_db)):
     # Check if email exists
-    if get_user_by_email(db, req.email):
+    email = req.email.lower().strip()
+    if get_user_by_email(db, email):
         raise HTTPException(status_code=400, detail="Email already registered")
         
     # Postgres handles gen_random_uuid internally
     user = create_user(
         db=db, 
-        email=req.email, 
+        email=email, 
         password_hash=_hash_password(req.password),
         tier="registered"
     )
@@ -102,25 +103,24 @@ async def register(req: RegisterRequest, db: Session = Depends(get_db)):
     log_event(db, "registration", user_id=str(user.user_id), details={"email": user.email})
     
     return {"success": True, "token": token,
-            "email": req.email, "tier": "registered", "user_id": str(user.user_id)}
-
-@router.post("/guest")
-async def guest_login():
-    """Returns a hardcoded guest token for seamless entry."""
-    # Note: user_id is None for guests
-    token = _create_token(user_id="guest", email="guest", tier="guest")
-    return {"success": True, "token": token, "email": "guest", "tier": "guest"}
+            "email": user.email, "tier": "registered", "user_id": str(user.user_id)}
 
 @router.post("/login")
 async def login(req: LoginRequest, db: Session = Depends(get_db)):
-    user = get_user_by_email(db, req.email)
+    email = req.email.lower().strip()
+    user = get_user_by_email(db, email)
     
-    if not user or not _verify_password(req.password, user.password_hash):
-        log_event(db, "failed_login", details={"email": req.email})
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if not user:
+        log_event(db, "failed_login_user_not_found", details={"email": email})
+        raise HTTPException(status_code=401, detail="User not found or disabled")
+        
+    if not _verify_password(req.password, user.password_hash):
+        log_event(db, "failed_login_wrong_password", details={"email": email})
+        raise HTTPException(status_code=401, detail="Invalid email or password")
         
     if not user.is_active:
-        raise HTTPException(status_code=403, detail="Account disabled")
+        log_event(db, "failed_login_disabled", user_id=str(user.user_id))
+        raise HTTPException(status_code=401, detail="User not found or disabled")
         
     # Update last login timestamp
     user.last_login = datetime.utcnow()
@@ -134,9 +134,10 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)):
 
 @router.post("/guest")
 async def guest_login():
-    token = _create_token("guest_id", "guest", "guest")
-    return {"success": True, "token": token,
-            "email": "guest", "tier": "guest",
+    """Returns a hardcoded guest token for seamless entry."""
+    # Note: user_id is None for guests
+    token = _create_token(user_id="guest", email="guest", tier="guest")
+    return {"success": True, "token": token, "email": "guest", "tier": "guest",
             "note": "Guest predictions limited to 10/day"}
 
 @router.get("/me")

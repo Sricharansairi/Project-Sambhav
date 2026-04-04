@@ -18,7 +18,7 @@ def create_user(db: Session, email: str,
                 password_hash: str, tier: str = "registered") -> User:
     user = User(
         user_id       = uuid.uuid4(),
-        email         = email,
+        email         = email.lower().strip(),
         password_hash = password_hash,
         tier          = tier,
         created_at    = datetime.utcnow(),
@@ -27,13 +27,15 @@ def create_user(db: Session, email: str,
     db.add(user)
     db.commit()
     db.refresh(user)
-    logger.info(f"User created: {email}")
+    logger.info(f"User created: {email.lower().strip()}")
     return user
 
 # Removed get_user_by_username - use get_user_by_email instead
 
 def get_user_by_email(db: Session, email: str) -> User:
-    return db.query(User).filter(User.email == email).first()
+    if not email:
+        return None
+    return db.query(User).filter(User.email.ilike(email.lower())).first()
 
 def update_user_brier(db: Session, user_id: str,
                       domain: str, brier_score: float):
