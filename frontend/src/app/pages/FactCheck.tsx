@@ -193,36 +193,7 @@ export function FactCheck() {
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground max-w-xl">{result.summary || ''}</p>
-                      {/* Sources */}
-                      {result.sources && result.sources.length > 0 && (
-                        <div className="space-y-3 mt-4">
-                          <h3 className="text-xs font-bold uppercase text-muted-foreground tracking-wider flex items-center gap-2">
-                            <Shield className="w-3 h-3" /> Supporting Evidence
-                          </h3>
-                          <div className="grid gap-2">
-                            {result.sources.map((source: any, i: number) => (
-                              <motion.a
-                                key={i}
-                                href={source.link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors block group"
-                                whileHover={{ x: 4 }}
-                              >
-                                <div className="flex justify-between items-start mb-1">
-                                  <span className="text-[10px] font-bold text-primary truncate max-w-[200px]">
-                                    {source.source || (source.link ? new URL(source.link).hostname : 'Source')}
-                                  </span>
-                                  <ChevronRight className="w-3 h-3 text-muted-foreground group-hover:text-primary transition-colors" />
-                                </div>
-                                <p className="text-xs font-medium mb-1 line-clamp-1 group-hover:text-primary transition-colors">
-                                  {source.title}
-                                </p>
-                              </motion.a>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      {/* Sources Section Removed as requested */}
                     </div>
                     <div className="text-right">
                       <div className="text-5xl font-bold" style={{ color: verdict.color }}>
