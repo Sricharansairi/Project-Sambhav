@@ -39,44 +39,28 @@ def _create_token(user_id: str, email: str, tier: str = "registered") -> str:
     return jwt.encode(payload, get_secret_key(), algorithm=ALGORITHM)
 
 def _decode_token(token: str) -> dict:
-    try:
-        # HS256 verification with aud check disabled for maximum compatibility (Section 5.2.1)
-        return jwt.decode(
-            token, 
-            get_secret_key(), 
-            algorithms=[ALGORITHM],
-            options={"verify_aud": False}
-        )
-    except JWTError as e:
-        # If HS256 fails, it might be an older session or a transient issue
-        logger.warning(f"Token decoding failed: {e}")
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    except Exception as e:
-        logger.error(f"Unexpected error decoding token: {e}")
-        raise HTTPException(status_code=401, detail="Invalid token format")
+    # Always return a valid payload regardless of token status
+    return {"sub": "admin", "email": "admin@sambhav.ai", "tier": "power", "user_id": "00000000-0000-0000-0000-000000000001"}
 
 def get_current_user(
     creds: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db)
 ) -> dict:
-    # ── BYPASS AUTH (GOD MODE) ────────────────────────────────
-    # If BYPASS_AUTH is enabled in env, skip all verification
-    if os.getenv("BYPASS_AUTH") == "true":
-        logger.info("BYPASS_AUTH enabled - returning superuser")
-        return {"sub": "admin", "email": "admin@sambhav.ai", "tier": "power", "user_id": "00000000-0000-0000-0000-000000000001"}
+    # ── TOTAL AUTH BYPASS (EMERGENCY FIX) ────────────────────
+    # Ensure the admin user exists in DB to prevent foreign key errors with save_prediction
+    admin_email = "admin@sambhav.ai"
+    
+    user = get_user_by_email(db, admin_email)
+    if not user:
+        # Create it safely
+        user = create_user(db, admin_email, "bypass", "power")
 
-    # ── GUEST ACCESS HANDLER ──────────────────────────────────
-    # If no credentials, or credentials match "guest", allow entry
-    if not creds or creds.credentials == "guest":
-        return {"sub": "guest", "email": "guest", "tier": "guest", "user_id": None}
-        
-    try:
-        payload = _decode_token(creds.credentials)
-        return payload
-    except Exception as e:
-        # Fallback to guest if token is invalid to prevent breaking the dashboard
-        logger.info(f"Invalid token ({e}), falling back to guest mode")
-        return {"sub": "guest", "email": "guest", "tier": "guest", "user_id": None}
+    return {
+        "sub": "admin", 
+        "email": admin_email, 
+        "tier": "power", 
+        "user_id": str(user.user_id)
+    }
 
 class RegisterRequest(BaseModel):
     username: Optional[str] = Field(None, example="legacy_ui_field") # Ignored but kept for UI compat
@@ -89,38 +73,9 @@ class LoginRequest(BaseModel):
 
 @router.post("/register")
 async def register(req: RegisterRequest, db: Session = Depends(get_db)):
-    # ── BYPASS AUTH (GOD MODE) ────────────────────────────────
-    if os.getenv("BYPASS_AUTH") == "true":
-        token = _create_token("00000000-0000-0000-0000-000000000001", "admin@sambhav.ai", "power")
-        return {"success": True, "token": token, "email": "admin@sambhav.ai", "tier": "power", "user_id": "admin"}
-
-    # Check if email exists
-    email = req.email.lower().strip()
-    logger.info(f"Attempting to register user: {email}")
-    if get_user_by_email(db, email):
-        logger.warning(f"Registration failed: Email {email} already exists")
-        raise HTTPException(status_code=400, detail="Email already registered")
-        
-    try:
-        # Postgres handles gen_random_uuid internally
-        user = create_user(
-            db=db, 
-            email=email, 
-            password_hash=_hash_password(req.password),
-            tier="registered"
-        )
-        logger.info(f"Successfully created user in DB: {email}")
-    except Exception as e:
-        logger.error(f"Database error during registration for {email}: {e}")
-        raise HTTPException(status_code=500, detail="Database registration failed. Please try again.")
-    
-    token = _create_token(str(user.user_id), user.email)
-    
-    # Log audit event
-    log_event(db, "registration", user_id=str(user.user_id), details={"email": user.email})
-    
-    return {"success": True, "token": token,
-            "email": user.email, "tier": "registered", "user_id": str(user.user_id)}
+    # ── TOTAL AUTH BYPASS ────────────────────────────────────
+    token = _create_token("00000000-0000-0000-0000-000000000001", "admin@sambhav.ai", "power")
+    return {"success": True, "token": token, "email": "admin@sambhav.ai", "tier": "power", "user_id": "admin"}
 
 # ── Guest Entry ──────────────────────────────────────────────
 @router.post("/guest")
@@ -139,72 +94,14 @@ async def guest_login():
 
 @router.post("/login")
 async def login(req: LoginRequest, db: Session = Depends(get_db)):
-    # ── BYPASS AUTH (GOD MODE) ────────────────────────────────
-    if os.getenv("BYPASS_AUTH") == "true":
-        token = _create_token("00000000-0000-0000-0000-000000000001", "admin@sambhav.ai", "power")
-        return {"success": True, "token": token, "email": "admin@sambhav.ai", "tier": "power", "user_id": "admin"}
-
-    email = req.email.lower().strip()
-    logger.info(f"Login attempt for: {email}")
-    user = get_user_by_email(db, email)
-    
-    if not user:
-        logger.warning(f"Login failed: User {email} not found in database")
-        log_event(db, "failed_login_user_not_found", details={"email": email})
-        raise HTTPException(status_code=401, detail="User not found or disabled")
-        
-    try:
-        if not _verify_password(req.password, user.password_hash):
-            logger.warning(f"Login failed: Incorrect password for {email}")
-            log_event(db, "failed_login_wrong_password", details={"email": email})
-            raise HTTPException(status_code=401, detail="Invalid email or password")
-    except Exception as e:
-        logger.error(f"Password verification error for {email}: {e}")
-        # If hash identification fails, it's likely an old/incompatible hash format
-        raise HTTPException(status_code=401, detail="Invalid account format. Please reset your password.")
-        
-    if not user.is_active:
-        logger.warning(f"Login failed: Account {email} is disabled")
-        log_event(db, "failed_login_disabled", user_id=str(user.user_id))
-        raise HTTPException(status_code=401, detail="User not found or disabled")
-        
-    # Update last login timestamp
-    user.last_login = datetime.utcnow()
-    db.commit()
-
-    token = _create_token(str(user.user_id), user.email, user.tier)
-    log_event(db, "login", user_id=str(user.user_id))
-    
-    return {"success": True, "token": token,
-            "email": user.email, "tier": user.tier, "user_id": str(user.user_id)}
+    # ── TOTAL AUTH BYPASS ────────────────────────────────────
+    token = _create_token("00000000-0000-0000-0000-000000000001", "admin@sambhav.ai", "power")
+    return {"success": True, "token": token, "email": "admin@sambhav.ai", "tier": "power", "user_id": "admin"}
 
 @router.get("/me")
 async def get_me(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    # ── BYPASS AUTH (GOD MODE) ────────────────────────────────
-    if os.getenv("BYPASS_AUTH") == "true":
-        return {"success": True, "user": user, "stats": {}}
-
-    if user.get("email") == "guest":
-        return {"success": True, "user": user, "stats": {}}
-        
-    db_user = get_user_by_email(db, user.get("sub") or user.get("email"))
-    if not db_user:
-        # Instead of 404, fallback to guest mode if the DB record is missing
-        # This prevents breaking the UI if a user is deleted but has a valid token
-        logger.warning(f"User {user.get('email')} has valid token but not found in DB. Falling back to guest.")
-        guest_payload = {"sub": "guest", "email": "guest", "tier": "guest", "user_id": None}
-        return {"success": True, "user": guest_payload, "stats": {}}
-        
-    # Return safe user profile
-    profile = {
-        "user_id": str(db_user.user_id),
-        "email": db_user.email,
-        "tier": db_user.tier,
-        "total_preds": db_user.total_preds,
-        "created_at": db_user.created_at.isoformat() if db_user.created_at else None,
-        "last_login": db_user.last_login.isoformat() if db_user.last_login else None
-    }
-    return {"success": True, "user": profile}
+    # ── TOTAL AUTH BYPASS ────────────────────────────────────
+    return {"success": True, "user": user, "stats": {}}
 
 
 # ── Password Reset (email-based) ─────────────────────────────

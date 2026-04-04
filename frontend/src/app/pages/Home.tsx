@@ -191,7 +191,7 @@ export function Home() {
               <p className="text-base text-muted-foreground mb-6">
                 Join researchers, analysts, and decision-makers who trust Sambhav for critical predictions
               </p>
-              <Link to="/auth">
+              <Link to="/dashboard">
                 <motion.button
                   className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-primary to-secondary text-black font-medium text-sm"
                   whileHover={{ scale: 1.05 }}

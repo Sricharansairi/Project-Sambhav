@@ -96,6 +96,9 @@ def _guardian_search(query: str) -> list:
 
 
 def search_web(query: str) -> list:
+    """
+    Enhanced search with relevance filtering.
+    """
     results = _duckduckgo_search(query)
     # Filter out results with missing or search-engine links
     results = [r for r in results if r.get("link") and "duckduckgo.com" not in r["link"]]
@@ -112,8 +115,17 @@ def search_web(query: str) -> list:
         if link.startswith("http"):
             valid_results.append(r)
             
-    logger.info(f"Search '{query[:40]}' -> {len(valid_results)} results")
-    return valid_results[:8]
+    # Step 3 — Semantic Filtering (Section 9.4)
+    # Filter out results that don't mention key terms from the query
+    keywords = [w.lower() for w in query.split() if len(w) > 3]
+    filtered = []
+    for r in valid_results:
+        text = (r["title"] + " " + r["snippet"]).lower()
+        # If at least one keyword matches or it's from a high-authority source
+        if any(k in text for k in keywords) or r["source"] == "The Guardian":
+            filtered.append(r)
+            
+    return filtered[:6]
 
 
 # ── Strip thinking tags ───────────────────────────────────────

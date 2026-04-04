@@ -218,9 +218,6 @@ export function FactCheck() {
                                 <p className="text-xs font-medium mb-1 line-clamp-1 group-hover:text-primary transition-colors">
                                   {source.title}
                                 </p>
-                                <p className="text-[10px] text-muted-foreground line-clamp-2 italic">
-                                  "{source.snippet}"
-                                </p>
                               </motion.a>
                             ))}
                           </div>
