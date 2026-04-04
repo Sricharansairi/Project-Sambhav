@@ -22,6 +22,7 @@ if env_file_content:
             os.environ[key] = value
             # Re-load into dotenv if possible
             if key == "SECRET_KEY": logger.info(f"Loaded SECRET_KEY from ENV_FILE")
+            if key == "BYPASS_AUTH": logger.info(f"Loaded BYPASS_AUTH={value} from ENV_FILE")
         except Exception as e:
             logger.warning(f"Failed to parse line in ENV_FILE: {line} - {e}")
 # ─────────────────────────────────────────────────────────────
