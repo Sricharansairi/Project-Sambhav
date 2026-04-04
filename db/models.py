@@ -1,4 +1,4 @@
-import os
+import os, socket
 import uuid
 from datetime import datetime
 from sqlalchemy import (create_engine, Column, String, Float, Integer,
@@ -13,8 +13,50 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+def resolve_to_ipv4(url: str) -> str:
+    """
+    Forces IPv4 resolution for the database host.
+    Hugging Face Spaces often have broken IPv6 routes, resulting in 'Network is unreachable'.
+    """
+    if not url or "://" not in url:
+        return url
+    
+    try:
+        from urllib.parse import urlparse, urlunparse
+        parsed = urlparse(url)
+        if not parsed.hostname:
+            return url
+            
+        # Resolve hostname to IPv4 specifically
+        # socket.getaddrinfo returns a list of (family, type, proto, canonname, sockaddr)
+        # We filter for socket.AF_INET (IPv4)
+        addr_info = socket.getaddrinfo(parsed.hostname, parsed.port, socket.AF_INET)
+        if addr_info:
+            ipv4_address = addr_info[0][4][0]
+            # Reconstruct URL with IP instead of hostname
+            netloc = f"{ipv4_address}"
+            if parsed.port:
+                netloc += f":{parsed.port}"
+            if parsed.username:
+                user_pass = parsed.username
+                if parsed.password:
+                    user_pass += f":{parsed.password}"
+                netloc = f"{user_pass}@{netloc}"
+            
+            new_url = urlunparse(parsed._replace(netloc=netloc))
+            print(f"DEBUG: Resolved {parsed.hostname} → {ipv4_address} (Forced IPv4)")
+            return new_url
+    except Exception as e:
+        print(f"WARNING: IPv4 resolution failed for {url}: {e}")
+    return url
+
+if DATABASE_URL:
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    
+    # Force IPv4 in production to bypass HF IPv6 issues
+    if os.getenv("DEPLOY_ENV") == "production":
+        DATABASE_URL = resolve_to_ipv4(DATABASE_URL)
 
 # Default to generic sqlite in-memory or fallback, but warn the user
 if not DATABASE_URL:
