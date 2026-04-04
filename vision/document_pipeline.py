@@ -119,17 +119,17 @@ def analyze_with_llm(text: str, domain: str) -> dict:
                 label = p.get("label", key)
                 param_info += f"- {key}: {label}\n"
 
-        # NO CHUNKING — send the whole text (Kimi K2.5 supports 1M tokens)
+        # NO CHUNKING — send the whole text (Large context window supported)
         messages  = [
             {"role": "system", "content": (
-                f"You are the NVIDIA NIM Kimi K2.5 document analysis engine for {domain} domain.\n"
-                "You have a 1 million token context window. Analyze the entire document.\n"
+                f"You are the document analysis engine for Project Sambhav ({domain} domain).\n"
+                "Analyze the entire document text provided and extract parameter values.\n"
                 f"Extract values for these specific parameters if found:\n{param_info or 'Any domain-relevant signals'}\n\n"
                 "YOUR TASK:\n"
                 "1. Be thorough. Extract every signal that maps to the requested parameters.\n"
                 "2. If values aren't explicitly stated, infer them if possible based on context (with confidence).\n"
-                "3. For the 'Sarvagna' domain, if 'text_input' is a required parameter, set it to a summary of the most important content found in the document.\n"
-                "4. Set 'confidence' to HIGH if you found most parameters or strong signals, LOW only if the document is literally empty or irrelevant.\n\n"
+                "3. For the 'Sarvagna' domain, if 'text_input' is a required parameter, set it to a summary of the content.\n"
+                "4. Set 'confidence' to HIGH if you found most parameters, LOW only if document is irrelevant.\n\n"
                 "Respond ONLY in this exact JSON format:\n"
                 "{\n"
                 '  "domain_detected": "<domain>",\n'
@@ -140,11 +140,12 @@ def analyze_with_llm(text: str, domain: str) -> dict:
                 "}"
             )},
             {"role": "user", "content": (
-                f"Analyze this full document for {domain} domain:\n\n{text}"
+                f"Analyze this full document for {domain} domain:\n\n{text[:50000]}" # Limit to 50k chars for safety, though models support more
             )}
         ]
-        # Using a model that supports large context as per Section 6.5
-        raw = call_nvidia(messages, model="nvidia/kimi-k1.5", temperature=0.2, max_tokens=1000)
+        
+        # Use a stable NVIDIA NIM model
+        raw = call_nvidia(messages, model="meta/llama-3.3-70b-instruct", temperature=0.1, max_tokens=1000)
         
         import json, re
         clean = re.sub(r"```(?:json)?", "", raw).strip()

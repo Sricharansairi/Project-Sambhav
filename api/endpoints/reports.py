@@ -17,6 +17,16 @@ EXPORTS_DIR = os.getenv("EXPORTS_DIR", "/tmp")
 
 def pred_to_dict(pred) -> dict:
     """Map PredictionResponse ORM object → export dict."""
+    # Ensure outcomes is a list of dicts with label and probability
+    raw_outcomes = pred.outcomes if isinstance(pred.outcomes, dict) else {}
+    outcomes_list = []
+    for label, prob in raw_outcomes.items():
+        outcomes_list.append({
+            "label": label.replace("_", " ").title(),
+            "probability": f"{prob*100:.1f}%",
+            "raw_prob": prob
+        })
+
     return {
         "prediction_id":         pred.prediction_id,
         "project_name":          "Project Sambhav",
@@ -26,22 +36,23 @@ def pred_to_dict(pred) -> dict:
         "generated_date":        pred.created_at.strftime("%Y-%m-%d") if getattr(pred, "created_at", None) else "",
         "institution":           "Sri Indu Institute of Engineering & Technology",
         "developer":             "Sricharan Sairi",
-        "version":               "Academic v1.0",
+        "version":               "Academic v1.1",
         "report_url":            f"https://sambhav-app.hf.space/report/{pred.prediction_id}",
-        "domain":                pred.domain,
+        "domain":                pred.domain.replace("_", " ").title(),
         "mode":                  pred.mode,
         "question":              pred.input_text or "Information provided via structured form.",
         "reliability_index":     int((pred.reliability_index or 0.82) * 100) if getattr(pred, "reliability_index", None) and pred.reliability_index <= 1 else int(getattr(pred, "reliability_index", None) or 82),
         "warning_level":         pred.warning_level or "CLEAR",
-        "ml_probability":        pred.ml_probability or 0.5,
-        "llm_probability":       pred.llm_probability or 0.5,
-        "reconciled_probability":pred.reconciled_prob or 0.5,
-        "agreement_gap":         pred.agreement_gap or 0.0,
-        "confidence_interval":   {"low": (pred.reconciled_prob or 0.5) - 0.07,
-                                  "high": (pred.reconciled_prob or 0.5) + 0.07},
+        "ml_probability":        f"{pred.ml_probability*100:.1f}%" if pred.ml_probability is not None else "N/A",
+        "llm_probability":       f"{pred.llm_probability*100:.1f}%" if pred.llm_probability is not None else "N/A",
+        "reconciled_probability":f"{pred.reconciled_prob*100:.1f}%",
+        "agreement_gap":         f"{pred.agreement_gap*100:.1f}%" if pred.agreement_gap is not None else "N/A",
+        "confidence_tier":       getattr(pred, "confidence_tier", "MODERATE"),
+        "confidence_interval":   {"low": f"{((pred.reconciled_prob or 0.5) - 0.07)*100:.1f}%",
+                                  "high": f"{((pred.reconciled_prob or 0.5) + 0.07)*100:.1f}%"},
         "parameters":            pred.parameters or {},
-        "outcomes":              pred.outcomes or [],
-        "shap_values":           pred.shap_values or [],
+        "outcomes":              outcomes_list,
+        "shap_values":           pred.shap_values or {},
         "audit": {
             "overall_status":   pred.audit_status or "PASSED",
             "flags":            pred.audit_flags if isinstance(pred.audit_flags, list) else [],
@@ -49,8 +60,6 @@ def pred_to_dict(pred) -> dict:
             "engine_2_predict": "PASS — Prediction OK",
             "engine_3_conf":    "PASS — Confidence OK",
         },
-        "failure_scenarios":     [],
-        "improvement_actions":   [],
         "model": {
             "name":       "XGBoost + LightGBM Stacking",
             "brier_score": 0.0639,

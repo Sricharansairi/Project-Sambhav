@@ -9,9 +9,9 @@
 
 domains:
 
-  # ── DOMAIN 1: Student Performance ───────────────────────────
+  # ── DOMAIN 1: Student & Career ──────────────────────────────
   student:
-    display_name: "Student Performance"
+    display_name: "Student & Career"
     emoji_icon: "📚"
     model_path: "models/student_v14_xgb.joblib"
     brier_score: 0.0639
@@ -20,106 +20,67 @@ domains:
     status: TROPHY
     model_available: true
     blend_mode: false
-    supported_outcomes: ["pass", "fail"]
-    question_template: "Will this student pass their exams?"
+    supported_outcomes: ["eligible_success", "ineligible_failure"]
+    question_template: "Is this student/candidate likely to succeed or be eligible for this opportunity?"
     parameters:
+      - key: cgpa
+        label: "Current CGPA (0–10 scale)?"
+        description: "Cumulative Grade Point Average"
+        type: number
+        min: 0
+        max: 10
+        default: 7.5
+        required: true
+
+      - key: technical_skills
+        label: "Technical Skills Proficiency?"
+        description: "Core competency in relevant technology stacks"
+        type: chips
+        required: true
+        options:
+          - { label: "Beginner",     value: 1 }
+          - { label: "Intermediate", value: 2 }
+          - { label: "Advanced",     value: 3 }
+          - { label: "Expert",       value: 4 }
+
+      - key: internships_done
+        label: "Number of completed internships?"
+        type: chips
+        required: true
+        options:
+          - { label: "0",    value: 0 }
+          - { label: "1",    value: 1 }
+          - { label: "2",    value: 2 }
+          - { label: "3+",   value: 3 }
+
+      - key: backlogs
+        label: "Any active backlogs?"
+        type: chips
+        required: true
+        options:
+          - { label: "No",  value: 0 }
+          - { label: "Yes", value: 1 }
+
       - key: study_hours
-        label: "How many hours does the student study per day?"
+        label: "How many hours do you study per day?"
         description: "Average daily study time"
         type: chips
-        required: true
+        required: false
         options:
-          - { label: "0 – 1 hr",   value: 0.5 }
-          - { label: "1 – 2 hrs",  value: 1.5 }
-          - { label: "2 – 4 hrs",  value: 3.0 }
-          - { label: "4 – 6 hrs",  value: 5.0 }
-          - { label: "6 – 9 hrs",  value: 7.5 }
-          - { label: "9+ hrs",     value: 10.0 }
+          - { label: "0 – 2 hrs",  value: 1.0 }
+          - { label: "2 – 5 hrs",  value: 3.5 }
+          - { label: "5 – 8 hrs",  value: 6.5 }
+          - { label: "8+ hrs",     value: 10.0 }
 
-      - key: sleep_hours
-        label: "How many hours does the student sleep per night?"
-        description: "Average nightly sleep duration"
-        type: chips
-        required: true
-        options:
-          - { label: "< 4 hrs",   value: 3.0 }
-          - { label: "4 – 5 hrs", value: 4.5 }
-          - { label: "5 – 6 hrs", value: 5.5 }
-          - { label: "6 – 7 hrs", value: 6.5 }
-          - { label: "7 – 8 hrs", value: 7.5 }
-          - { label: "8 – 9 hrs", value: 8.5 }
-          - { label: "9+ hrs",    value: 9.5 }
-
-      - key: attendance_pct
-        label: "What is the student's attendance percentage?"
-        description: "Classes attended out of total classes"
-        type: number
-        min: 0
-        max: 100
-        default: 75
-        required: true
-
-      - key: stress_level
-        label: "What is the student's current stress level?"
-        description: "Self-reported or observed stress"
-        type: chips
-        required: true
-        options:
-          - { label: "Low",     value: 0 }
-          - { label: "Medium",  value: 1 }
-          - { label: "High",    value: 2 }
-          - { label: "Extreme", value: 3 }
-
-      - key: past_score
-        label: "What was the student's last exam score? (0–100)"
-        description: "Most recent examination result"
-        type: number
-        min: 0
-        max: 100
-        default: 60
-        required: true
-
-      - key: motivation
-        label: "How motivated is the student? (1 = very low, 5 = very high)"
-        description: "Intrinsic motivation level"
+      - key: communication_level
+        label: "Communication & Soft Skills?"
         type: chips
         required: false
         options:
-          - { label: "1 – Very Low", value: 1 }
-          - { label: "2 – Low",      value: 2 }
-          - { label: "3 – Medium",   value: 3 }
-          - { label: "4 – High",     value: 4 }
-          - { label: "5 – Very High",value: 5 }
-
-      - key: preparation_days
-        label: "How many days before the exam did they start preparing?"
-        description: "Lead time for exam preparation"
-        type: chips
-        required: false
-        options:
-          - { label: "0 – 2 days",  value: 1 }
-          - { label: "3 – 7 days",  value: 5 }
-          - { label: "8 – 14 days", value: 11 }
-          - { label: "15+ days",    value: 20 }
-
-      - key: project_complexity
-        label: "What is the project's complexity level?"
-        description: "How difficult or multifaceted is the current project?"
-        type: chips
-        required: false
-        options:
-          - { label: "Low",    value: 1 }
-          - { label: "Medium", value: 2 }
-          - { label: "High",   value: 3 }
-
-      - key: project_progress
-        label: "What is the current project progress (%)?"
-        description: "Completion status of the project"
-        type: number
-        min: 0
-        max: 100
-        default: 0
-        required: false
+          - { label: "Poor",      value: 1 }
+          - { label: "Average",   value: 2 }
+          - { label: "Good",      value: 3 }
+          - { label: "Excellent", value: 4 }
 
   # ── DOMAIN 2: High School Outcomes ──────────────────────────
   high_school:
@@ -347,9 +308,9 @@ domains:
           - { label: "Yes — mild",   value: 1 }
           - { label: "Yes — serious",value: 2 }
 
-  # ── DOMAIN 5: Fitness Performance ───────────────────────────
+  # ── DOMAIN 5: Fitness & Body Performance ────────────────────
   fitness:
-    display_name: "Fitness"
+    display_name: "Fitness & Body"
     emoji_icon: "💪"
     model_path: "models/fitness_v16_xgb.joblib"
     brier_score: 0.0709
@@ -358,9 +319,25 @@ domains:
     status: GREAT
     model_available: true
     blend_mode: false
-    supported_outcomes: ["achieves_goal", "does_not_achieve"]
-    question_template: "Will this person achieve their fitness goal?"
+    supported_outcomes: ["fit_healthy", "risk_obesity"]
+    question_template: "What is the likelihood of this person being fit/healthy versus having body-related risks?"
     parameters:
+      - key: weight_kg
+        label: "What is the person's weight in kg?"
+        type: number
+        min: 20
+        max: 250
+        default: 70
+        required: true
+
+      - key: height_cm
+        label: "What is the person's height in cm?"
+        type: number
+        min: 100
+        max: 250
+        default: 170
+        required: true
+
       - key: age
         label: "What is the person's age?"
         type: chips
@@ -372,39 +349,15 @@ domains:
           - { label: "41 – 55", value: 47 }
           - { label: "55+",     value: 62 }
 
-      - key: bmi
-        label: "Current BMI?"
+      - key: activity_level
+        label: "Physical activity frequency?"
         type: chips
         required: true
         options:
-          - { label: "< 18.5",       value: 17 }
-          - { label: "18.5 – 24.9",  value: 22 }
-          - { label: "25 – 29.9",    value: 27 }
-          - { label: "30 – 34.9",    value: 32 }
-          - { label: "35+",          value: 38 }
-
-      - key: sit_ups
-        label: "How many sit-ups can they do in 1 minute?"
-        type: chips
-        required: true
-        options:
-          - { label: "< 10",    value: 5 }
-          - { label: "10 – 20", value: 15 }
-          - { label: "21 – 35", value: 28 }
-          - { label: "36 – 50", value: 43 }
-          - { label: "51 – 70", value: 60 }
-          - { label: "70+",     value: 80 }
-
-      - key: broad_jump_cm
-        label: "Standing broad jump distance (cm)?"
-        type: chips
-        required: false
-        options:
-          - { label: "< 100 cm",     value: 80 }
-          - { label: "100 – 150 cm", value: 125 }
-          - { label: "150 – 200 cm", value: 175 }
-          - { label: "200 – 240 cm", value: 220 }
-          - { label: "240+ cm",      value: 260 }
+          - { label: "Sedentary",   value: 0 }
+          - { label: "1–2x/week",   value: 1 }
+          - { label: "3–4x/week",   value: 2 }
+          - { label: "Daily",       value: 3 }
 
       - key: body_fat_pct
         label: "Estimated body fat percentage?"

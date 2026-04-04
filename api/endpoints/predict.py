@@ -160,11 +160,25 @@ class BatchPredictRequest(BaseModel):
 
 # ── POST /predict ─────────────────────────────────────────────
 @router.post("")
+@router.post("/{domain}")
 async def predict_endpoint(
-    req: PredictRequest,
+    req: PredictRequest = None,
+    domain: str = None,
     db: Session = Depends(get_db),
     user: dict  = Depends(get_current_user)
 ):
+    # Support both /predict (with domain in body) and /predict/{domain}
+    if domain:
+        # If domain is in URL, ensure it's used
+        if req:
+            req.domain = domain
+        else:
+            # Handle case where only URL is used (though unlikely for POST)
+            raise HTTPException(status_code=422, detail="Request body missing")
+    
+    if not req:
+        raise HTTPException(status_code=422, detail="Request body missing")
+
     logger.info(f"POST /predict domain={req.domain}")
 
     valid, reason = _validate_input_quality(req.question, req.parameters or {}, req.domain)
@@ -338,19 +352,27 @@ async def transparency_endpoint(req: TransparencyRequest):
 # ── POST /predict/conversational/start ───────────────────────
 @router.post("/conversational/start")
 async def conversational_start(req: ConversationalStartRequest):
+    """
+    Starts a smart conversational session.
+    Automatically detects the best first question based on domain and context.
+    """
     try:
         from llm.conversational_mode import ConversationalSession
         session = ConversationalSession(req.domain, req.question)
         q = session.get_next_question()
         if q is None:
-            # Maybe the domain or question is already enough
             return {
                 "success": True, 
                 "complete": True, 
                 "message": "I already have enough information to generate a prediction.",
                 "session_domain": req.domain
             }
-        return {"success": True, "question": q, "session_domain": req.domain}
+        return {
+            "success": True, 
+            "question": q, 
+            "session_domain": req.domain,
+            "reliability": q.get("reliability", 0)
+        }
     except Exception as e:
         logger.error(f"Conversational start error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to start conversation: {str(e)}")
@@ -359,6 +381,10 @@ async def conversational_start(req: ConversationalStartRequest):
 # ── POST /predict/conversational/answer ──────────────────────
 @router.post("/conversational/answer")
 async def conversational_answer(req: ConversationalAnswerRequest):
+    """
+    Processes a user answer and returns the next smart question.
+    Stops when Reliability Index reaches target threshold.
+    """
     try:
         from llm.conversational_mode import ConversationalSession
         session = ConversationalSession(req.domain, req.question)
@@ -366,18 +392,39 @@ async def conversational_answer(req: ConversationalAnswerRequest):
         session.history = req.history or []
         session.step = req.step - 1
         
-        # In dynamic mode, reliability is returned by the LLM in submit_answer -> get_next_question
+        # Process the answer
         state = session.submit_answer(req.param_key, req.value, req.skipped or False)
         
         if state is None:
              raise ValueError("Failed to process your answer. Please try again.")
+
+        # If complete, prepare for final prediction
+        prediction_ready = None
+        if state.get("complete"):
+            from core.predictor import predict, generate_outcomes
+            params = session.parameters
+            
+            # Run parallel prediction
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                pred_future = executor.submit(predict, domain=req.domain, params=params, question=req.question)
+                out_future  = executor.submit(generate_outcomes, domain=req.domain, parameters=params, question=req.question)
+                
+                prediction = pred_future.result()
+                outcomes   = out_future.result()
+                
+            prediction_ready = {
+                "prediction": prediction.to_dict(),
+                "outcomes": outcomes.get("outcomes", []),
+                "parameters": params
+            }
 
         return {
             "success": True, 
             "state": state, 
             "parameters": session.parameters,
             "history": session.history,
-            "prediction_ready": session.get_prediction_ready() if state.get("complete") else None
+            "prediction_ready": prediction_ready
         }
     except Exception as e:
         logger.error(f"Conversational answer error: {e}")

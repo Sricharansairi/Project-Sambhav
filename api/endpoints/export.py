@@ -108,24 +108,33 @@ async def export_csv(req: ExportRequest, db: Session = Depends(get_db)):
     writer.writerow(["Prediction ID",   data.get("prediction_id", "")])
     writer.writerow(["Domain",          data.get("domain", "")])
     writer.writerow(["Question",        data.get("question", "")])
-    writer.writerow(["Final Probability", data.get("final_probability", "")])
-    writer.writerow(["ML Probability",  data.get("ml_probability", "")])
-    writer.writerow(["LLM Probability", data.get("llm_probability", "")])
-    writer.writerow(["Reliability Index", data.get("reliability_index", "")])
+    writer.writerow(["Final Probability", _fmt_pct(data.get("final_probability"))])
+    writer.writerow(["ML Probability Layer",  _fmt_pct(data.get("ml_probability"))])
+    writer.writerow(["LLM Inference Layer", _fmt_pct(data.get("llm_probability"))])
+    writer.writerow(["Reliability Index", _fmt_pct(data.get("reliability_index"))])
     writer.writerow(["Confidence Tier", data.get("confidence_tier", "")])
-    writer.writerow(["Gap",             data.get("gap", "")])
+    writer.writerow(["Agreement Gap",   _fmt_pct(data.get("gap"))])
+    writer.writerow(["Warning Level",   data.get("warning_level", "CLEAR")])
     writer.writerow(["Mode",            data.get("mode", "")])
+    
     writer.writerow([])
-    writer.writerow(["Parameter", "Value"])
+    writer.writerow(["Detailed Outcomes", "Probability"])
+    outcomes = data.get("outcomes", {})
+    if isinstance(outcomes, dict):
+        for label, prob in outcomes.items():
+            writer.writerow([label, _fmt_pct(prob)])
+
+    writer.writerow([])
+    writer.writerow(["Input Parameter", "Value"])
     for k, v in (data.get("raw_parameters") or data.get("parameters") or {}).items():
         writer.writerow([k, v])
 
     shap = data.get("shap_values", {})
     if shap:
         writer.writerow([])
-        writer.writerow(["SHAP Feature", "Contribution"])
+        writer.writerow(["SHAP Feature Contribution", "Impact Score"])
         for k, v in shap.items():
-            writer.writerow([k, v])
+            writer.writerow([k, _fmt_float(v)])
 
     content = output.getvalue().encode()
     return StreamingResponse(
@@ -147,19 +156,29 @@ async def export_xml(req: ExportRequest, db: Session = Depends(get_db)):
     lines.append(f"  <PredictionId>{_val(data.get('prediction_id',''))}</PredictionId>")
     lines.append(f"  <Domain>{_val(data.get('domain',''))}</Domain>")
     lines.append(f"  <Question>{_val(data.get('question',''))}</Question>")
-    lines.append(f"  <FinalProbability>{_val(data.get('final_probability',''))}</FinalProbability>")
-    lines.append(f"  <MLProbability>{_val(data.get('ml_probability',''))}</MLProbability>")
-    lines.append(f"  <LLMProbability>{_val(data.get('llm_probability',''))}</LLMProbability>")
-    lines.append(f"  <ReliabilityIndex>{_val(data.get('reliability_index',''))}</ReliabilityIndex>")
+    lines.append(f"  <FinalProbability>{_val(_fmt_pct(data.get('final_probability')))}</FinalProbability>")
+    lines.append(f"  <MLProbabilityLayer>{_val(_fmt_pct(data.get('ml_probability')))}</MLProbabilityLayer>")
+    lines.append(f"  <LLMInferenceLayer>{_val(_fmt_pct(data.get('llm_probability')))}</LLMInferenceLayer>")
+    lines.append(f"  <ReliabilityIndex>{_val(_fmt_pct(data.get('reliability_index')))}</ReliabilityIndex>")
     lines.append(f"  <ConfidenceTier>{_val(data.get('confidence_tier',''))}</ConfidenceTier>")
+    lines.append(f"  <AgreementGap>{_val(_fmt_pct(data.get('gap')))}</AgreementGap>")
+    lines.append(f"  <WarningLevel>{_val(data.get('warning_level','CLEAR'))}</WarningLevel>")
     lines.append(f"  <Mode>{_val(data.get('mode',''))}</Mode>")
+    
+    lines.append("  <Outcomes>")
+    outcomes = data.get("outcomes", {})
+    if isinstance(outcomes, dict):
+        for label, prob in outcomes.items():
+            lines.append(f"    <Outcome label=\"{_val(label)}\">{_val(_fmt_pct(prob))}</Outcome>")
+    lines.append("  </Outcomes>")
+
     lines.append("  <Parameters>")
     for k, v in (data.get("raw_parameters") or data.get("parameters") or {}).items():
         lines.append(f"    <{k}>{_val(v)}</{k}>")
     lines.append("  </Parameters>")
     lines.append("  <SHAPValues>")
     for k, v in (data.get("shap_values") or {}).items():
-        lines.append(f"    <Feature name=\"{_val(k)}\">{_val(v)}</Feature>")
+        lines.append(f"    <Feature name=\"{_val(k)}\" impact=\"{_val(_fmt_float(v))}\" />")
     lines.append("  </SHAPValues>")
     lines.append("</SambhavPrediction>")
 

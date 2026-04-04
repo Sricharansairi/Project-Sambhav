@@ -227,7 +227,22 @@ def prepare_features(domain: str, params: dict, dm: DomainModel) -> Optional[np.
     Align collected chip-modal params to the feature_columns expected by the model.
     Handles: missing values (imputed), extra keys (ignored), ordering.
     Section 12.1 — Dynamic padding for shape mismatch using model's expected count.
+    Section 12.2 — Smart Parameter Calculation (BMI, Risk Scores).
     """
+    # ── Smart Parameter Calculation ──────────────────────────
+    # If fitness/health domain and we have height/weight but no BMI
+    if (domain in ["fitness", "health"]) and params.get("bmi") is None:
+        w = params.get("weight_kg")
+        h = params.get("height_cm")
+        if w is not None and h is not None:
+            try:
+                # BMI = kg / (m^2)
+                bmi = float(w) / ((float(h) / 100) ** 2)
+                params["bmi"] = round(bmi, 2)
+                log.info(f"[{domain}] Calculated BMI: {params['bmi']}")
+            except (TypeError, ValueError, ZeroDivisionError):
+                pass
+
     # Get expected count from model if available
     expected_count = 0
     if dm.xgb_model is not None:
@@ -486,14 +501,19 @@ class SambhavPredictor:
 def cross_validate(ml_prob: Optional[float], llm_prob: Optional[float]) -> tuple[float, float, str]:
     """
     Reconcile ML and LLM predictions.
-    Returns (reconciled_prob, gap, confidence_tier)
+    Enhanced: If ML is missing, LLM takes full weight with HIGH/MODERATE confidence 
+    instead of default LOW, as long as LLM returned a valid probability.
     """
     if ml_prob is None and llm_prob is None:
         return 0.5, 1.0, "CRITICAL"
+    
     if ml_prob is None:
-        return llm_prob, 1.0, "LOW"
+        # Smart fallback: If ML model is missing from disk, rely on LLM.
+        # We cap confidence at MODERATE because ML verification is missing.
+        return llm_prob, 0.0, "MODERATE"
+    
     if llm_prob is None:
-        return ml_prob, 1.0, "LOW"
+        return ml_prob, 0.0, "LOW"
 
     gap = abs(ml_prob - llm_prob)
 

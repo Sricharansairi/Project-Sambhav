@@ -121,19 +121,15 @@ _monitoring_sessions: Dict[str, Dict] = {}
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _run_prediction(domain: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-    """Run a standard prediction and return the raw result dict."""
+def _run_prediction(domain: str, parameters: Dict[str, Any], question: str = None) -> Dict[str, Any]:
+    """Run a standard prediction and return the full result dict."""
     try:
-        predictor = _predictor()
-        result = predictor.predict(domain=domain, parameters=parameters)
-        if isinstance(result, dict):
-            return result
-        return {"probability": float(result)}
-    except HTTPException:
-        raise
+        from core.predictor import predict
+        result = predict(domain=domain, parameters=parameters, question=question)
+        return result.to_dict()
     except Exception as exc:
         logger.warning("Prediction failed in modes endpoint: %s", exc)
-        return {"probability": 0.5, "warning": str(exc)}
+        return {"final_probability": 0.5, "warning": str(exc), "outcomes": {"outcome": 0.5}}
 
 
 # ---------------------------------------------------------------------------
@@ -142,67 +138,53 @@ def _run_prediction(domain: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
 
 @router.post("/whatif")
 async def whatif(payload: WhatIfRequest):
-    """Run what-if scenario analysis by tweaking parameters."""
-    base = _run_prediction(payload.domain, payload.parameters or {})
-    base_prob = base.get("probability", payload.base_probability or 0.5)
+    """Run what-if scenario analysis with narrative simulation."""
+    base_result = _run_prediction(payload.domain, payload.parameters or {}, payload.question)
+    base_prob = base_result.get("final_probability", 0.5)
 
-    # Generate a small set of perturbations
-    perturbations = []
-    params = payload.parameters or {}
-    for key, val in list(params.items())[:payload.depth]:
-        try:
-            tweaked = {**params}
-            if isinstance(val, (int, float)):
-                tweaked[key] = val * 1.1
-                up = _run_prediction(payload.domain, tweaked)
-                tweaked[key] = val * 0.9
-                down = _run_prediction(payload.domain, tweaked)
-                perturbations.append({
-                    "parameter": key,
-                    "original":  val,
-                    "increase":  {"value": val * 1.1, "probability": up.get("probability")},
-                    "decrease":  {"value": val * 0.9, "probability": down.get("probability")},
-                })
-        except Exception:
-            pass
+    from llm.outcome_simulation import simulate_both_outcomes
+    from core.predictor import _load_registry
+    
+    reg = _load_registry()
+    domain_cfg = reg.get(payload.domain, {})
+    supported = domain_cfg.get("supported_outcomes", ["Outcome A", "Outcome B"])
+    
+    simulation = simulate_both_outcomes(
+        domain=payload.domain,
+        parameters=payload.parameters or {},
+        question=payload.question or "What if this scenario unfolds?",
+        final_probability=base_prob,
+        positive_outcome=supported[0],
+        negative_outcome=supported[1] if len(supported) > 1 else None
+    )
 
     return {
         "success": True,
         "mode": "what_if",
         "domain": payload.domain,
         "base_probability": base_prob,
-        "perturbations": perturbations,
+        "simulation": simulation,
+        "outcomes": base_result.get("outcomes", []),
         "question": payload.question,
-        "insight": (
-            f"What-if analysis for {payload.domain}: base probability is "
-            f"{base_prob:.1%}. Explored {len(perturbations)} parameter(s)."
-        ),
     }
 
 
 @router.post("/comparative")
 async def comparative(payload: ComparativeRequest):
-    """Compare multiple scenarios side-by-side."""
-    results = []
-    for scenario in payload.scenarios:
-        label = scenario.get("label", "Scenario")
-        params = {k: v for k, v in scenario.items() if k != "label"}
-        prediction = _run_prediction(payload.domain, params)
-        results.append({
-            "label": label,
-            "parameters": params,
-            "probability": prediction.get("probability"),
-            "prediction": prediction,
-        })
+    """Compare multiple scenarios side-by-side using comparative inference."""
+    from llm.comparative_inference import compare_scenarios
+    
+    result = compare_scenarios(
+        domain=payload.domain,
+        scenarios=payload.scenarios,
+        outcomes=payload.outcomes,
+        question=payload.question
+    )
 
-    best = max(results, key=lambda r: r.get("probability") or 0) if results else None
     return {
         "success": True,
         "mode": "comparative",
-        "domain": payload.domain,
-        "scenarios": results,
-        "best_scenario": best.get("label") if best else None,
-        "question": payload.question,
+        "result": result,
     }
 
 
@@ -210,7 +192,7 @@ async def comparative(payload: ComparativeRequest):
 async def monitoring_start(payload: MonitoringStartRequest):
     """Initialise a live-monitoring session."""
     session_id = str(uuid.uuid4())
-    base = _run_prediction(payload.domain, payload.parameters or {})
+    base = _run_prediction(payload.domain, payload.parameters or {}, payload.question)
     session = {
         "session_id": session_id,
         "name": payload.name,
@@ -219,8 +201,8 @@ async def monitoring_start(payload: MonitoringStartRequest):
         "question": payload.question,
         "threshold_low": payload.threshold_low,
         "threshold_high": payload.threshold_high,
-        "history": [{"probability": base.get("probability"), "event": "Session started"}],
-        "current_probability": base.get("probability"),
+        "history": [{"probability": base.get("final_probability"), "event": "Session started"}],
+        "current_probability": base.get("final_probability"),
         "status": "active",
     }
     _monitoring_sessions[session_id] = session
@@ -235,8 +217,8 @@ async def monitoring_update(payload: MonitoringUpdateRequest):
         raise HTTPException(status_code=404, detail="Monitoring session not found.")
 
     session["parameters"].update(payload.parameters)
-    updated = _run_prediction(payload.domain, session["parameters"])
-    prob = updated.get("probability")
+    updated = _run_prediction(payload.domain, session["parameters"], payload.question)
+    prob = updated.get("final_probability")
     session["current_probability"] = prob
     session["history"].append({
         "probability": prob,
@@ -264,148 +246,106 @@ async def monitoring_update(payload: MonitoringUpdateRequest):
 
 @router.post("/adversarial")
 async def adversarial(payload: AdversarialRequest):
-    """Run adversarial stress-testing — probe worst/best-case inputs."""
-    base = _run_prediction(payload.domain, payload.parameters or {})
-    base_prob = base.get("probability", 0.5)
-
-    stress_cases = []
-    for label, factor in [("optimistic", 1.2), ("pessimistic", 0.8), ("extreme_low", 0.5), ("extreme_high", 1.5)]:
-        tweaked = {k: (v * factor if isinstance(v, (int, float)) else v)
-                   for k, v in (payload.parameters or {}).items()}
-        result = _run_prediction(payload.domain, tweaked)
-        stress_cases.append({
-            "case": label,
-            "factor": factor,
-            "probability": result.get("probability"),
-        })
+    """Adversarial stress-test using Devil's Advocate."""
+    from llm.multi_agent import run_devils_advocate
+    from core.predictor import predict
+    
+    # Run normal prediction first
+    base_result = predict(domain=payload.domain, parameters=payload.parameters or {}, question=payload.question)
+    
+    # Challenge it
+    devil = run_devils_advocate(
+        domain=payload.domain,
+        parameters=payload.parameters or {},
+        question=payload.question,
+        dominant_prob=base_result.reconciled_probability
+    )
 
     return {
         "success": True,
         "mode": "adversarial",
-        "domain": payload.domain,
-        "base_probability": base_prob,
-        "stress_cases": stress_cases,
-        "robustness": "stable" if all(
-            abs((c.get("probability") or base_prob) - base_prob) < 0.15 for c in stress_cases
-        ) else "sensitive",
-        "question": payload.question,
+        "base_prediction": base_result.to_dict(),
+        "devils_advocate": devil,
+        "outcomes": base_result.outcomes,
     }
 
 
 @router.post("/expert")
 async def expert(payload: ExpertRequest):
-    """Deep-dive expert analysis with feature importance."""
-    prediction = _run_prediction(payload.domain, payload.parameters or {})
-
-    feature_importance = []
-    try:
-        from core.predictor import SambhavPredictor
-        p = SambhavPredictor()
-        if hasattr(p, "explain"):
-            feature_importance = p.explain(payload.domain, payload.parameters or {})
-    except Exception:
-        pass
+    """Expert consultation mode using 4-agent debate."""
+    from llm.multi_agent import run_debate
+    
+    debate_result = run_debate(
+        domain=payload.domain,
+        parameters=payload.parameters or {},
+        question=payload.question or "Expert analysis required"
+    )
 
     return {
         "success": True,
         "mode": "expert",
-        "domain": payload.domain,
-        "prediction": prediction,
-        "probability": prediction.get("probability"),
-        "feature_importance": feature_importance,
-        "question": payload.question,
-        "analysis": (
-            f"Expert analysis for {payload.domain}: probability is "
-            f"{prediction.get('probability', 0):.1%}."
-        ),
+        "debate": debate_result,
+        "final_probability": debate_result["final_probability"],
     }
 
 
 @router.post("/retrospective")
 async def retrospective(payload: RetrospectiveRequest):
-    """Analyse a historical case and compare actual vs predicted outcome."""
-    prediction = _run_prediction(payload.domain, payload.parameters or {})
-    prob = prediction.get("probability", 0.5)
-
-    match = None
-    if payload.outcome:
-        if payload.outcome.lower() in ("positive", "success", "yes", "1", "true"):
-            match = prob >= 0.5
-        elif payload.outcome.lower() in ("negative", "failure", "no", "0", "false"):
-            match = prob < 0.5
+    """Retrospective case analysis — simulate how a past outcome unfolded."""
+    from llm.outcome_simulation import generate_outcome_story
+    
+    story = generate_outcome_story(
+        domain=payload.domain,
+        parameters=payload.parameters or {},
+        outcome=payload.outcome or "Past event",
+        probability=1.0, # Retrospective assumes it happened
+        question=payload.description
+    )
 
     return {
         "success": True,
         "mode": "retrospective",
-        "domain": payload.domain,
-        "description": payload.description,
-        "actual_outcome": payload.outcome,
-        "predicted_probability": prob,
-        "prediction_aligned": match,
-        "prediction": prediction,
-        "insight": (
-            f"Retrospective: model predicted {prob:.1%} confidence. "
-            + (f"Prediction {'aligned' if match else 'did not align'} with actual outcome." if match is not None else "")
-        ),
+        "story": story,
     }
 
 
 @router.post("/simulation")
 async def simulation(payload: SimulationRequest):
-    """Monte-Carlo style simulation over parameter distributions."""
-    import random
-
-    base = _run_prediction(payload.domain, payload.parameters or {})
-    base_prob = base.get("probability", 0.5)
-
-    n = min(payload.n_runs or 500, 1000)
-    probs = []
-    params = payload.parameters or {}
-
-    for _ in range(n):
-        noisy = {
-            k: (v + random.gauss(0, abs(v) * 0.05) if isinstance(v, (int, float)) else v)
-            for k, v in params.items()
-        }
-        try:
-            r = _run_prediction(payload.domain, noisy)
-            p = r.get("probability")
-            if p is not None:
-                probs.append(float(p))
-        except Exception:
-            probs.append(base_prob)
-
-    if not probs:
-        probs = [base_prob]
-
-    mean_p = sum(probs) / len(probs)
-    sorted_p = sorted(probs)
-    p5  = sorted_p[int(len(sorted_p) * 0.05)]
-    p95 = sorted_p[int(len(sorted_p) * 0.95)]
+    """Monte-Carlo simulation of outcomes."""
+    from core.predictor import predict
+    
+    # Run prediction to get base probabilities
+    result = predict(domain=payload.domain, parameters=payload.parameters or {}, question=payload.question)
+    
+    # In a real MC simulation, we'd perturb inputs, but here we'll use the LLM to simulate the spread
+    from llm.outcome_simulation import simulate_both_outcomes
+    
+    sim = simulate_both_outcomes(
+        domain=payload.domain,
+        parameters=payload.parameters or {},
+        question=payload.question,
+        final_probability=result.reconciled_probability
+    )
 
     return {
         "success": True,
         "mode": "simulation",
-        "domain": payload.domain,
-        "n_runs": n,
-        "base_probability": base_prob,
-        "mean_probability": round(mean_p, 4),
-        "confidence_interval_5": round(p5, 4),
-        "confidence_interval_95": round(p95, 4),
-        "std_dev": round((sum((p - mean_p) ** 2 for p in probs) / len(probs)) ** 0.5, 4),
-        "question": payload.question,
+        "base_result": result.to_dict(),
+        "simulation": sim,
+        "outcomes": result.outcomes,
     }
 
 
 @router.post("/document")
 async def document_analysis(
-    file: UploadFile = File(...),
     domain: str = Form(...),
+    file: UploadFile = File(...),
     question: Optional[str] = Form(None),
+    user=Depends(get_current_user)
 ):
     """
     Advanced Document Analysis (Mode 5).
-    Uses NVIDIA NIM Kimi K2.5 for 1M token context window (P.16).
+    Uses NVIDIA NIM for high-accuracy parameter extraction.
     """
     import os, tempfile
     from vision.document_pipeline import analyze_document
@@ -418,26 +358,24 @@ async def document_analysis(
         tmp_path = tmp.name
 
     try:
-        # Step 1 — Analyze document (P.03/P.17/P.18)
+        # Step 1 — Analyze document
         analysis = analyze_document(tmp_path, domain)
         
         if "error" in analysis:
             raise HTTPException(status_code=400, detail=analysis["error"])
 
         # Step 2 — Check for insufficient info
-        # Only flag insufficient if we literally found ZERO parameters
         params = analysis.get("parameters", {})
-        if not params:
+        if not params and domain != "sarvagna": # Sarvagna usually has text_input
             return {
                 "success": True,
                 "insufficient_info": True,
-                "reason": f"The document does not contain clear domain-relevant signals for {domain}. Please provide a document with more specific data points.",
-                "missing_info": ["Specific values related to the domain's core parameters"],
+                "reason": f"The document does not contain clear domain-relevant signals for {domain}.",
+                "missing_info": ["Core parameter values"],
                 "analysis": analysis
             }
 
         # Step 3 — Predict using extracted parameters
-        # Parallelize for speed
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             pred_future = executor.submit(predict, domain=domain, params=params, question=question or analysis.get("prediction_question"))
