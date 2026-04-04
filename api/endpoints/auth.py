@@ -59,6 +59,12 @@ def get_current_user(
     creds: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db)
 ) -> dict:
+    # ── BYPASS AUTH (GOD MODE) ────────────────────────────────
+    # If BYPASS_AUTH is enabled in env, skip all verification
+    if os.getenv("BYPASS_AUTH") == "true":
+        logger.info("BYPASS_AUTH enabled - returning superuser")
+        return {"sub": "admin", "email": "admin@sambhav.ai", "tier": "power", "user_id": "00000000-0000-0000-0000-000000000001"}
+
     # ── GUEST ACCESS HANDLER ──────────────────────────────────
     # If no credentials, or credentials match "guest", allow entry
     if not creds or creds.credentials == "guest":
@@ -164,6 +170,10 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)):
 
 @router.get("/me")
 async def get_me(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    # ── BYPASS AUTH (GOD MODE) ────────────────────────────────
+    if os.getenv("BYPASS_AUTH") == "true":
+        return {"success": True, "user": user, "stats": {}}
+
     if user.get("email") == "guest":
         return {"success": True, "user": user, "stats": {}}
         

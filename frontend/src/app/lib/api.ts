@@ -30,10 +30,15 @@ async function _post(path: string, body: object) {
     headers: authHeaders(),
     body:    JSON.stringify(body),
   });
+
   if (res.status === 401) {
-    clearToken();
-    window.location.href = '/auth';
+    const bypassAuth = (import.meta as any).env.VITE_BYPASS_AUTH === 'true';
+    if (!bypassAuth) {
+      clearToken();
+      window.location.href = '/auth';
+    }
   }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new SambhavAPIError(res.status, err.detail || err.error || JSON.stringify(err));
@@ -43,10 +48,16 @@ async function _post(path: string, body: object) {
 
 async function _get(path: string) {
   const res = await fetch(`${API_BASE}${path}`, { headers: authHeaders() });
+  
+  // If 401 Unauthorized, only redirect to auth if we are NOT in bypass mode
   if (res.status === 401) {
-    clearToken();
-    window.location.href = '/auth';
+    const bypassAuth = (import.meta as any).env.VITE_BYPASS_AUTH === 'true';
+    if (!bypassAuth) {
+      clearToken();
+      window.location.href = '/auth';
+    }
   }
+  
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new SambhavAPIError(res.status, err.detail || JSON.stringify(err));
@@ -60,10 +71,15 @@ async function _postBlob(path: string, body: object): Promise<Blob> {
     headers: authHeaders(),
     body:    JSON.stringify(body),
   });
+
   if (res.status === 401) {
-    clearToken();
-    window.location.href = '/auth';
+    const bypassAuth = (import.meta as any).env.VITE_BYPASS_AUTH === 'true';
+    if (!bypassAuth) {
+      clearToken();
+      window.location.href = '/auth';
+    }
   }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new SambhavAPIError(res.status, err.detail || JSON.stringify(err));
