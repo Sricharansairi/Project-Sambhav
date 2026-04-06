@@ -41,10 +41,9 @@ def call_groq(
     model: str = "llama-3.3-70b-versatile",
     retries: int = 4
 ) -> str:
-    # Use faster model for simple probability tasks if not explicitly requested
-    if model == "llama-3.3-70b-versatile" and len(messages) < 10:
-        model = "llama-3.1-8b-instant"
-        
+    # NOTE: Do NOT silently downgrade llama-3.3-70b-versatile — it is used by multi-agent
+    # debate and fact-check chains that require the 70B model for calibration quality.
+    # The llm_predict() helper below explicitly passes llama-3.1-8b-instant for speed.
     fallback_model = "deepseek-r1-distill-llama-70b"
     for attempt in range(retries):
         try:

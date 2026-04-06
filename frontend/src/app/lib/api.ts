@@ -189,11 +189,12 @@ export interface FactCheckSource {
 }
 
 export interface FactCheckResult {
-  verdict:           string;
-  credibility_score: number;
-  dimensions:        Record<string, { score: number; reasoning: string }>;
-  sources:           FactCheckSource[];
-  summary:           string;
+  verdict:            string;
+  credibility_score:  number;
+  dimensions:         Record<string, { score: number; reasoning: string }>;
+  sources:            FactCheckSource[];
+  explanation:        string;   // primary: backend sends this field
+  summary?:           string;   // optional alias (may not exist in backend response)
 }
 
 // ── Auth ──────────────────────────────────────────────────────

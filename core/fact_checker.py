@@ -204,7 +204,7 @@ def analyze_8_dimensions(claim: str, evidence: list) -> dict:
     ]
 
     result = route("fact_check", messages, max_tokens=600, temperature=0.1)
-    raw = _strip_thinking(result.get("content", ""))
+    raw = _strip_thinking(result.get("content") or "")   # guard against None
     logger.info(f"Fact-check provider: {result.get('provider_used', 'unknown')}")
     return _parse_8d(raw, claim)
 
@@ -411,8 +411,9 @@ def fact_check_claim(claim: str, mode: str = "standard") -> dict:
     prompt_8d = f"CLAIM: {claim}\n\nEVIDENCE:\n{evidence_str or 'No external evidence found. Use internal knowledge.'}"
     
     # We use a higher temperature for reasoning but low for final scores
-    raw_analysis = route("fact_check", [{"role": "system", "content": SYSTEM_8D}, {"role": "user", "content": prompt_8d}], temperature=0.2)
-    analysis = _parse_8d(raw_analysis.get("content", ""), claim)
+    raw_result = route("fact_check", [{"role": "system", "content": SYSTEM_8D}, {"role": "user", "content": prompt_8d}], temperature=0.2)
+    raw_content = raw_result.get("content") or ""   # Guard against None if all providers failed
+    analysis = _parse_8d(raw_content, claim)
 
     # Step 3 — Cross-validation (Dual LLM)
     if mode == "quick":
@@ -420,13 +421,18 @@ def fact_check_claim(claim: str, mode: str = "standard") -> dict:
         cv = {"secondary_score": sec, "agreement": True, "disagreement_flag": False}
     else:
         cv_res = route("fact_check", [
-            {"role": "system", "content": "You are a critical cross-validator. Review the claim and evidence. Rate credibility 0-100. If you strongly disagree with common consensus, explain why."},
+            {"role": "system", "content": "You are a critical cross-validator. Review the claim and evidence. Return ONLY this format:\nCREDIBILITY: <0-100>\nREASON: <one sentence>"},
             {"role": "user", "content": prompt_8d}
         ], temperature=0.1)
         
         import re
-        cv_score_match = re.search(r"(\d+)", cv_res.get("content", ""))
-        sec = int(cv_score_match.group(1)) if cv_score_match else analysis["overall"]
+        cv_content = cv_res.get("content") or ""
+        # Require explicit CREDIBILITY: prefix to avoid picking up random numbers from evidence text
+        cv_score_match = re.search(r"(?:^|\n)CREDIBILITY:\s*(\d+)", cv_content, re.MULTILINE)
+        if cv_score_match:
+            sec = max(0, min(100, int(cv_score_match.group(1))))
+        else:
+            sec = analysis["overall"]  # Fall back to primary score if CV parse fails
         
         cv = {
             "secondary_score": sec,

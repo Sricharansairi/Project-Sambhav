@@ -192,7 +192,7 @@ export function FactCheck() {
                           {result.verdict || verdict.label}
                         </span>
                       </div>
-                      <p className="text-sm text-muted-foreground max-w-xl">{result.summary || ''}</p>
+                      <p className="text-sm text-muted-foreground max-w-xl">{result.explanation || result.summary || ''}</p>
                       {/* Sources Section Removed as requested */}
                     </div>
                     <div className="text-right">

@@ -125,6 +125,9 @@ OUTPUT — valid JSON only:
 {{"counter_probability": <int 0-100>, "counter_argument": "<2-3 sentences>", "counter_score": <0.0-1.0>, "key_contradiction": "<single most important contradicting parameter>", "adjustment_recommended": <true|false>, "adjustment_magnitude": <0.0-0.25>}}"""
 
 def _parse_json(raw, fallback):
+    if not raw:
+        logger.warning("_parse_json: received empty/None raw — using fallback")
+        return fallback
     try:
         clean = raw.strip()
         if "```" in clean:
