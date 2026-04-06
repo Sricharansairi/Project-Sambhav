@@ -117,15 +117,16 @@ def search_web(query: str) -> list:
             
     # Step 3 — Semantic Filtering (Section 9.4)
     # Filter out results that don't mention key terms from the query
-    keywords = [w.lower() for w in query.split() if len(w) > 3]
+    # RELAXED FILTER: Only filter if we have more than 6 results
+    keywords = [w.lower() for w in query.split() if len(w) > 4]
     if not keywords:
         keywords = [w.lower() for w in query.split()]
         
     filtered = []
     for r in valid_results:
         text = (r["title"] + " " + (r.get("snippet") or "")).lower()
-        # MUST match at least one keyword, no exceptions for source name
-        if any(k in text for k in keywords):
+        # MUST match at least one keyword, OR if keywords are generic, keep it
+        if any(k in text for k in keywords) or len(valid_results) <= 3:
             filtered.append(r)
             
     return filtered[:6]
@@ -145,18 +146,22 @@ DIMENSIONS = [
 ]
 
 SYSTEM_8D = (
-    "You are a fact-checking engine for Project Sambhav.\n"
-    "Analyze the claim across 8 dimensions. Score each 0-100 (100=fully credible).\n\n"
+    "You are a highly critical, elite fact-checking engine for Project Sambhav.\n"
+    "Your mission is to find the objective truth. Do not be fooled by misinformation or SEO spam.\n"
+    "Analyze the claim across 8 dimensions. Score each 0-100 (100=fully credible, 0=definitely false).\n\n"
+    "CRITICAL TRUTH RULES:\n"
+    "1. AUTHORITATIVE KNOWLEDGE: Use your internal high-quality training data. If you know a claim is false (e.g. Article 360 was NOT passed in 2022), score it as 0 regardless of search results.\n"
+    "2. SEARCH SKEPTICISM: Search results can be noisy or misleading. If results are contradictory, prioritize authoritative official sources (gov.in, edu, reputable news).\n"
+    "3. ABSOLUTE VERDICTS: If a claim is factually impossible or historically wrong, the OVERALL score MUST be below 10.\n\n"
     "SCORING GUIDE:\n"
-    "- factual_accuracy: Is the core claim factually correct?\n"
-    "- temporal_accuracy: Was it true when stated? Is it still true?\n"
-    "- geographic_accuracy: Is it true globally or only regionally?\n"
-    "- source_reliability: Quality of sources supporting this claim\n"
-    "- linguistic_precision: Is the claim precisely worded?\n"
-    "- context_completeness: Does it include necessary qualifiers?\n"
-    "- intent_analysis: Informing vs misleading (100=clearly informing)\n"
-    "- viral_risk: How dangerous if widely believed when false (0=safe)\n\n"
-    "IMPORTANT: Use your training knowledge. Poor search results do NOT mean false.\n\n"
+    "- factual_accuracy: Core truth of the statement (0 if factually wrong)\n"
+    "- temporal_accuracy: Timeline validity (e.g. wrong year = low score)\n"
+    "- geographic_accuracy: Regional specificity\n"
+    "- source_reliability: Reliability of the evidence provided\n"
+    "- linguistic_precision: Clarity vs Vagueness\n"
+    "- context_completeness: Are critical details missing?\n"
+    "- intent_analysis: Is it meant to inform or deceive?\n"
+    "- viral_risk: Danger of this misinformation\n\n"
     "Respond ONLY in this EXACT format (one dimension per block, include REASONING):\n"
     "FACTUAL_ACCURACY: <0-100>\n"
     "REASONING_FACTUAL_ACCURACY: <detailed reasoning for this score>\n"
@@ -265,16 +270,17 @@ def _parse_8d(raw: str, claim: str) -> dict:
 
 # ── Cross-validation with second LLM ─────────────────────────
 SYSTEM_CV = (
-    "You are an independent fact-checker.\n"
+    "You are a highly critical independent fact-checker.\n"
+    "Your job is to debunk false claims. Be extremely skeptical.\n"
     "Rate the credibility of this claim from 0-100:\n"
-    "- 90-100: Verified true, well-documented\n"
-    "- 70-89:  Likely true, strong evidence\n"
-    "- 50-69:  Uncertain, mixed evidence\n"
-    "- 30-49:  Likely false, contradicting evidence\n"
-    "- 0-29:   Verified false, definitively wrong\n\n"
+    "- 90-100: Absolute truth, verified by multiple authoritative sources\n"
+    "- 70-89:  Likely true, good evidence exists\n"
+    "- 40-69:  Uncertain, ambiguous, or unverified\n"
+    "- 10-39:  Likely false, strong evidence contradicts\n"
+    "- 0-9:    Absolute falsehood, factually impossible or historically wrong\n\n"
     "Respond ONLY in this format:\n"
     "CREDIBILITY: <0-100>\n"
-    "REASON: <one sentence based on your knowledge>"
+    "REASON: <one sentence based on your knowledge and the evidence>"
 )
 
 

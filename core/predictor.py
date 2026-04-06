@@ -148,6 +148,29 @@ def load_domain_model(domain: str) -> DomainModel:
             dm = _unpack_artifact(dm, artifact)
             dm.available = True
             log.info(f"[{domain}] Loaded main artifact: {main_path.name}")
+            
+            # ── Proactively load associated artifacts if not in main ──
+            # Section 5.4 — Resilience for split-artifact deployment
+            base_name = main_path.name.replace("_xgb.joblib", "").replace("_stacking_v1.joblib", "").replace("_stacking_v8.joblib", "")
+            
+            if dm.imputer is None:
+                imp_p = _MODELS_DIR / f"{base_name}_imputer.joblib"
+                if imp_p.exists():
+                    dm.imputer = joblib.load(imp_p)
+                    log.info(f"[{domain}] Loaded separate imputer: {imp_p.name}")
+            
+            if dm.scaler is None:
+                scl_p = _MODELS_DIR / f"{base_name}_scaler.joblib"
+                if scl_p.exists():
+                    dm.scaler = joblib.load(scl_p)
+                    log.info(f"[{domain}] Loaded separate scaler: {scl_p.name}")
+                    
+            if dm.iso_xgb is None:
+                iso_p = _MODELS_DIR / f"{base_name}_iso.joblib"
+                if iso_p.exists():
+                    dm.iso_xgb = joblib.load(iso_p)
+                    log.info(f"[{domain}] Loaded separate isotonic: {iso_p.name}")
+
         except Exception as e:
             log.error(f"[{domain}] Failed to load {main_path.name}: {e}")
             dm.available = False
@@ -254,20 +277,28 @@ def prepare_features(domain: str, params: dict, dm: DomainModel) -> Optional[np.
             pass
 
     if not dm.feature_columns:
-        # Fallback: use registry params and pad to expected count
-        reg_params = [v for v in params.values() if v is not None]
-        count = expected_count if expected_count > 0 else len(reg_params)
+        # Fallback: use registry params in the order they appear in domain_registry.yaml
+        reg = _load_registry()
+        domain_cfg = reg.get(domain, {})
+        registry_param_keys = [p["key"] for p in domain_cfg.get("parameters", [])]
         
-        if expected_count > 0 and expected_count != len(reg_params):
-            log.info(f"[{domain}] Feature mismatch: registry has {len(reg_params)}, model expects {expected_count}. Padding with NaNs.")
+        # Collect values in registry order
+        vals = []
+        for k in registry_param_keys:
+            val = params.get(k)
+            try:
+                vals.append(float(val) if val is not None else np.nan)
+            except (TypeError, ValueError):
+                vals.append(np.nan)
+        
+        count = expected_count if expected_count > 0 else len(vals)
+        if expected_count > 0 and expected_count != len(vals):
+            log.info(f"[{domain}] Feature mismatch: registry has {len(vals)}, model expects {expected_count}. Padding with NaNs.")
         
         # Create array of 'count' size, filled with NaNs initially
         arr_full = np.full((1, count), np.nan)
-        for i, val in enumerate(reg_params[:count]):
-            try:
-                arr_full[0, i] = float(val)
-            except (TypeError, ValueError):
-                arr_full[0, i] = np.nan
+        for i, val in enumerate(vals[:count]):
+            arr_full[0, i] = val
         arr = arr_full
     else:
         row = {}
