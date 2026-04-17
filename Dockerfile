@@ -13,7 +13,7 @@ ENV DEPLOY_ENV=production
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies + Node.js 20 (for building the React frontend)
 RUN apt-get update && apt-get install -y \
     build-essential \
     libpq-dev \
@@ -23,6 +23,8 @@ RUN apt-get update && apt-get install -y \
     libgl1 \
     libglib2.0-0 \
     libgomp1 \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Initialize git-lfs for HF Hub models
@@ -37,6 +39,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # Copy the core project source code
 COPY . .
+
+# ── Build the React frontend ──────────────────────────────────────────────────
+# This ensures the latest source changes are compiled into frontend/dist/
+RUN cd frontend && npm install --legacy-peer-deps && npx vite build && cd ..
 
 # HF Spaces requires a user with UID 1000
 RUN useradd -m -u 1000 user

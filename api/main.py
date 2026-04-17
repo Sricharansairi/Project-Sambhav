@@ -95,32 +95,74 @@ async def health():
     }
 from api.endpoints import predict, factcheck, vision, history, auth, evaluate, export, modes, reports
 
-app.include_router(predict.router,   prefix="/predict",    tags=["Prediction"])
-app.include_router(modes.router,     prefix="/modes",      tags=["Operating Modes"])
-app.include_router(factcheck.router, prefix="/fact-check", tags=["Fact Check"])
-app.include_router(vision.router,    prefix="/vision",     tags=["Vision"])
-app.include_router(history.router,   prefix="/history",    tags=["History"])
-app.include_router(auth.router,      prefix="/auth",       tags=["Auth"])
-app.include_router(evaluate.router,  prefix="/evaluate",   tags=["Evaluation"])
-app.include_router(reports.router,   prefix="/v1",         tags=["Reports"])
-app.include_router(export.router,    prefix="/export",     tags=["Export"])
+# ── Mount all API routers under BOTH bare and /api prefix ───────────────────
+# The frontend calls /api/* in production (VITE_API_URL defaults to '/api')
+# The bare prefixes keep backward compat for direct API testing
+for _prefix, _router, _tag in [
+    ("/predict",    predict.router,   "Prediction"),
+    ("/modes",      modes.router,     "Operating Modes"),
+    ("/fact-check", factcheck.router, "Fact Check"),
+    ("/vision",     vision.router,    "Vision"),
+    ("/history",    history.router,   "History"),
+    ("/auth",       auth.router,      "Auth"),
+    ("/evaluate",   evaluate.router,  "Evaluation"),
+    ("/v1",         reports.router,   "Reports"),
+    ("/export",     export.router,    "Export"),
+]:
+    app.include_router(_router, prefix=_prefix,        tags=[_tag])
+    app.include_router(_router, prefix=f"/api{_prefix}", tags=[f"{_tag} (api)"])
+
 from fastapi import APIRouter
 config_router = APIRouter()
 @config_router.get("/registry")
 async def get_registry():
     from core.predictor import _load_registry
     return {"success": True, "registry": _load_registry()}
-app.include_router(config_router, prefix="/config", tags=["Config"])
-@app.get("/")
-async def root():
-    return {
-        "name":      "Project Sambhav",
-        "version":   "1.0.0",
-        "docs":      "/docs",
-        "health":    "/health",
-        "api_root":  "/api",
-        "endpoints": ["/api/predict", "/api/fact-check", "/api/vision", "/api/history", "/api/auth", "/api/export", "/api/modes"]
-    }
+app.include_router(config_router, prefix="/config",     tags=["Config"])
+app.include_router(config_router, prefix="/api/config", tags=["Config (api)"])
+
+# ── Serve built React frontend (frontend/dist/) ──────────────────────────────
+import os as _os
+from pathlib import Path as _Path
+_DIST = _Path(__file__).parent.parent / "frontend" / "dist"
+if _DIST.exists():
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
+
+    # Serve assets (JS/CSS/images) from /assets
+    app.mount("/assets", StaticFiles(directory=str(_DIST / "assets")), name="assets")
+
+    # Serve any other static files at root level (favicon, robots.txt, etc.)
+    @app.get("/favicon.ico", include_in_schema=False)
+    async def favicon():
+        p = _DIST / "favicon.ico"
+        return FileResponse(str(p)) if p.exists() else JSONResponse({}, status_code=404)
+
+    # SPA catch-all — serve index.html for any route not matched above
+    @app.get("/", include_in_schema=False)
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def spa_fallback(full_path: str = ""):
+        # Don't intercept API routes
+        if full_path.startswith(("api/", "predict/", "auth/", "fact-check/",
+                                  "vision/", "history/", "evaluate/", "export/",
+                                  "modes/", "v1/", "config/", "health", "docs", "redoc",
+                                  "openapi.json")):
+            return JSONResponse({"detail": "Not Found"}, status_code=404)
+        index = _DIST / "index.html"
+        return FileResponse(str(index))
+else:
+    logger.warning(f"Frontend dist not found at {_DIST}. Run: cd frontend && npm run build")
+    @app.get("/")
+    async def root():
+        return {
+            "name":      "Project Sambhav",
+            "version":   "1.0.0",
+            "docs":      "/docs",
+            "health":    "/health",
+            "api_root":  "/api",
+            "endpoints": ["/api/predict", "/api/fact-check", "/api/vision", "/api/history", "/api/auth", "/api/export", "/api/modes"]
+        }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
