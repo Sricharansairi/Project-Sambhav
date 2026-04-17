@@ -162,19 +162,9 @@ class BatchPredictRequest(BaseModel):
 @router.post("")
 async def predict_endpoint(
     req: PredictRequest = None,
-    domain: str = None,
     db: Session = Depends(get_db),
     user: dict  = Depends(get_current_user)
 ):
-    # Support both /predict (with domain in body) and /predict/{domain}
-    if domain:
-        # If domain is in URL, ensure it's used
-        if req:
-            req.domain = domain
-        else:
-            # Handle case where only URL is used (though unlikely for POST)
-            raise HTTPException(status_code=422, detail="Request body missing")
-    
     if not req:
         raise HTTPException(status_code=422, detail="Request body missing")
 
