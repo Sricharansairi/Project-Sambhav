@@ -42,7 +42,7 @@ COPY . .
 
 # ── Build the React frontend ──────────────────────────────────────────────────
 # This ensures the latest source changes are compiled into frontend/dist/
-RUN cd frontend && npm install --legacy-peer-deps && npx vite build && cd ..
+RUN cd frontend && npm install --include=dev --legacy-peer-deps && npx vite build && cd ..
 
 # HF Spaces requires a user with UID 1000
 RUN useradd -m -u 1000 user
