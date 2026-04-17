@@ -19,7 +19,11 @@ export default defineConfig({
   // without CORS issues. In production set VITE_API_URL env var instead.
   server: {
     proxy: {
-      '/api': { target: 'http://localhost:8000', changeOrigin: true },
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
     },
   },
 })
