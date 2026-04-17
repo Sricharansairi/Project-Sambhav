@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from db.models import get_db, User
 from db.database import create_user, get_user_by_email, log_event
 
-from passlib.context import CryptContext
+import bcrypt
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -24,14 +24,15 @@ def get_secret_key() -> str:
     return os.getenv("SECRET_KEY", "sambhav_secret_key_2026")
 
 security = HTTPBearer(auto_error=False)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 def _hash_password(password: str) -> str:
     """Strong bcrypt hashing."""
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 def _verify_password(password: str, hashed: str) -> bool:
-    return pwd_context.verify(password, hashed)
+    try:
+        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    except Exception:
+        return False
 
 def _create_token(user_id: str, email: str, tier: str = "registered") -> str:
     expire  = datetime.utcnow() + timedelta(hours=TOKEN_EXPIRE_HOURS)

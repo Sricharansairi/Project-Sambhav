@@ -18,6 +18,8 @@ import { AuditPanel }           from '../components/AuditPanel';
 import { ReliabilityIndex }     from '../components/ReliabilityIndex';
 import { ExportPanel }          from '../components/ExportPanel';
 import { ChipParameterModal }   from '../components/ChipParameterModal';
+import { PragmaChat }           from '../components/PragmaChat';
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
 import {
   getDomains, runPredict, runFreeInfer, getOutcomes, getTransparency, getInverseTransparency,
   startConversational, answerConversational, screenInput,
@@ -1271,23 +1273,39 @@ export function Prediction() {
                       {activeWhyData.simple?.one_line_reason && (
                         <p className="text-[10px] text-muted-foreground leading-relaxed italic">"{activeWhyData.simple.one_line_reason}"</p>
                       )}
-                      {(transparencyLevel === 'detailed' || transparencyLevel === 'full') && activeWhyData.detailed && (
+                      {(transparencyLevel === 'detailed' || transparencyLevel === 'full') && (
                         <div className="space-y-2 pt-1.5 border-t border-white/5">
-                          <div className="p-2 rounded-lg bg-primary/5 border border-primary/15">
-                            <p className="text-[9px] text-primary font-semibold mb-0.5 uppercase tracking-wide">Case FOR — {outcome.probability.toFixed(1)}%</p>
-                            <p className="text-[10px] text-muted-foreground leading-relaxed">{activeWhyData.detailed.case_for}</p>
-                          </div>
-                          <div className="p-2 rounded-lg bg-secondary/5 border border-secondary/15">
-                            <p className="text-[9px] text-secondary font-semibold mb-0.5 uppercase tracking-wide">Case AGAINST — {(100 - outcome.probability).toFixed(1)}%</p>
-                            <p className="text-[10px] text-muted-foreground leading-relaxed">{activeWhyData.detailed.case_against}</p>
-                          </div>
+                          {activeWhyData.detailed ? (
+                            <>
+                              <div className="p-2 rounded-lg bg-primary/5 border border-primary/15">
+                                <p className="text-[9px] text-primary font-semibold mb-0.5 uppercase tracking-wide">Case FOR — {outcome.probability.toFixed(1)}%</p>
+                                <p className="text-[10px] text-muted-foreground leading-relaxed">{activeWhyData.detailed.case_for || "No supporting logic provided."}</p>
+                              </div>
+                              <div className="p-2 rounded-lg bg-secondary/5 border border-secondary/15">
+                                <p className="text-[9px] text-secondary font-semibold mb-0.5 uppercase tracking-wide">Case AGAINST — {(100 - outcome.probability).toFixed(1)}%</p>
+                                <p className="text-[10px] text-muted-foreground leading-relaxed">{activeWhyData.detailed.case_against || "No disputing logic provided."}</p>
+                              </div>
+                            </>
+                          ) : (
+                             <div className="p-2 text-center border border-white/5 rounded-lg">
+                               <p className="text-[10px] text-muted-foreground italic">Detailed breakdown unavailable.</p>
+                             </div>
+                          )}
                         </div>
                       )}
-                      {transparencyLevel === 'full' && activeWhyData.full && (
+                      {transparencyLevel === 'full' && (
                         <div className="pt-1.5 border-t border-white/5 space-y-1">
-                          {(activeWhyData.full.primary_driver) && <p className="text-[10px] text-muted-foreground"><span className="text-primary font-medium">Primary Driver: </span>{activeWhyData.full.primary_driver}</p>}
-                          {activeWhyData.full.intervention && <p className="text-[10px] text-muted-foreground"><span className="text-primary font-medium">Key Intervention: </span>{activeWhyData.full.intervention}</p>}
-                          {(activeWhyData.full.confidence_note || activeWhyData.full.confidence_factors) && <p className="text-[10px] text-muted-foreground"><span className="text-primary font-medium">Confidence: </span>{activeWhyData.full.confidence_note || activeWhyData.full.confidence_factors}</p>}
+                          {activeWhyData.full ? (
+                            <>
+                              {(activeWhyData.full.primary_driver) && <p className="text-[10px] text-muted-foreground"><span className="text-primary font-medium">Primary Driver: </span>{activeWhyData.full.primary_driver}</p>}
+                              {activeWhyData.full.intervention && <p className="text-[10px] text-muted-foreground"><span className="text-primary font-medium">Key Intervention: </span>{activeWhyData.full.intervention}</p>}
+                              {(activeWhyData.full.confidence_note || activeWhyData.full.confidence_factors) && <p className="text-[10px] text-muted-foreground"><span className="text-primary font-medium">Confidence: </span>{activeWhyData.full.confidence_note || activeWhyData.full.confidence_factors}</p>}
+                            </>
+                          ) : (
+                             <div className="p-2 text-center border border-white/5 rounded-lg">
+                               <p className="text-[10px] text-muted-foreground italic">Full breakdown unavailable.</p>
+                             </div>
+                          )}
                         </div>
                       )}
                     </>
@@ -1378,7 +1396,6 @@ export function Prediction() {
   // ── PRAGMA: Forensic Psychological Profiling Results ─────────────────────
   const renderPragmaResults = () => {
     const deceptionPct = outcomes[0]?.probability ?? (predResult ? Math.round((predResult as any).reconciled_probability * 100) : 50);
-    const genuinePct   = outcomes[1]?.probability ?? (100 - deceptionPct);
     const isDeceptive  = deceptionPct > 50;
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
@@ -1401,31 +1418,84 @@ export function Prediction() {
         {/* Outcomes with inverse buttons */}
         {outcomes.length > 0 && renderStandardResults()}
 
-        {/* Forensic Psychological Profile */}
-        <div className="p-3 rounded-xl bg-white/5 border border-white/10">
-          <p className="text-[9px] text-primary font-semibold uppercase tracking-widest mb-2">Forensic Psychological Profile</p>
-          <div className="space-y-2">
-            {[
-              ['Primary Motive / Trigger', isDeceptive
-                ? 'Self-preservation or concealment of information detected. Communication exhibits stress-induced linguistic distancing.'
-                : 'No clear deceptive motive identified. Communication aligns with baseline genuine patterns.'],
-              ['Linguistic Markers', isDeceptive
-                ? 'Increased hedging language, pronoun distancing, over-qualification, and non-committed phrasing detected.'
-                : 'Direct language, appropriate emotional resonance, and consistent tense usage observed.'],
-              ['Psychological State', isDeceptive
-                ? 'Elevated cognitive load indicators suggesting active information suppression or fabrication.'
-                : 'Consistent psychological baseline with no significant stress markers.'],
-              ['Recommendation', isDeceptive
-                ? 'Recommend follow-up with corroborating evidence. Do not rely solely on this communication.'
-                : 'Communication passes preliminary forensic screening. Standard verification protocols apply.'],
-            ].map(([label, value]) => (
-              <div key={label} className="flex gap-2">
-                <span className="text-[9px] text-primary/60 font-medium min-w-[90px] shrink-0 pt-0.5">{label}:</span>
-                <p className="text-[10px] text-muted-foreground leading-relaxed">{value}</p>
+        {/* Forensic Psychological Profile (interactive dialog) */}
+        <Dialog>
+          <DialogTrigger asChild>
+            <button className="w-full relative overflow-hidden group p-4 rounded-xl bg-gradient-to-br from-white/5 to-white/5 border border-white/20 hover:border-primary/50 transition-all text-left">
+              <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="flex items-center justify-between relative z-10">
+                <div>
+                  <p className="text-[11px] text-primary font-semibold uppercase tracking-widest mb-1 flex items-center gap-2">
+                    <History className="w-3.5 h-3.5" /> Comprehensive Forensic Profile
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Expand to view linguistic stress markers, cognitive load analysis, and discuss findings with the AI Profiler.
+                  </p>
+                </div>
+                <div className="text-primary group-hover:translate-x-1 transition-transform">
+                  <ChevronRight className="w-5 h-5" />
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
+            </button>
+          </DialogTrigger>
+          
+          <DialogContent className="max-w-2xl bg-[#0a0a0f] border-white/10 p-0 text-white overflow-hidden max-h-[85vh] flex flex-col">
+            <DialogHeader className="p-5 border-b border-white/10 shrink-0">
+              <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-primary" /> PRAGMA Complete Analysis
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground">
+                Deep multi-modal forensic evaluation of textual and psychological markers.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="p-5 overflow-y-auto space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                  <p className="text-[10px] text-primary font-semibold uppercase tracking-wider mb-2">Primary Motive / Trigger</p>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    {isDeceptive 
+                      ? 'Self-preservation or concealment of information detected. Communication exhibits stress-induced linguistic distancing.'
+                      : 'No clear deceptive motive identified. Communication aligns with baseline genuine patterns.'}
+                  </p>
+                </div>
+                <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                  <p className="text-[10px] text-primary font-semibold uppercase tracking-wider mb-2">Psychological State</p>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    {isDeceptive
+                      ? 'Elevated cognitive load indicators suggesting active information suppression or fabrication.'
+                      : 'Consistent psychological baseline with no significant stress markers.'}
+                  </p>
+                </div>
+                <div className="p-4 rounded-lg bg-white/5 border border-white/10 col-span-2">
+                  <p className="text-[10px] text-primary font-semibold uppercase tracking-wider mb-2">Linguistic Breakdown</p>
+                  <p className="text-xs leading-relaxed text-muted-foreground mb-3">
+                    {isDeceptive
+                      ? 'Increased hedging language, pronoun distancing ("they", "one"), over-qualification ("to be perfectly honest"), and non-committed phrasing detected in text embedding analysis.'
+                      : 'Direct language ("I", "we"), appropriate context-driven emotional resonance, and consistent tense usage observed throughout the communication string.'}
+                  </p>
+                  <div className="space-y-1 block">
+                     <p className="text-[11px] font-medium text-white/80">Actionable Intervention:</p>
+                     <p className="text-[10px] text-muted-foreground/80 italic border-l-2 border-primary/50 pl-2">
+                       {isDeceptive ? 'Subject shows evasiveness about specific timelines. Grill on chronological details.' : 'No intervention needed. Trust baseline verified.'}
+                     </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Chatbot Interface inside Dialog */}
+              <div>
+                <p className="text-[10px] text-primary font-semibold uppercase tracking-wider mb-3">Consult the Profiler</p>
+                <PragmaChat 
+                   predictionId={predId} 
+                   contextParams={parameters} 
+                   baselinePrediction={predResult} 
+                />
+              </div>
+
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <p className="text-[9px] text-muted-foreground/50 italic text-center">
           PRAGMA v17 — Research-grade forensic tool. Probabilistic — not a legal verdict. Always verify independently.

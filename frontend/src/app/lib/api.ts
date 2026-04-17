@@ -418,9 +418,17 @@ export async function analyzeDocument(file: File, domain: string, question?: str
     headers: _token ? { Authorization: `Bearer ${_token}` } : {},
     body: fd,
   });
+  if (resp.status === 401) {
+    const bypassAuth = (import.meta as any).env.VITE_BYPASS_AUTH === 'true';
+    if (!bypassAuth) {
+      clearToken();
+      window.location.href = '/auth';
+    }
+  }
+
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ detail: resp.statusText }));
-    throw new SambhavAPIError(resp.status, err.detail || 'Document analysis failed');
+    throw new SambhavAPIError(resp.status, err.detail || err.error || 'Document analysis failed');
   }
   return resp.json();
 }
@@ -514,3 +522,15 @@ export const exports = {
     return _post('/export/api-link', payload);
   },
 };
+
+export async function runPragmaChat(payload: {
+  prediction_id?: string;
+  question: string;
+  context: string;
+  history: any[];
+  parameters: any;
+}) {
+  if (!_token) await auth.guest();
+  return _post('/predict/pragma-chat', payload);
+}
+

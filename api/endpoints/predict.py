@@ -647,3 +647,48 @@ async def get_domain_outcomes(domain: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# ── POST /predict/pragma-chat ──────────────────────────────────
+class PragmaChatRequest(BaseModel):
+    prediction_id: Optional[str] = None
+    question: str
+    context: str
+    history: List[dict] = []
+    parameters: dict = {}
+
+@router.post("/pragma-chat")
+async def pragma_chat(req: PragmaChatRequest):
+    """
+    A dedicated Chatbot endpoint acting as a veteran forensic psychological profiler 
+    to answer deep follow-up questions about a Pragma deception/genuineness prediction.
+    """
+    try:
+        from llm.providers import call_llm
+        from core.prompts import _build_prompt
+        
+        system_prompt = """You are Dr. Elias Vance, a globally recognized veteran Forensic Psychological Profiler with 30 years of experience in deception detection, linguistic micro-expression analysis, and cognitive load mapping. You speak with extreme authority, clinical precision, and deep psychological insight, but remain accessible. 
+Your goal is to answer the user's specific follow-up questions regarding the PRAGMA forensic analysis of their provided text. Do not break character. Do not be overly verbose unless deep clinical explanation is requested. Draw explicitly from the provided baseline parameters and linguistic context."""
+
+        conversation_context = f"Forensic Context/Text Analyzed:\n{req.context}\n\nExtracted Parameters:\n{req.parameters}\n"
+        
+        messages = [{"role": "system", "content": system_prompt}]
+        for msg in req.history:
+            messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+        
+        # Add the latest question wrapped with the forensic context if this is the first interaction, otherwise just the question
+        if len(req.history) == 0:
+            messages.append({"role": "user", "content": f"{conversation_context}\nUser Question: {req.question}"})
+        else:
+            messages.append({"role": "user", "content": req.question})
+
+        response = call_llm(
+            messages=messages,
+            temperature=0.4,
+            max_tokens=600
+        )
+        
+        return {"success": True, "reply": response}
+    except Exception as e:
+        logger.error(f"Pragma Chat Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+

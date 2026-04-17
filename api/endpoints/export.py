@@ -276,10 +276,14 @@ async def export_pdf(req: ExportRequest, db: Session = Depends(get_db)):
         story.append(Paragraph("Prediction Summary", h2_style))
         fp = data.get("final_probability", 0)
         ri = data.get("reliability_index", 0)
+        # Create a style for table cells
+        from reportlab.lib.styles import ParagraphStyle
+        cell_style = ParagraphStyle(name='cell', fontSize=8, textColor=colors.HexColor("#e2e8f0"))
+
         meta_rows = [
             ["Field", "Value"],
             ["Domain",           str(data.get("domain", "")).upper()],
-            ["Question",         str(data.get("question", ""))],
+            ["Question",         Paragraph(str(data.get("question", "")), cell_style)],
             ["Mode",             str(data.get("mode", ""))],
             ["Final Probability",_fmt_pct(fp)],
             ["ML Layer",         _fmt_pct(data.get('ml_probability'))],
@@ -330,15 +334,15 @@ async def export_pdf(req: ExportRequest, db: Session = Depends(get_db)):
                 ["Indicator", "Forensic Analysis"]
             ]
             if is_deceptive:
-                profile_rows.append(["Motive", "Self-preservation or concealment. Stress-induced distancing."])
-                profile_rows.append(["Linguistic", "Increased hedging, pronoun distancing, over-qualification."])
-                profile_rows.append(["Psychological", "Elevated cognitive load, mapping to information suppression."])
-                profile_rows.append(["Recommendation", "DO NOT RELY. Obtain corroborating evidence."])
+                profile_rows.append(["Motive", Paragraph("Self-preservation or concealment. Stress-induced distancing.", cell_style)])
+                profile_rows.append(["Linguistic", Paragraph("Increased hedging, pronoun distancing, over-qualification.", cell_style)])
+                profile_rows.append(["Psychological", Paragraph("Elevated cognitive load, mapping to information suppression.", cell_style)])
+                profile_rows.append(["Recommendation", Paragraph("DO NOT RELY. Obtain corroborating evidence.", cell_style)])
             else:
-                profile_rows.append(["Motive", "No deceptive motive. Aligns with genuine patterns."])
-                profile_rows.append(["Linguistic", "Direct language, emotionally resonant, consistent."])
-                profile_rows.append(["Psychological", "Baseline stable. No cognitive load spikes."])
-                profile_rows.append(["Recommendation", "Passes preliminary screening. Proceed normally."])
+                profile_rows.append(["Motive", Paragraph("No deceptive motive. Aligns with genuine patterns.", cell_style)])
+                profile_rows.append(["Linguistic", Paragraph("Direct language, emotionally resonant, consistent.", cell_style)])
+                profile_rows.append(["Psychological", Paragraph("Baseline stable. No cognitive load spikes.", cell_style)])
+                profile_rows.append(["Recommendation", Paragraph("Passes preliminary screening. Proceed normally.", cell_style)])
                 
             p_t = Table(profile_rows, colWidths=[4*cm, 13*cm])
             p_t.setStyle(TABLE_STYLE)
@@ -349,7 +353,7 @@ async def export_pdf(req: ExportRequest, db: Session = Depends(get_db)):
         params = data.get("raw_parameters") or data.get("parameters") or {}
         if params:
             story.append(Paragraph("Input Parameters", h2_style))
-            p_data = [[str(k).replace("_"," ").title(), str(v)] for k, v in params.items() if not str(k).startswith("_")]
+            p_data = [[Paragraph(str(k).replace("_"," ").title(), cell_style), Paragraph(str(v), cell_style)] for k, v in params.items() if not str(k).startswith("_")]
             if p_data:
                 p_table = Table([["Parameter", "Value"]] + p_data, colWidths=[8*cm, 9*cm])
                 p_table.setStyle(TABLE_STYLE)
