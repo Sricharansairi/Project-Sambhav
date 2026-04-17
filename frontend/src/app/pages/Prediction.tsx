@@ -770,7 +770,7 @@ export function Prediction() {
           }
         }} />
       {selectedMode === 'guided' && paramList.length > 0 && (
-        <motion.button onClick={() => { setModalStep(0); setModalOpen(true); }}
+        <motion.button onClick={() => { handleGenerate(false); }}
           className="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 hover:border-primary/30 transition-all flex items-center justify-between group"
           whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
           <span className="text-muted-foreground group-hover:text-foreground transition-colors">

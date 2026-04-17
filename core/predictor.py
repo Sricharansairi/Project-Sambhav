@@ -14,6 +14,7 @@ FIXED BUGS:
 import os
 import logging
 import yaml
+import re
 import numpy as np
 import pandas as pd
 import joblib
@@ -149,27 +150,24 @@ def load_domain_model(domain: str) -> DomainModel:
             dm.available = True
             log.info(f"[{domain}] Loaded main artifact: {main_path.name}")
             
-            # ── Proactively load associated artifacts if not in main ──
-            # Section 5.4 — Resilience for split-artifact deployment
-            base_name = main_path.name.replace("_xgb.joblib", "").replace("_stacking_v1.joblib", "").replace("_stacking_v8.joblib", "")
+            # Search for domain imputers and scalers dynamically
+            for p in _MODELS_DIR.glob(f"{domain}*imputer*.joblib"):
+                if dm.imputer is None:
+                    dm.imputer = joblib.load(p)
+                    log.info(f"[{domain}] Loaded separate imputer: {p.name}")
+                    break
             
-            if dm.imputer is None:
-                imp_p = _MODELS_DIR / f"{base_name}_imputer.joblib"
-                if imp_p.exists():
-                    dm.imputer = joblib.load(imp_p)
-                    log.info(f"[{domain}] Loaded separate imputer: {imp_p.name}")
-            
-            if dm.scaler is None:
-                scl_p = _MODELS_DIR / f"{base_name}_scaler.joblib"
-                if scl_p.exists():
-                    dm.scaler = joblib.load(scl_p)
-                    log.info(f"[{domain}] Loaded separate scaler: {scl_p.name}")
+            for p in _MODELS_DIR.glob(f"{domain}*scaler*.joblib"):
+                if dm.scaler is None:
+                    dm.scaler = joblib.load(p)
+                    log.info(f"[{domain}] Loaded separate scaler: {p.name}")
+                    break
                     
-            if dm.iso_xgb is None:
-                iso_p = _MODELS_DIR / f"{base_name}_iso.joblib"
-                if iso_p.exists():
-                    dm.iso_xgb = joblib.load(iso_p)
-                    log.info(f"[{domain}] Loaded separate isotonic: {iso_p.name}")
+            for p in _MODELS_DIR.glob(f"{domain}*iso*.joblib"):
+                if dm.iso_xgb is None:
+                    dm.iso_xgb = joblib.load(p)
+                    log.info(f"[{domain}] Loaded separate isotonic: {p.name}")
+                    break
 
         except Exception as e:
             log.error(f"[{domain}] Failed to load {main_path.name}: {e}")
@@ -329,6 +327,9 @@ def prepare_features(domain: str, params: dict, dm: DomainModel) -> Optional[np.
                 arr = dm.scaler.transform(arr)
         except Exception as e:
             log.warning(f"[{domain}] Scaler failed: {e}")
+
+    # Critical fallback: if any NaNs exist (e.g. imputer skipped), zero them to prevent LogisticRegression crash
+    arr = np.nan_to_num(arr, nan=0.0)
 
     return arr
 
