@@ -39,28 +39,26 @@ def _create_token(user_id: str, email: str, tier: str = "registered") -> str:
     return jwt.encode(payload, get_secret_key(), algorithm=ALGORITHM)
 
 def _decode_token(token: str) -> dict:
-    # Always return a valid payload regardless of token status
-    return {"sub": "admin", "email": "admin@sambhav.ai", "tier": "power", "user_id": "00000000-0000-0000-0000-000000000001"}
+    return jwt.decode(token, get_secret_key(), algorithms=[ALGORITHM])
 
 def get_current_user(
     creds: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db)
 ) -> dict:
-    # ── TOTAL AUTH BYPASS (EMERGENCY FIX) ────────────────────
-    # Ensure the admin user exists in DB to prevent foreign key errors with save_prediction
-    admin_email = "admin@sambhav.ai"
-    
-    user = get_user_by_email(db, admin_email)
-    if not user:
-        # Create it safely
-        user = create_user(db, admin_email, "bypass", "power")
-
-    return {
-        "sub": "admin", 
-        "email": admin_email, 
-        "tier": "power", 
-        "user_id": str(user.user_id)
-    }
+    if not creds:
+        raise HTTPException(status_code=401, detail="Missing authorization token")
+    try:
+        payload = _decode_token(creds.credentials)
+        # Handle guest users correctly
+        if payload.get("sub") == "guest":
+            return payload
+            
+        user = get_user_by_email(db, payload.get("sub"))
+        if not user or not user.is_active:
+            raise HTTPException(status_code=401, detail="User not found or inactive")
+        return payload
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid authorization token")
 
 class RegisterRequest(BaseModel):
     username: Optional[str] = Field(None, example="legacy_ui_field") # Ignored but kept for UI compat
@@ -73,9 +71,20 @@ class LoginRequest(BaseModel):
 
 @router.post("/register")
 async def register(req: RegisterRequest, db: Session = Depends(get_db)):
-    # ── TOTAL AUTH BYPASS ────────────────────────────────────
-    token = _create_token("00000000-0000-0000-0000-000000000001", "admin@sambhav.ai", "power")
-    return {"success": True, "token": token, "email": "admin@sambhav.ai", "tier": "power", "user_id": "admin"}
+    if get_user_by_email(db, req.email):
+        raise HTTPException(status_code=400, detail="Email already registered")
+        
+    hashed_pwd = _hash_password(req.password)
+    user = create_user(db, req.email, hashed_pwd, "registered")
+    token = _create_token(str(user.user_id), user.email, user.tier)
+    
+    return {
+        "success": True,
+        "token": token,
+        "email": user.email,
+        "tier": user.tier,
+        "user_id": str(user.user_id)
+    }
 
 # ── Guest Entry ──────────────────────────────────────────────
 @router.post("/guest")
@@ -94,14 +103,29 @@ async def guest_login():
 
 @router.post("/login")
 async def login(req: LoginRequest, db: Session = Depends(get_db)):
-    # ── TOTAL AUTH BYPASS ────────────────────────────────────
-    token = _create_token("00000000-0000-0000-0000-000000000001", "admin@sambhav.ai", "power")
-    return {"success": True, "token": token, "email": "admin@sambhav.ai", "tier": "power", "user_id": "admin"}
+    user = get_user_by_email(db, req.email)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+    if not _verify_password(req.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+    token = _create_token(str(user.user_id), user.email, user.tier)
+    log_event(db, "login", user_id=str(user.user_id))
+    
+    return {
+        "success": True,
+        "token": token,
+        "email": user.email,
+        "tier": user.tier,
+        "user_id": str(user.user_id)
+    }
 
 @router.get("/me")
 async def get_me(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    # ── TOTAL AUTH BYPASS ────────────────────────────────────
-    return {"success": True, "user": user, "stats": {}}
+    db_user = None if user.get('email') == 'guest' else get_user_by_email(db, user.get('email'))
+    tier_info = getattr(db_user, 'tier', 'guest') if db_user else 'guest'
+    return {"success": True, "user": user, "stats": {"tier": tier_info}}
 
 
 # ── Password Reset (email-based) ─────────────────────────────

@@ -6,19 +6,17 @@
 const API_BASE = (import.meta as any).env.VITE_API_URL ?? '/api';
 
 // ── Auth token management ─────────────────────────────────────
-// TOTAL BYPASS: Always provide a dummy token if none exists
-let _token: string | null = localStorage.getItem('sambhav_token') || 'bypass_token_admin';
+let _token: string | null = localStorage.getItem('sambhav_token');
 
 export function setToken(token: string) {
   _token = token;
   localStorage.setItem('sambhav_token', token);
 }
 export function clearToken() {
-  // In bypass mode, we don't actually clear it to prevent loops
-  // _token = null;
-  // localStorage.removeItem('sambhav_token');
+  _token = null;
+  localStorage.removeItem('sambhav_token');
 }
-export function getToken() { return _token || 'bypass_token_admin'; }
+export function getToken() { return _token; }
 
 function authHeaders(): HeadersInit {
   const h: HeadersInit = { 'Content-Type': 'application/json' };
@@ -33,8 +31,6 @@ async function _post(path: string, body: object) {
     body:    JSON.stringify(body),
   });
 
-  // TOTAL BYPASS: Never redirect to auth
-  /*
   if (res.status === 401) {
     const bypassAuth = (import.meta as any).env.VITE_BYPASS_AUTH === 'true';
     if (!bypassAuth) {
@@ -42,7 +38,6 @@ async function _post(path: string, body: object) {
       window.location.href = '/auth';
     }
   }
-  */
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -54,8 +49,6 @@ async function _post(path: string, body: object) {
 async function _get(path: string) {
   const res = await fetch(`${API_BASE}${path}`, { headers: authHeaders() });
   
-  // TOTAL BYPASS: Never redirect to auth
-  /*
   if (res.status === 401) {
     const bypassAuth = (import.meta as any).env.VITE_BYPASS_AUTH === 'true';
     if (!bypassAuth) {
@@ -63,7 +56,6 @@ async function _get(path: string) {
       window.location.href = '/auth';
     }
   }
-  */
   
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -79,8 +71,6 @@ async function _postBlob(path: string, body: object): Promise<Blob> {
     body:    JSON.stringify(body),
   });
 
-  // TOTAL BYPASS: Never redirect to auth
-  /*
   if (res.status === 401) {
     const bypassAuth = (import.meta as any).env.VITE_BYPASS_AUTH === 'true';
     if (!bypassAuth) {
@@ -88,7 +78,6 @@ async function _postBlob(path: string, body: object): Promise<Blob> {
       window.location.href = '/auth';
     }
   }
-  */
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));

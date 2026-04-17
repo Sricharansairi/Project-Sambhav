@@ -13,7 +13,7 @@ domains:
   student:
     display_name: "Student & Career"
     emoji_icon: "📚"
-    model_path: "models/student_v14_xgb.joblib"
+    model_path: "models/student_stacking_v2.joblib"
     brier_score: 0.0639
     auc: 0.8753
     accuracy: 0.842
@@ -86,7 +86,7 @@ domains:
   high_school:
     display_name: "High School"
     emoji_icon: "🎓"
-    model_path: "models/higher_ed_v14_xgb.joblib"
+    model_path: "models/student_dropout_stacking_v3.joblib"
     brier_score: 0.0879
     auc: 0.9387
     accuracy: 0.856
@@ -154,7 +154,7 @@ domains:
   job_life:
     display_name: "Job Life"
     emoji_icon: "👥"
-    model_path: "models/hr_v14_xgb.joblib"
+    model_path: "models/hr_stacking_v2.joblib"
     brier_score: 0.0700
     auc: 0.9139
     accuracy: 0.874
@@ -229,16 +229,16 @@ domains:
           - { label: "4 – Clear",               value: 4 }
           - { label: "5 – Highly Defined",      value: 5 }
 
-  # ── DOMAIN 4: Health (Wellness & Diagnosis) ──────────────────
+  # ── DOMAIN 4: Health & Wellness ──────────────────────────────
   health:
-    display_name: "Health"
-    emoji_icon: "🏥"
+    display_name: "Health & Wellness"
+    emoji_icon: "🩺"
+    model_available: false
     model_path: "models/medico_v19.joblib"
-    brier_score: 0.0578
+    brier_score: 0.1120
     auc: 0.8468
     accuracy: 0.925
     status: TROPHY
-    model_available: true
     blend_mode: false
     supported_outcomes: ["low_risk", "high_risk"]
     question_template: "What is this person's health risk level?"
@@ -312,6 +312,7 @@ domains:
   fitness:
     display_name: "Fitness & Body"
     emoji_icon: "💪"
+    model_available: false
     model_path: "models/fitness_v14_xgb.joblib"
     brier_score: 0.0709
     auc: 0.9052
@@ -370,10 +371,11 @@ domains:
           - { label: "26 – 32%", value: 29 }
           - { label: "32%+",     value: 36 }
 
-  # ── DOMAIN 6: Financial Assessment ──────────────────────────
+  # ── DOMAIN 6: Financial Stability ────────────────────────────
   financial:
     display_name: "Financial"
-    emoji_icon: "💳"
+    emoji_icon: "💰"
+    model_available: false
     model_path: "models/loan_stacking_v5.joblib"
     brier_score: 0.0337
     auc: 0.9184
@@ -451,10 +453,11 @@ domains:
           - { label: "Business / Investment", value: 2 }
           - { label: "Debt Management", value: 4 }
 
-  # ── DOMAIN 7: Mental Health Risk ────────────────────────────
+  # ── DOMAIN 7: Mental Health ──────────────────────────────────
   mental_health:
     display_name: "Mental Health"
     emoji_icon: "🧠"
+    model_available: false
     model_path: "models/mental_health_stacking_v8.joblib"
     brier_score: 0.0359
     auc: 0.9912
@@ -538,8 +541,8 @@ domains:
   claim:
     display_name: "Claim Credibility"
     emoji_icon: "🔍"
-    model_path: "models/claim_v14_xgb.joblib"
-    model_path_synthetic: "models/claim_v14_synthetic.joblib"
+    model_path: "models/claim_stacking_v3.joblib"
+    model_path_synthetic: "models/claim_stacking_v2.joblib"
     blend_weight: 0.72          # 72% real-data model, 28% synthetic
     brier_score: 0.1211
     auc: 0.8949
@@ -603,8 +606,8 @@ domains:
   behavioral:
     display_name: "Behavioral"
     emoji_icon: "🧩"
-    model_path: "models/behavioral_v14_xgb.joblib"
-    model_path_synthetic: "models/behavioral_v14_synthetic.joblib"
+    model_path: "models/behavioral_stacking_v2.joblib"
+    model_path_synthetic: "models/behavioral_stacking_v1.joblib"
     blend_weight: 0.68          # 68% real-data model, 32% synthetic
     brier_score: 0.0841
     auc: 0.9234
