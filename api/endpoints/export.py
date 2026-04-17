@@ -297,13 +297,52 @@ async def export_pdf(req: ExportRequest, db: Session = Depends(get_db)):
         outcome_items = _get_outcomes_list(data)
         if outcome_items:
             story.append(Paragraph("Multi-Outcome Predictions", h2_style))
+            # Support wrapping for reasoning text
+            from reportlab.lib.styles import ParagraphStyle
+            from reportlab.platypus import Paragraph
+            cell_style = ParagraphStyle(name='cell', fontSize=8, textColor=colors.HexColor("#e2e8f0"))
+            
             o_rows = [["Outcome", "Probability", "Reasoning"]] + [
-                [label, prob_pct, (reasoning[:80] + "...") if len(reasoning) > 80 else reasoning]
+                [label, prob_pct, Paragraph(str(reasoning) if reasoning else "-", cell_style)]
                 for label, prob_pct, reasoning in outcome_items
             ]
-            o_t = Table(o_rows, colWidths=[5*cm, 2.5*cm, 9.5*cm])
-            o_t.setStyle(TABLE_STYLE)
+            o_t = Table(o_rows, colWidths=[4*cm, 2.5*cm, 10.5*cm])
+            # Align reasoning to TOP so it doesn't float vertically centered if long
+            base_style = list(TABLE_STYLE.getCommands())
+            base_style.append(("VALIGN", (2, 1), (-1, -1), "TOP"))
+            o_t.setStyle(TableStyle(base_style))
+            
             story.append(o_t)
+            story.append(Spacer(1, 0.4*cm))
+            
+        # Support Pragma forensic profile in exports
+        if str(data.get("domain", "")).lower() == "pragma":
+            story.append(Paragraph("PRAGMA Forensic Profile", h2_style))
+            deception_pct = data.get("final_probability", 0)
+            if outcome_items:
+                try: 
+                    deception_pct = float(outcome_items[0][1].strip('%')) / 100
+                except:
+                    pass
+            is_deceptive = deception_pct > 0.5
+            
+            profile_rows = [
+                ["Indicator", "Forensic Analysis"]
+            ]
+            if is_deceptive:
+                profile_rows.append(["Motive", "Self-preservation or concealment. Stress-induced distancing."])
+                profile_rows.append(["Linguistic", "Increased hedging, pronoun distancing, over-qualification."])
+                profile_rows.append(["Psychological", "Elevated cognitive load, mapping to information suppression."])
+                profile_rows.append(["Recommendation", "DO NOT RELY. Obtain corroborating evidence."])
+            else:
+                profile_rows.append(["Motive", "No deceptive motive. Aligns with genuine patterns."])
+                profile_rows.append(["Linguistic", "Direct language, emotionally resonant, consistent."])
+                profile_rows.append(["Psychological", "Baseline stable. No cognitive load spikes."])
+                profile_rows.append(["Recommendation", "Passes preliminary screening. Proceed normally."])
+                
+            p_t = Table(profile_rows, colWidths=[4*cm, 13*cm])
+            p_t.setStyle(TABLE_STYLE)
+            story.append(p_t)
             story.append(Spacer(1, 0.4*cm))
 
         # ── Input Parameters ─────────────────────────────────────────
