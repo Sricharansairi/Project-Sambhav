@@ -1235,7 +1235,7 @@ export function Prediction() {
         {outcomes.length > 0 && (
           <div className="space-y-2 pt-2 border-t border-white/10">
             <p className="text-[10px] font-medium text-muted-foreground">Simulated Outcomes</p>
-            {outcomes.map((o, i) => <OutcomeRow key={i} name={o.outcome} probability={o.probability} delay={i * 0.1} onWhyClick={() => handleWhyClick(i)} isAnimating={isAnimating} />)}
+            {renderStandardResults()}
           </div>
         )}
         <p className="text-[9px] text-muted-foreground/60 italic text-center">Mode 8: Simulation — Monte Carlo {mc?.n_runs ?? 200} iterations</p>
@@ -1285,9 +1285,9 @@ export function Prediction() {
                       )}
                       {transparencyLevel === 'full' && activeWhyData.full && (
                         <div className="pt-1.5 border-t border-white/5 space-y-1">
-                          {activeWhyData.full.primary_driver && <p className="text-[10px] text-muted-foreground"><span className="text-primary font-medium">Primary Driver: </span>{activeWhyData.full.primary_driver}</p>}
+                          {(activeWhyData.full.primary_driver) && <p className="text-[10px] text-muted-foreground"><span className="text-primary font-medium">Primary Driver: </span>{activeWhyData.full.primary_driver}</p>}
                           {activeWhyData.full.intervention && <p className="text-[10px] text-muted-foreground"><span className="text-primary font-medium">Key Intervention: </span>{activeWhyData.full.intervention}</p>}
-                          {activeWhyData.full.confidence_factors && <p className="text-[10px] text-muted-foreground"><span className="text-primary font-medium">Confidence Factors: </span>{activeWhyData.full.confidence_factors}</p>}
+                          {(activeWhyData.full.confidence_note || activeWhyData.full.confidence_factors) && <p className="text-[10px] text-muted-foreground"><span className="text-primary font-medium">Confidence: </span>{activeWhyData.full.confidence_note || activeWhyData.full.confidence_factors}</p>}
                         </div>
                       )}
                     </>

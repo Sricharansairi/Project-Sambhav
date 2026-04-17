@@ -1144,7 +1144,7 @@ def explain_prediction_transparency(
         return {
             "simple":   parsed.get("simple",   {"one_line_reason": f"Based on the current parameters, {outcome_label} has a {prob_pct} probability.", "dominant_probability": round((final_probability or 0.5) * 100, 1), "minority_probability": round((1 - (final_probability or 0.5)) * 100, 1)}),
             "detailed": parsed.get("detailed", {"case_for": "The current parameter signals support this outcome.", "case_against": "Alternative signals may reduce this probability.", "positive_signals": [], "negative_signals": []}),
-            "full":     parsed.get("full",     {"primary_driver": "Combined parameter signals", "intervention": "Improve key negative signals", "confidence_note": "Based on available data."}),
+            "full":     {**{"primary_driver": "Combined parameter signals", "intervention": "Improve key negative signals", "confidence_note": "Based on available data.", "confidence_factors": "Based on available data."}, **parsed.get("full", {})},
             "outcome":  outcome_label,
             "probability": prob_pct,
         }
