@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 from sqlalchemy.orm import Session
 
 from core.predictor import predict, predict_free, generate_outcomes, explain_prediction_transparency, _get_shap, _load_registry
