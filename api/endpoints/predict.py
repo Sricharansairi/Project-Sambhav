@@ -160,7 +160,6 @@ class BatchPredictRequest(BaseModel):
 
 # ── POST /predict ─────────────────────────────────────────────
 @router.post("")
-@router.post("/{domain}")
 async def predict_endpoint(
     req: PredictRequest = None,
     domain: str = None,
