@@ -94,12 +94,30 @@ export function Calibration() {
     }
   });
 
-  // Submit actual outcome
+  // Submit actual outcome — save to backend + update UI
   const handleResolve = async (id: string) => {
     const val = parseFloat(newActual[id] || '');
     if (isNaN(val) || val < 0 || val > 100) return;
     setResolving(id);
-    // Optimistic update
+    const record = records.find(r => r.id === id);
+    if (record) {
+      try {
+        const BASE = (import.meta as any).env?.VITE_API_BASE ?? 'http://localhost:8000';
+        const userJson = localStorage.getItem('sambhav_user');
+        const token = userJson ? JSON.parse(userJson)?.token || '' : '';
+        await fetch(`${BASE}/evaluate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({
+            prediction_id:  record.id,
+            predicted_prob: record.predicted / 100,
+            actual_outcome: val >= 50, // treat ≥50% as "happened"
+            domain:         record.domain,
+          }),
+        });
+      } catch (e) { console.warn('Evaluate POST failed (likely auth):', e); }
+    }
+    // Optimistic UI update
     setRecords(prev => prev.map(r => r.id === id
       ? { ...r, resolved: true, actual: val, error: Math.abs(r.predicted - val) }
       : r

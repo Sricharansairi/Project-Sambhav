@@ -260,9 +260,21 @@ export async function getTransparency(payload: {
   final_probability?: number;
   question?:          string;
   outcome?:           string;
+  level?:             string;
 }): Promise<{ success: boolean; result: TransparencyResult }> {
   if (!_token) await auth.guest();
   return _post('/predict/transparency', payload);
+}
+
+export async function getInverseTransparency(payload: {
+  domain:             string;
+  parameters:         Record<string, any>;
+  final_probability?: number;
+  question?:          string;
+  outcome?:           string;
+}): Promise<{ success: boolean; inverse_scenario: any; inverse_pct: number; probability: number }> {
+  if (!_token) await auth.guest();
+  return _post('/predict/inverse-transparency', payload);
 }
 
 export async function getRichPrediction(payload: {

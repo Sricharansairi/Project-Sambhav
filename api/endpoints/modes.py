@@ -141,14 +141,16 @@ async def whatif(payload: WhatIfRequest):
     """Run what-if scenario analysis with narrative simulation."""
     base_result = _run_prediction(payload.domain, payload.parameters or {}, payload.question)
     base_prob = base_result.get("final_probability", 0.5)
+    base_pct = round(base_prob * 100, 1)
 
     from llm.outcome_simulation import simulate_both_outcomes
     from core.predictor import _load_registry
-    
+    import json, re
+
     reg = _load_registry()
     domain_cfg = reg.get(payload.domain, {})
-    supported = domain_cfg.get("supported_outcomes", ["Outcome A", "Outcome B"])
-    
+    supported = domain_cfg.get("supported_outcomes", ["Positive Outcome", "Negative Outcome"])
+
     simulation = simulate_both_outcomes(
         domain=payload.domain,
         parameters=payload.parameters or {},
@@ -158,11 +160,74 @@ async def whatif(payload: WhatIfRequest):
         negative_outcome=supported[1] if len(supported) > 1 else None
     )
 
+    # Build the tree structure the frontend expects
+    branches = []
+    sim_data = simulation if isinstance(simulation, dict) else {}
+
+    # Branch 1: Positive outcome scenario
+    pos_story = sim_data.get("positive_story") or sim_data.get("positive_outcome") or sim_data.get("story_a") or ""
+    neg_story = sim_data.get("negative_story") or sim_data.get("negative_outcome") or sim_data.get("story_b") or ""
+
+    if pos_story or base_pct > 0:
+        branches.append({
+            "event": f"If {supported[0]} occurs ({base_pct}%)",
+            "new_probability": base_pct,
+            "probability_shift": 0,
+            "reasoning": pos_story,
+            "children": []
+        })
+
+    neg_pct = round(100 - base_pct, 1)
+    if neg_story or neg_pct > 0:
+        branches.append({
+            "event": f"If {supported[1] if len(supported) > 1 else 'other outcome'} occurs ({neg_pct}%)",
+            "new_probability": neg_pct,
+            "probability_shift": round(neg_pct - base_pct, 1),
+            "reasoning": neg_story,
+            "children": []
+        })
+
+    # Generate LLM-based scenario branches for the question
+    try:
+        from llm.router import route
+        q = payload.question or f"What if this {payload.domain} scenario changes?"
+        msgs = [
+            {"role": "system", "content": (
+                f"You are an expert in {payload.domain} prediction. Generate 2-3 specific what-if scenario branches."
+                f" Base probability: {base_pct}%. Question: {q}"
+                " Respond ONLY as JSON: {\"branches\": [{\"event\": \"...\", \"probability_shift\": 15, \"reasoning\": \"...\"}]}"
+            )},
+            {"role": "user", "content": f"Generate what-if branches for: {q}"}
+        ]
+        raw = route("conversational", msgs, max_tokens=400, temperature=0.25)
+        txt = raw.get("content", "")
+        txt = re.sub(r"<think>.*?</think>", "", txt, flags=re.DOTALL).strip()
+        if "{" in txt:
+            d = json.loads(txt[txt.find("{"):txt.rfind("}")+1])
+            for b in d.get("branches", []):
+                shift = float(b.get("probability_shift", 0))
+                branches.append({
+                    "event": b.get("event", "Scenario"),
+                    "new_probability": min(99, max(1, round(base_pct + shift, 1))),
+                    "probability_shift": round(shift, 1),
+                    "reasoning": b.get("reasoning", ""),
+                    "children": []
+                })
+    except Exception as e:
+        logger.warning(f"WhatIf branch generation failed: {e}")
+
+    tree = {
+        "base_probability": base_pct,
+        "description": payload.question or f"{payload.domain} scenario analysis",
+        "branches": branches
+    }
+
     return {
         "success": True,
         "mode": "what_if",
         "domain": payload.domain,
         "base_probability": base_prob,
+        "tree": tree,
         "simulation": simulation,
         "outcomes": base_result.get("outcomes", []),
         "question": payload.question,
@@ -291,48 +356,130 @@ async def expert(payload: ExpertRequest):
 
 @router.post("/retrospective")
 async def retrospective(payload: RetrospectiveRequest):
-    """Retrospective case analysis — simulate how a past outcome unfolded."""
-    from llm.outcome_simulation import generate_outcome_story
-    
-    story = generate_outcome_story(
-        domain=payload.domain,
-        parameters=payload.parameters or {},
-        outcome=payload.outcome or "Past event",
-        probability=1.0, # Retrospective assumes it happened
-        question=payload.description
-    )
+    """Retrospective case analysis — analyse why a past outcome occurred."""
+    import json, re
+
+    raw_story = None
+    try:
+        from llm.outcome_simulation import generate_outcome_story
+        raw_story = generate_outcome_story(
+            domain=payload.domain,
+            parameters=payload.parameters or {},
+            outcome=payload.outcome or "Past event",
+            probability=1.0,
+            question=payload.description
+        )
+    except Exception as e:
+        logger.warning(f"generate_outcome_story failed: {e}")
+
+    # Build structured forensic analysis via LLM
+    try:
+        from llm.router import route
+        msgs = [
+            {"role": "system", "content": (
+                f"You are a forensic analyst for the {payload.domain} domain. "
+                "Analyse why a past event occurred. Respond ONLY as JSON with these exact keys: "
+                '{"probability_at_time": <number 0-100>, "root_cause": "...", '
+                '"prevention_point": "...", "contributing_factors": ["..."], "lessons_learned": [".."]}, '
+                'do not include additional keys.'
+            )},
+            {"role": "user", "content": (
+                f"Event description: {payload.description}\n"
+                f"Actual outcome: {payload.outcome or 'Unspecified'}\n"
+                f"Domain: {payload.domain}\n"
+                f"Known parameters: {json.dumps(payload.parameters or {})}\n"
+                "Perform retrospective analysis."
+            )}
+        ]
+        raw = route("llm_predict", msgs, max_tokens=500, temperature=0.2)
+        txt = raw.get("content", "")
+        txt = re.sub(r"<think>.*?</think>", "", txt, flags=re.DOTALL).strip()
+        if "{" in txt:
+            analysis = json.loads(txt[txt.find("{"):txt.rfind("}")+1])
+        else:
+            raise ValueError("no JSON")
+    except Exception as e:
+        logger.warning(f"Retrospective LLM analysis failed: {e}")
+        analysis = {
+            "probability_at_time": 50,
+            "root_cause": raw_story if raw_story else f"The {payload.outcome or 'event'} occurred due to a confluence of factors described in the scenario.",
+            "prevention_point": "An earlier intervention could have altered the trajectory at the critical decision point.",
+            "contributing_factors": ["Primary environmental conditions", "Behavioural patterns", "External pressures"],
+            "lessons_learned": ["Monitor early warning signals", "Adjust parameters proactively"]
+        }
 
     return {
         "success": True,
         "mode": "retrospective",
-        "story": story,
+        "analysis": analysis,
+        "story": raw_story,
     }
 
 
 @router.post("/simulation")
 async def simulation(payload: SimulationRequest):
     """Monte-Carlo simulation of outcomes."""
-    from core.predictor import predict
-    
-    # Run prediction to get base probabilities
+    import random, math
+    from core.predictor import predict, generate_outcomes
+
+    # Run base prediction
     result = predict(domain=payload.domain, parameters=payload.parameters or {}, question=payload.question)
-    
-    # In a real MC simulation, we'd perturb inputs, but here we'll use the LLM to simulate the spread
-    from llm.outcome_simulation import simulate_both_outcomes
-    
-    sim = simulate_both_outcomes(
-        domain=payload.domain,
-        parameters=payload.parameters or {},
-        question=payload.question,
-        final_probability=result.reconciled_probability
-    )
+    base_prob = result.reconciled_probability or 0.5
+    n_runs = payload.n_runs or 500
+
+    # Monte-Carlo: perturb base_prob with Gaussian noise to simulate uncertainty
+    runs = []
+    for _ in range(n_runs):
+        noise = random.gauss(0, 0.08)  # ±8% std deviation
+        p = max(0.01, min(0.99, base_prob + noise))
+        runs.append(p)
+
+    mean_p   = sum(runs) / len(runs)
+    variance = sum((r - mean_p) ** 2 for r in runs) / len(runs)
+    std_dev  = math.sqrt(variance)
+    sorted_r = sorted(runs)
+    ci_low   = sorted_r[int(0.025 * n_runs)]
+    ci_high  = sorted_r[int(0.975 * n_runs)]
+    stability = std_dev  # lower = more stable
+
+    monte_carlo = {
+        "mean":      round(mean_p * 100, 1),
+        "ci_low":    round(ci_low * 100, 1),
+        "ci_high":   round(ci_high * 100, 1),
+        "stability": round(stability, 3),
+        "n_runs":    n_runs,
+    }
+
+    # LLM narrative
+    try:
+        from llm.outcome_simulation import simulate_both_outcomes
+        sim = simulate_both_outcomes(
+            domain=payload.domain,
+            parameters=payload.parameters or {},
+            question=payload.question,
+            final_probability=base_prob
+        )
+        narrative = {"story": sim.get("positive_story") or sim.get("story_a") or ""} if isinstance(sim, dict) else {"story": ""}
+    except Exception as e:
+        logger.warning(f"Simulation narrative failed: {e}")
+        sim = {}
+        narrative = {"story": f"Based on {n_runs} Monte Carlo runs, the mean probability is {monte_carlo['mean']}% with a 95% CI of {monte_carlo['ci_low']}%–{monte_carlo['ci_high']}%."}
+
+    # Generate outcomes
+    try:
+        outcomes_res = generate_outcomes(domain=payload.domain, parameters=payload.parameters or {}, question=payload.question)
+        outcomes_list = outcomes_res.get("outcomes", [])
+    except Exception:
+        outcomes_list = result.outcomes or []
 
     return {
-        "success": True,
-        "mode": "simulation",
-        "base_result": result.to_dict(),
-        "simulation": sim,
-        "outcomes": result.outcomes,
+        "success":      True,
+        "mode":         "simulation",
+        "monte_carlo":  monte_carlo,
+        "narrative":    narrative,
+        "base_result":  result.to_dict(),
+        "simulation":   sim,
+        "outcomes":     outcomes_list,
     }
 
 
@@ -377,10 +524,11 @@ async def document_analysis(
 
         # Step 3 — Predict using extracted parameters
         import concurrent.futures
+        _q = question or analysis.get("prediction_question")
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            pred_future = executor.submit(predict, domain=domain, params=params, question=question or analysis.get("prediction_question"))
-            out_future  = executor.submit(generate_outcomes, domain=domain, parameters=params, question=question or analysis.get("prediction_question"))
-            
+            pred_future = executor.submit(predict, domain=domain, parameters=params, question=_q)
+            out_future  = executor.submit(generate_outcomes, domain=domain, parameters=params, question=_q)
+
             prediction = pred_future.result()
             outcomes   = out_future.result()
 

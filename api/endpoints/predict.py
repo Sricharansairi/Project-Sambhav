@@ -396,7 +396,7 @@ async def conversational_answer(req: ConversationalAnswerRequest):
             # Run parallel prediction
             import concurrent.futures
             with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-                pred_future = executor.submit(predict, domain=req.domain, params=params, question=req.question)
+                pred_future = executor.submit(predict, domain=req.domain, parameters=params, question=req.question)
                 out_future  = executor.submit(generate_outcomes, domain=req.domain, parameters=params, question=req.question)
                 
                 prediction = pred_future.result()
@@ -429,59 +429,158 @@ class DiscoverParamsRequest(BaseModel):
 async def discover_params_endpoint(req: DiscoverParamsRequest):
     """
     DYNAMIC PARAMETER GENERATION (Section 6.1)
-    Generates relevant chip parameters on-the-fly based on the user's specific question.
-    Ensures parameters are always relevant to the current scenario.
+    Generates 6-10 relevant chip parameters based on the user's specific question.
+    Scales parameter count with question complexity.
     """
     try:
         from llm.router import route
         import json, re
-        
+
         registry = _load_registry()
         domain_cfg = registry.get(req.domain, {})
-        
-        # System prompt for dynamic parameter generation
+        domain_params = domain_cfg.get("parameters", [])
+        existing_keys = [p.get("key", "") if isinstance(p, dict) else p for p in domain_params]
+
+        # Estimate complexity: simple questions → 5-6 params, complex multi-factor → 8-10
+        word_count = len(req.question.split())
+        min_params = 5 if word_count < 10 else 7
+        max_params = 7 if word_count < 10 else 10
+
         messages = [
             {"role": "system", "content": (
                 f"You are the Sambhav Dynamic Parameter Generator for the '{req.domain}' domain.\n"
                 f"User Question: \"{req.question}\"\n\n"
                 "YOUR TASK:\n"
-                "Generate 4-6 most relevant parameters (features) needed to predict the outcome of this specific scenario.\n"
-                "Each parameter must be quantifiable or categorical.\n\n"
-                "Respond ONLY in this JSON format:\n"
+                f"Generate between {min_params} and {max_params} parameters (features) most relevant to predict the outcome of this specific question.\n"
+                "Rules:\n"
+                "1. Each parameter must be directly relevant to the question — not generic filler.\n"
+                "2. Parameters must be quantifiable or categorical (not free-text).\n"
+                "3. Include both positive drivers (increase probability) and risk factors (decrease probability).\n"
+                "4. Each parameter needs 3-5 options spanning Low/Medium/High or similar meaningful range.\n"
+                "5. Label questions should be natural English questions (e.g. 'How many hours do you study per day?').\n"
+                "6. Weight must be 'critical', 'high', 'medium', or 'low' based on impact on the outcome.\n\n"
+                "Respond ONLY in this JSON format (no markdown, no explanation):\n"
                 "{\n"
                 '  "parameters": [\n'
                 '    {\n'
                 '      "key": "unique_snake_case_key",\n'
-                '      "label": "User friendly question?",\n'
+                '      "label": "Natural language question?",\n'
                 '      "type": "chips",\n'
+                '      "placeholder": "Select the most accurate option",\n'
                 '      "options": [\n'
-                '        {"label": "Option 1", "value": 1.0},\n'
-                '        {"label": "Option 2", "value": 2.0}\n'
+                '        {"label": "Low (describe)", "value": 1.0},\n'
+                '        {"label": "Medium (describe)", "value": 2.0},\n'
+                '        {"label": "High (describe)", "value": 3.0}\n'
                 '      ],\n'
-                '      "description": "Short explanation of impact",\n'
-                '      "weight": "high|medium|low",\n'
+                '      "description": "Brief explanation of why this matters",\n'
+                '      "weight": "high",\n'
                 '      "required": true\n'
                 '    }\n'
                 '  ]\n'
                 "}"
             )},
-            {"role": "user", "content": f"Generate dynamic parameters for: {req.question}"}
+            {"role": "user", "content": f"Generate {min_params}-{max_params} dynamic parameters for: {req.question}"}
         ]
-        
-        # Use high-speed Groq 8B for fast generation
-        raw_res = route("conversational", messages, max_tokens=1000, temperature=0.2)
+
+        raw_res = route("conversational", messages, max_tokens=1800, temperature=0.15)
         raw = raw_res.get("content", "")
         raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
         if "```" in raw:
             raw = re.sub(r"```(?:json)?", "", raw).strip().rstrip("`")
-            
+
         data = json.loads(raw[raw.find("{"):raw.rfind("}")+1])
-        return {"success": True, "parameters": data.get("parameters", [])}
-        
+        params = data.get("parameters", [])
+        # Clamp to max
+        params = params[:max_params]
+        return {"success": True, "parameters": params, "count": len(params)}
+
     except Exception as e:
         logger.error(f"Discover params failed: {e}")
-        # Fallback to static registry params if generation fails
         return {"success": False, "error": str(e)}
+
+
+# ── POST /predict/inverse-transparency ─────────────────────────
+class InverseTransparencyRequest(BaseModel):
+    domain:            str
+    parameters:        Optional[dict] = {}
+    final_probability: Optional[float] = 0.5
+    question:          Optional[str]   = None
+    outcome:           Optional[str]   = None
+
+@router.post("/inverse-transparency")
+async def inverse_transparency_endpoint(req: InverseTransparencyRequest):
+    """
+    'When this FAILS' — explains what would need to happen for the outcome NOT to occur.
+    Given an outcome with probability P%, explains the remaining (100-P)% scenario.
+    """
+    try:
+        from llm.router import route
+        import json, re
+
+        prob_pct   = round((req.final_probability or 0.5) * 100, 1)
+        inv_pct    = round(100 - prob_pct, 1)
+        outcome_lbl = req.outcome or "the predicted outcome"
+        q_context   = req.question or "No additional context"
+
+        messages = [
+            {"role": "system", "content": (
+                f"You are an expert inverse-scenario analyst for the '{req.domain}' domain.\n"
+                f"The current outcome '{outcome_lbl}' has a {prob_pct}% probability of occurring.\n"
+                f"Your task: explain the {inv_pct}% scenario where this outcome DOES NOT happen.\n"
+                "Be specific about:\n"
+                "1. What factors would need to change for the failure/alternative scenario\n"
+                "2. What triggers or tipping points would cause this\n"
+                "3. What the alternative outcome would look like\n"
+                "4. How someone could detect early warning signs\n\n"
+                "Respond ONLY as JSON:\n"
+                '{"inverse_probability": <number>, "scenario_title": "When X does NOT happen", '
+                '"what_goes_wrong": "...", "trigger_factors": ["...", "..."], '
+                '"alternative_outcome": "...", "early_warnings": ["...", "..."], '
+                '"reversal_actions": "What could prevent this alternative scenario"}'
+            )},
+            {"role": "user", "content": (
+                f"Outcome: {outcome_lbl} ({prob_pct}% probability)\n"
+                f"Context: {q_context}\n"
+                f"Domain parameters: {json.dumps(req.parameters or {})}\n"
+                f"Explain the {inv_pct}% failure scenario."
+            )}
+        ]
+
+        raw = route("llm_predict", messages, max_tokens=600, temperature=0.25)
+        txt = raw.get("content", "")
+        txt = re.sub(r"<think>.*?</think>", "", txt, flags=re.DOTALL).strip()
+        if "{" in txt:
+            result = json.loads(txt[txt.find("{"):txt.rfind("}")+1])
+        else:
+            raise ValueError("No JSON in response")
+
+        return {
+            "success":           True,
+            "outcome":           outcome_lbl,
+            "probability":       prob_pct,
+            "inverse_pct":       inv_pct,
+            "inverse_scenario":  result,
+            "disclaimer":        "Sambhav may be incorrect. Always verify important decisions independently."
+        }
+    except Exception as e:
+        logger.error(f"Inverse transparency error: {e}")
+        # Fallback structured response
+        inv_pct = round(100 - (req.final_probability or 0.5) * 100, 1)
+        return {
+            "success": True,
+            "outcome": req.outcome,
+            "probability": round((req.final_probability or 0.5)*100, 1),
+            "inverse_pct": inv_pct,
+            "inverse_scenario": {
+                "inverse_probability": inv_pct,
+                "scenario_title": f"When {req.outcome} does NOT occur ({inv_pct}%)",
+                "what_goes_wrong": f"In {inv_pct}% of cases, insufficient supporting factors cause the outcome to fail.",
+                "trigger_factors": ["Insufficient preparation", "Unexpected external events", "Key parameter changes"],
+                "alternative_outcome": f"The opposite of {req.outcome or 'the predicted outcome'} occurs.",
+                "early_warnings": ["Declining trend in key metrics", "Increased uncertainty signals"],
+                "reversal_actions": "Focus on strengthening the critical success factors identified in the main prediction."
+            }
+        }
 
 
 # ── POST /predict/rich ────────────────────────────────────────

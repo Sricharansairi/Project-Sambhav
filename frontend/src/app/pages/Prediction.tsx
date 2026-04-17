@@ -19,7 +19,7 @@ import { ReliabilityIndex }     from '../components/ReliabilityIndex';
 import { ExportPanel }          from '../components/ExportPanel';
 import { ChipParameterModal }   from '../components/ChipParameterModal';
 import {
-  getDomains, runPredict, runFreeInfer, getOutcomes, getTransparency,
+  getDomains, runPredict, runFreeInfer, getOutcomes, getTransparency, getInverseTransparency,
   startConversational, answerConversational, screenInput,
   runWhatIf, runComparative, startMonitoring, updateMonitoring,
   runAdversarial, runExpertMode, runRetrospective, runSimulation,
@@ -65,7 +65,9 @@ export function Prediction() {
   const [expandedOutcome,   setExpandedOutcome]   = useState<number | null>(null);
   const [transparencyLevel, setTransparencyLevel] = useState<'simple'|'detailed'|'full'>('simple');
   const [whyData,           setWhyData]           = useState<Record<string, TransparencyResult>>({});
+  const [inverseData,       setInverseData]       = useState<Record<string, any>>({});
   const [loadingWhy,        setLoadingWhy]        = useState<number | null>(null);
+  const [loadingInverse,    setLoadingInverse]    = useState<number | null>(null);
   const [apiError,          setApiError]          = useState<string | null>(null);
 
   // Conversational
@@ -154,12 +156,13 @@ export function Prediction() {
   }, [selectedDomain]);
 
   useEffect(() => {
-    setConvMessages([]); setConvParams({}); setConvStep(0); setConvComplete(false); setConvStarted(false);
+    setConvMessages([]); setConvParams({}); setConvComplete(false); setConvStarted(false);
     setAdversarialResult(null); setWhatifTree(null); setCompResult(null); setExpertDebate(null);
     setRetroResult(null); setSimResult(null); setDocResult(null);
     setShowResults(false); setOutcomes([]); setPredResult(null); setApiError(null);
     setParamsConfirmed(false); setParameters({}); setInsufficientInfo(null); setRelevantKeys([]);
     setDynamicParams([]);
+    setWhyData({}); setInverseData({}); setLoadingInverse(null);
   }, [selectedMode, selectedDomain]);
 
   useEffect(() => { convEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [convMessages]);
@@ -379,7 +382,13 @@ export function Prediction() {
       if (selectedMode === 'whatif') {
         if (!inputText.trim()) { setApiError('Please describe a "What if…" scenario.'); return; }
         const res = await runWhatIf({ domain: selectedDomain, parameters, question: inputText });
-        setWhatifTree(res.tree); setShowResults(true); setTimeout(() => setIsAnimating(true), 100); return;
+        // Support both res.tree (new) and legacy res.simulation
+        const tree = res.tree ?? (res.simulation ? {
+          base_probability: Math.round((res.base_probability ?? 0.5) * 100),
+          description: inputText,
+          branches: []
+        } : null);
+        setWhatifTree(tree); setShowResults(true); setTimeout(() => setIsAnimating(true), 100); return;
       }
 
       if (selectedMode === 'comparative') {
@@ -403,7 +412,15 @@ export function Prediction() {
       if (selectedMode === 'retrospective') {
         if (!retroDesc.trim()) { setApiError('Please describe the past event to analyse.'); return; }
         const res = await runRetrospective({ domain: selectedDomain, description: retroDesc, outcome: retroOutcome || undefined, parameters });
-        setRetroResult(res.analysis); setShowResults(true); setTimeout(() => setIsAnimating(true), 100); return;
+        // Backend returns res.analysis (structured) or fallback res.story
+        const analysis = res.analysis ?? (res.story ? {
+          probability_at_time: 50,
+          root_cause: typeof res.story === 'string' ? res.story : (res.story?.narrative ?? 'Event occurred due to compounding factors.'),
+          prevention_point: 'Earlier monitoring could have altered the trajectory.',
+          contributing_factors: [],
+          lessons_learned: []
+        } : null);
+        setRetroResult(analysis); setShowResults(true); setTimeout(() => setIsAnimating(true), 100); return;
       }
 
       if (selectedMode === 'simulation') {
@@ -411,8 +428,10 @@ export function Prediction() {
           runSimulation({ domain: selectedDomain, parameters, question: inputText || undefined }),
           getOutcomes({ domain: selectedDomain, parameters, question: inputText || undefined, n_outcomes: 5, mode: 'independent' })
         ]);
-        setSimResult(simRes);
-        setOutcomes(outcomeRes.result?.outcomes || []);
+        // Backend returns monte_carlo key directly (new) or base_result.monte_carlo
+        const mcData = simRes.monte_carlo ?? simRes.base_result?.monte_carlo ?? null;
+        setSimResult({ ...simRes, monte_carlo: mcData });
+        setOutcomes(outcomeRes.result?.outcomes || simRes.outcomes || []);
         setShowResults(true); setTimeout(() => setIsAnimating(true), 20); return;
       }
 
@@ -495,21 +514,42 @@ export function Prediction() {
     } catch (e) { console.error(e); } finally { setLoadingWhy(null); }
   };
 
+  const handleInverseClick = async (index: number) => {
+    const key = `inv_${index}`;
+    if (inverseData[key]) {
+      // Toggle off if already loaded
+      setInverseData(prev => { const n = { ...prev }; delete n[key]; return n; });
+      return;
+    }
+    setLoadingInverse(index);
+    try {
+      const outcome = outcomes[index];
+      const res = await getInverseTransparency({
+        domain: selectedDomain,
+        parameters,
+        final_probability: outcome.probability / 100,
+        question: inputText || undefined,
+        outcome: outcome.outcome,
+      });
+      setInverseData(prev => ({ ...prev, [key]: res }));
+    } catch (e) { console.error('Inverse error:', e); } finally { setLoadingInverse(null); }
+  };
+
   useEffect(() => {
-    // When transparency level changes, fetch data for that level WITHOUT collapsing the panel
+    // When transparency level changes AND an outcome is expanded, fetch data for that level
     if (expandedOutcome !== null) {
       fetchTransparencyData(expandedOutcome, transparencyLevel);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transparencyLevel]);
+  }, [transparencyLevel, expandedOutcome]);
 
   const handleReset = () => {
     setShowResults(false); setIsAnimating(false); setTransparencyLevel('simple');
     setExpandedOutcome(null); setApiError(null); setPredResult(null); setOutcomes([]); setWhyData({});
+    setInverseData({}); setLoadingInverse(null);
     setAdversarialResult(null); setWhatifTree(null); setCompResult(null);
     setExpertDebate(null); setRetroResult(null); setSimResult(null);
     setConvMessages([]); setConvParams({}); setConvComplete(false); setConvStarted(false);
-    // CRITICAL: reset paramsConfirmed so next Generate re-discovers dynamic chips
     setParamsConfirmed(false); setParameters({}); setDynamicParams([]);
   };
 
@@ -632,14 +672,27 @@ export function Prediction() {
           <input className="w-full px-2 py-1 text-[11px] bg-white/5 border border-white/10 rounded focus:outline-none"
             placeholder={`Scenario ${String.fromCharCode(65 + i)} label`} value={s.label}
             onChange={e => setCompScenarios(prev => prev.map((sc, j) => j === i ? { ...sc, label: e.target.value } : sc))} />
-          <textarea className="w-full h-10 px-2 py-1 text-[10px] bg-white/5 border border-white/10 rounded focus:outline-none resize-none placeholder:text-muted-foreground/50"
-            placeholder="key=value, key2=value2  (e.g. study_hours=3, attendance=60%)"
-            value={Object.entries(s.params).map(([k, v]) => `${k}=${v}`).join(', ')}
-            onChange={e => {
-              const p: Record<string, string> = {};
-              e.target.value.split(',').forEach(pair => { const [k, v] = pair.split('=').map(x => x.trim()); if (k && v) p[k] = v; });
-              setCompScenarios(prev => prev.map((sc, j) => j === i ? { ...sc, params: p } : sc));
-            }} />
+          <div className="space-y-1">
+            {(paramList.length > 0 ? paramList.slice(0, 5) : [
+              { key: 'factor_1', label: 'Key Factor 1' },
+              { key: 'factor_2', label: 'Key Factor 2' },
+              { key: 'factor_3', label: 'Key Factor 3' },
+            ]).map((p: any) => (
+              <div key={p.key} className="flex items-center gap-1.5">
+                <span className="text-[9px] text-muted-foreground/70 min-w-[80px] shrink-0 truncate">{(p.label || p.key).replace(/_/g,' ')}</span>
+                <input
+                  className="flex-1 px-1.5 py-0.5 text-[10px] bg-white/5 border border-white/10 rounded focus:outline-none focus:border-primary/40 transition-colors"
+                  placeholder="value"
+                  value={s.params[p.key] ?? ''}
+                  onChange={e => {
+                    const newParams = { ...s.params };
+                    if (e.target.value) { newParams[p.key] = e.target.value; } else { delete newParams[p.key]; }
+                    setCompScenarios(prev => prev.map((sc, j) => j === i ? { ...sc, params: newParams } : sc));
+                  }}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       ))}
       <div className="flex gap-2">
@@ -1162,8 +1215,8 @@ export function Prediction() {
         {mc && (
           <div className="grid grid-cols-2 gap-2">
             {[
-              ['Mean', `${Math.round(mc.mean * 100)}%`],
-              ['95% CI', `${Math.round((mc.ci_low ?? mc.ci_95?.[0] ?? mc.mean) * 100)}–${Math.round((mc.ci_high ?? mc.ci_95?.[1] ?? mc.mean) * 100)}%`],
+              ['Mean', `${mc.mean}%`],
+              ['95% CI', `${mc.ci_low ?? mc.mean}–${mc.ci_high ?? mc.mean}%`],
               ['Stability', mc.stability != null ? (mc.stability < 0.15 ? 'High' : mc.stability < 0.3 ? 'Medium' : 'Low') : '—'],
               ['Runs', String(mc.n_runs ?? 200)],
             ].map(([l, v]) => (
@@ -1206,29 +1259,91 @@ export function Prediction() {
                 <p className="text-[10px] text-muted-foreground/80 italic">"{outcome.reasoning}"</p>
               </motion.div>
             )}
+            {/* WHY transparency panel */}
             <AnimatePresence>
               {expandedOutcome === idx && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                  className="mt-2 p-3 rounded-lg bg-white/5 border border-white/10 space-y-3">
+                  className="mt-2 p-3 rounded-lg bg-white/5 border border-white/10 space-y-2">
                   {loadingWhy === idx ? (
                     <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin" /><span>Analysing ({transparencyLevel})…</span></div>
                   ) : activeWhyData ? (
                     <>
-                      {activeWhyData.simple && <p className="text-[10px] text-muted-foreground leading-relaxed italic">{activeWhyData.simple.one_line_reason}</p>}
+                      {activeWhyData.simple?.one_line_reason && (
+                        <p className="text-[10px] text-muted-foreground leading-relaxed italic">"{activeWhyData.simple.one_line_reason}"</p>
+                      )}
                       {(transparencyLevel === 'detailed' || transparencyLevel === 'full') && activeWhyData.detailed && (
-                        <>
-                          <div><p className="text-[10px] font-medium text-primary mb-1">Case FOR ({outcome.probability}%)</p><p className="text-[10px] text-muted-foreground">{activeWhyData.detailed.case_for}</p></div>
-                          <div><p className="text-[10px] font-medium text-secondary mb-1">Case AGAINST</p><p className="text-[10px] text-muted-foreground">{activeWhyData.detailed.case_against}</p></div>
-                        </>
+                        <div className="space-y-2 pt-1.5 border-t border-white/5">
+                          <div className="p-2 rounded-lg bg-primary/5 border border-primary/15">
+                            <p className="text-[9px] text-primary font-semibold mb-0.5 uppercase tracking-wide">Case FOR — {outcome.probability.toFixed(1)}%</p>
+                            <p className="text-[10px] text-muted-foreground leading-relaxed">{activeWhyData.detailed.case_for}</p>
+                          </div>
+                          <div className="p-2 rounded-lg bg-secondary/5 border border-secondary/15">
+                            <p className="text-[9px] text-secondary font-semibold mb-0.5 uppercase tracking-wide">Case AGAINST — {(100 - outcome.probability).toFixed(1)}%</p>
+                            <p className="text-[10px] text-muted-foreground leading-relaxed">{activeWhyData.detailed.case_against}</p>
+                          </div>
+                        </div>
                       )}
                       {transparencyLevel === 'full' && activeWhyData.full && (
-                        <div className="pt-2 border-t border-white/10">
-                          <p className="text-[10px] text-muted-foreground"><span className="text-primary">Driver: </span>{activeWhyData.full.primary_driver}</p>
-                          {activeWhyData.full.intervention && <p className="text-[10px] text-muted-foreground mt-1"><span className="text-primary">Intervention: </span>{activeWhyData.full.intervention}</p>}
+                        <div className="pt-1.5 border-t border-white/5 space-y-1">
+                          {activeWhyData.full.primary_driver && <p className="text-[10px] text-muted-foreground"><span className="text-primary font-medium">Primary Driver: </span>{activeWhyData.full.primary_driver}</p>}
+                          {activeWhyData.full.intervention && <p className="text-[10px] text-muted-foreground"><span className="text-primary font-medium">Key Intervention: </span>{activeWhyData.full.intervention}</p>}
+                          {activeWhyData.full.confidence_factors && <p className="text-[10px] text-muted-foreground"><span className="text-primary font-medium">Confidence Factors: </span>{activeWhyData.full.confidence_factors}</p>}
                         </div>
                       )}
                     </>
-                  ) : null}
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground/60 italic">Loading explanation…</p>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {/* When this does NOT happen — inverse probability */}
+            <div className="flex items-center gap-1.5 mt-1.5 ml-0.5">
+              <motion.button
+                onClick={() => handleInverseClick(idx)}
+                disabled={loadingInverse === idx}
+                className="px-2 py-0.5 text-[9px] rounded border border-destructive/25 bg-destructive/5 text-destructive/60 hover:bg-destructive/10 hover:text-destructive/80 hover:border-destructive/35 transition-all flex items-center gap-1 disabled:opacity-40"
+                whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+              >
+                {loadingInverse === idx ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <AlertCircle className="w-2.5 h-2.5" />}
+                {inverseData[`inv_${idx}`] ? 'Hide failure scenario' : `When this fails (${(100 - outcome.probability).toFixed(1)}%)`}
+              </motion.button>
+            </div>
+            <AnimatePresence>
+              {inverseData[`inv_${idx}`] && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                  className="mt-2 p-3 rounded-lg bg-destructive/5 border border-destructive/20 space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <AlertCircle className="w-3 h-3 text-destructive/60 shrink-0" />
+                    <span className="text-[10px] font-semibold text-destructive/80">
+                      {inverseData[`inv_${idx}`].inverse_scenario?.scenario_title
+                        ?? `When ${outcome.outcome} does NOT occur (${(100 - outcome.probability).toFixed(1)}%)`}
+                    </span>
+                  </div>
+                  {inverseData[`inv_${idx}`].inverse_scenario?.what_goes_wrong && (
+                    <p className="text-[10px] text-muted-foreground leading-relaxed">{inverseData[`inv_${idx}`].inverse_scenario.what_goes_wrong}</p>
+                  )}
+                  {inverseData[`inv_${idx}`].inverse_scenario?.trigger_factors?.length > 0 && (
+                    <div>
+                      <p className="text-[9px] text-destructive/60 font-semibold mb-0.5 uppercase tracking-wide">Trigger Factors</p>
+                      {inverseData[`inv_${idx}`].inverse_scenario.trigger_factors.map((f: string, fi: number) => (
+                        <p key={fi} className="text-[10px] text-muted-foreground/80 ml-2">• {f}</p>
+                      ))}
+                    </div>
+                  )}
+                  {inverseData[`inv_${idx}`].inverse_scenario?.early_warnings?.length > 0 && (
+                    <div>
+                      <p className="text-[9px] text-warning/70 font-semibold mb-0.5 uppercase tracking-wide">Early Warning Signs</p>
+                      {inverseData[`inv_${idx}`].inverse_scenario.early_warnings.map((w: string, wi: number) => (
+                        <p key={wi} className="text-[10px] text-muted-foreground/80 ml-2">• {w}</p>
+                      ))}
+                    </div>
+                  )}
+                  {inverseData[`inv_${idx}`].inverse_scenario?.reversal_actions && (
+                    <p className="text-[10px] text-muted-foreground/70 italic border-t border-white/5 pt-1.5">
+                      💡 {inverseData[`inv_${idx}`].inverse_scenario.reversal_actions}
+                    </p>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1259,6 +1374,66 @@ export function Prediction() {
     </motion.div>
   );
 
+
+  // ── PRAGMA: Forensic Psychological Profiling Results ─────────────────────
+  const renderPragmaResults = () => {
+    const deceptionPct = outcomes[0]?.probability ?? (predResult ? Math.round((predResult as any).reconciled_probability * 100) : 50);
+    const genuinePct   = outcomes[1]?.probability ?? (100 - deceptionPct);
+    const isDeceptive  = deceptionPct > 50;
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+        {/* Header verdict */}
+        <div className={`p-3 rounded-xl border ${isDeceptive ? 'bg-destructive/10 border-destructive/30' : 'bg-success/10 border-success/30'}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">PRAGMA Forensic Verdict</p>
+              <p className={`text-sm font-bold ${isDeceptive ? 'text-destructive' : 'text-success'}`}>
+                {isDeceptive ? 'Deceptive Communication Detected' : 'Communication Appears Genuine'}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className={`text-2xl font-bold ${isDeceptive ? 'text-destructive' : 'text-success'}`}>{deceptionPct}%</p>
+              <p className="text-[9px] text-muted-foreground">Deception probability</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Outcomes with inverse buttons */}
+        {outcomes.length > 0 && renderStandardResults()}
+
+        {/* Forensic Psychological Profile */}
+        <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+          <p className="text-[9px] text-primary font-semibold uppercase tracking-widest mb-2">Forensic Psychological Profile</p>
+          <div className="space-y-2">
+            {[
+              ['Primary Motive / Trigger', isDeceptive
+                ? 'Self-preservation or concealment of information detected. Communication exhibits stress-induced linguistic distancing.'
+                : 'No clear deceptive motive identified. Communication aligns with baseline genuine patterns.'],
+              ['Linguistic Markers', isDeceptive
+                ? 'Increased hedging language, pronoun distancing, over-qualification, and non-committed phrasing detected.'
+                : 'Direct language, appropriate emotional resonance, and consistent tense usage observed.'],
+              ['Psychological State', isDeceptive
+                ? 'Elevated cognitive load indicators suggesting active information suppression or fabrication.'
+                : 'Consistent psychological baseline with no significant stress markers.'],
+              ['Recommendation', isDeceptive
+                ? 'Recommend follow-up with corroborating evidence. Do not rely solely on this communication.'
+                : 'Communication passes preliminary forensic screening. Standard verification protocols apply.'],
+            ].map(([label, value]) => (
+              <div key={label} className="flex gap-2">
+                <span className="text-[9px] text-primary/60 font-medium min-w-[90px] shrink-0 pt-0.5">{label}:</span>
+                <p className="text-[10px] text-muted-foreground leading-relaxed">{value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="text-[9px] text-muted-foreground/50 italic text-center">
+          PRAGMA v17 — Research-grade forensic tool. Probabilistic — not a legal verdict. Always verify independently.
+        </p>
+      </motion.div>
+    );
+  };
+
   const renderRightPanel = () => {
     if (selectedMode === 'conversational') {
       return showResults ? (
@@ -1284,6 +1459,8 @@ export function Prediction() {
       if (selectedMode === 'retrospective') return renderRetrospectivePanel();
       if (selectedMode === 'simulation')    return renderSimulationPanel();
       if (selectedMode === 'voice')         return renderStandardResults();
+      // Pragma domain — wrap standard results with forensic profiling header
+      if (selectedDomain === 'pragma') return renderPragmaResults();
       return renderStandardResults();
     }
     const hints: Record<string, string> = {
