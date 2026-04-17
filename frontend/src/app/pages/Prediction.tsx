@@ -270,30 +270,33 @@ export function Prediction() {
     const userId = userObj?.user_id;
 
     // Dynamic Parameter Flow (Section 6.1)
-    // In Guided mode, ALWAYS try to discover relevant parameters first
-    if (selectedMode === 'guided' && !paramsConfirmed && !isConfirmed) {
+    // In Guided mode, ALWAYS discover params fresh from the question — never skip
+    if (selectedMode === 'guided' && !isConfirmed) {
       if (!inputText.trim()) { 
-        setApiError('Please enter a question or context first.'); 
+        setApiError('Please describe your situation or question first.'); 
         setIsGenerating(false); 
         return; 
       }
       
+      // Reset so chips are fully regenerated for this specific question
+      setDynamicParams([]);
+      setParameters({});
+      setParamsConfirmed(false);
       setIsDiscovering(true);
-      console.log('Guided mode: generating dynamic parameters...');
+      console.log('Guided mode: discovering dynamic parameters for:', inputText);
       try {
         const { discoverParams } = await import('../lib/api');
         const res = await discoverParams({ domain: selectedDomain, question: inputText });
         
         if (res.success && res.parameters && res.parameters.length > 0) {
+          // LLM returned question-specific chips — use them
           setDynamicParams(res.parameters);
-          setModalStep(0); 
-          setModalOpen(true); 
         } else {
-          // Fallback to static registry params if discovery fails
+          // Fallback to static registry params
           setDynamicParams([]);
-          setModalStep(0); 
-          setModalOpen(true); 
         }
+        setModalStep(0); 
+        setModalOpen(true); 
       } catch (e) {
         console.error('Discovery failed, falling back to static:', e);
         setDynamicParams([]);
@@ -485,6 +488,8 @@ export function Prediction() {
     setAdversarialResult(null); setWhatifTree(null); setCompResult(null);
     setExpertDebate(null); setRetroResult(null); setSimResult(null);
     setConvMessages([]); setConvParams({}); setConvComplete(false); setConvStarted(false);
+    // CRITICAL: reset paramsConfirmed so next Generate re-discovers dynamic chips
+    setParamsConfirmed(false); setParameters({}); setDynamicParams([]);
   };
 
   const activeWhyData = expandedOutcome !== null ? (whyData as any)[`${expandedOutcome}_${transparencyLevel}`] || null : null;

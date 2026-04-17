@@ -308,6 +308,15 @@ def prepare_features(domain: str, params: dict, dm: DomainModel) -> Optional[np.
                 row[col] = np.nan
         arr = np.array([row[c] for c in dm.feature_columns], dtype=float).reshape(1, -1)
 
+    # ── Coverage Check ─────────────────────────────────────────────
+    # If fewer than 30% of model features are filled, zero-padding corrupts the stacking
+    # classifier. Return None so the LLM layer handles prediction cleanly instead.
+    non_nan_count = int(np.sum(~np.isnan(arr)))
+    total_cols = arr.shape[1]
+    if total_cols > 6 and non_nan_count / total_cols < 0.30:
+        log.warning(f"[{domain}] Only {non_nan_count}/{total_cols} features filled. Skipping ML — deferring to LLM.")
+        return None
+
     # Impute then scale
     if dm.imputer is not None:
         try:
