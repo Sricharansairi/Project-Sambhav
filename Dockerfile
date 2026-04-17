@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     libgl1 \
     libglib2.0-0 \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Initialize git-lfs for HF Hub models
