@@ -39,6 +39,8 @@ def get_user_by_email(db: Session, email: str) -> User:
 
 def update_user_brier(db: Session, user_id: str,
                       domain: str, brier_score: float):
+    if user_id == "guest":
+        return
     user = db.query(User).filter(User.user_id == user_id).first()
     if user:
         brier = user.personal_brier or {}
@@ -51,6 +53,8 @@ def update_user_brier(db: Session, user_id: str,
 # ── PREDICTION OPERATIONS ─────────────────────────────────────
 def save_prediction(db: Session, user_id: str,
                     prediction_result: dict) -> Prediction:
+    if str(user_id).lower() == "guest":
+        user_id = None
     pred = Prediction(
         prediction_id     = generate_id("SMB"),
         user_id           = user_id,
@@ -76,6 +80,8 @@ def save_prediction(db: Session, user_id: str,
 
 def get_predictions(db: Session, user_id: str,
                     domain: str = None, limit: int = 20) -> list:
+    if str(user_id).lower() == "guest":
+        return []
     query = db.query(Prediction).filter(Prediction.user_id == user_id)
     if domain:
         query = query.filter(Prediction.domain == domain)
@@ -131,7 +137,9 @@ def save_evaluation(db: Session, prediction_id: str,
 
 # ── FACT CHECK OPERATIONS ─────────────────────────────────────
 def save_fact_check(db: Session, user_id: str,
-                    result: dict) -> FactCheck:
+                    claim: str, result: dict) -> FactCheck:
+    if str(user_id).lower() == "guest":
+        user_id = None
     fc = FactCheck(
         fact_check_id    = generate_id("FCK"),
         user_id          = user_id,
@@ -152,6 +160,8 @@ def save_fact_check(db: Session, user_id: str,
 def log_event(db: Session, event_type: str, user_id: str = None,
               domain: str = None, details: dict = None,
               ip_address: str = None):
+    if str(user_id).lower() == "guest":
+        user_id = None
     log = AuditLog(
         log_id     = generate_id("LOG"),
         event_type = event_type,
@@ -170,6 +180,8 @@ def create_monitoring_session(db: Session, user_id: str,
                                parameters: dict,
                                threshold_low: float = 0.3,
                                threshold_high: float = 0.7) -> MonitoringSession:
+    if str(user_id).lower() == "guest":
+        user_id = None
     session = MonitoringSession(
         session_id      = generate_id("MON"),
         user_id         = user_id,
@@ -192,6 +204,8 @@ def get_user_calibration_bias(db: Session, user_id: str) -> float:
     Positive bias means the user's predictions are higher than reality (overconfident).
     Negative bias means predictions are lower than reality (underconfident).
     """
+    if str(user_id).lower() == "guest":
+        return 0.0
     # Fetch all resolved predictions for this user
     # Prediction has a relationship to Evaluation in models.py
     # We join Prediction and Evaluation
@@ -213,6 +227,8 @@ def get_user_calibration_bias(db: Session, user_id: str) -> float:
 
 def get_user_stats(db: Session, user_id: str) -> dict:
     """Get user statistics — predictions, avg Brier, best domain."""
+    if str(user_id).lower() == "guest":
+        return {"total_predictions": 0, "avg_reliability": 0.0, "domains_used": 0}
     preds = db.query(Prediction).filter(
         Prediction.user_id == user_id).all()
     evals = []
