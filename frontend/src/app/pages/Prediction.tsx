@@ -474,10 +474,31 @@ export function Prediction() {
     } catch (e) { console.error(e); } finally { setLoadingWhy(null); }
   };
 
+
+  // Dedicated fetch — does NOT toggle expand/collapse (fixes button race condition)
+  const fetchTransparencyData = async (index: number, level: 'simple' | 'detailed' | 'full') => {
+    const key = `${index}_${level}`;
+    if ((whyData as any)[key]) return; // already cached for this level
+    setLoadingWhy(index);
+    try {
+      const outcome = outcomes[index];
+      const outcomeProb = outcome.probability / 100;
+      const res = await getTransparency({
+        domain: selectedDomain,
+        parameters,
+        final_probability: outcomeProb,
+        question: inputText || undefined,
+        outcome: outcome.outcome,
+        level,
+      } as any);
+      setWhyData(prev => ({ ...prev, [key]: res.result }));
+    } catch (e) { console.error(e); } finally { setLoadingWhy(null); }
+  };
+
   useEffect(() => {
+    // When transparency level changes, fetch data for that level WITHOUT collapsing the panel
     if (expandedOutcome !== null) {
-      const key = `${expandedOutcome}_${transparencyLevel}`;
-      if (!(whyData as any)[key]) handleWhyClick(expandedOutcome);
+      fetchTransparencyData(expandedOutcome, transparencyLevel);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transparencyLevel]);
@@ -505,7 +526,17 @@ export function Prediction() {
     : ['Add more parameters to increase reliability'];
 
   const exportPayload = predResult
-    ? { prediction_id: predId, domain: selectedDomain, parameters, question: inputText || undefined, result: predResult as any }
+    ? {
+        prediction_id: predId,
+        domain: selectedDomain,
+        parameters,
+        question: inputText || undefined,
+        result: {
+          ...predResult as any,
+          // Include full multi-outcome list for export templates
+          outcomes_list: outcomes.map(o => ({ outcome: o.outcome, probability: o.probability, reasoning: o.reasoning || '' }))
+        }
+      }
     : null;
 
   // ── Left-panel renderers ─────────────────────────────────────────────────

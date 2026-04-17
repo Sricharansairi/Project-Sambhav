@@ -544,34 +544,40 @@ class SambhavPredictor:
 def cross_validate(ml_prob: Optional[float], llm_prob: Optional[float]) -> tuple[float, float, str]:
     """
     Reconcile ML and LLM predictions.
-    Enhanced: If ML is missing, LLM takes full weight with HIGH/MODERATE confidence 
-    instead of default LOW, as long as LLM returned a valid probability.
+    ML is the PRIMARY layer (70-80% weight) — domain-specific, trained on real data.
+    LLM is a CALIBRATION signal (20-30%) — adds context and semantic correction.
+
+    When ML is missing: LLM takes full weight at MODERATE confidence.
+    When LLM is missing: ML is returned as-is at LOW confidence.
     """
     if ml_prob is None and llm_prob is None:
         return 0.5, 1.0, "CRITICAL"
-    
+
     if ml_prob is None:
-        # Smart fallback: If ML model is missing from disk, rely on LLM.
-        # We cap confidence at MODERATE because ML verification is missing.
-        return llm_prob, 0.0, "MODERATE"
-    
+        # No ML model available — LLM only, capped at MODERATE confidence
+        return round(min(llm_prob, 0.97), 4), 0.0, "MODERATE"
+
     if llm_prob is None:
-        return ml_prob, 0.0, "LOW"
+        # ML only — returned as-is, LOW confidence (no cross-validation)
+        return round(min(ml_prob, 0.97), 4), 0.0, "LOW"
 
     gap = abs(ml_prob - llm_prob)
 
     if gap < 0.10:
-        reconciled = (ml_prob + llm_prob) / 2
+        # High agreement — ML 70%, LLM 30%
+        reconciled = 0.70 * ml_prob + 0.30 * llm_prob
         tier = "HIGH"
     elif gap < 0.25:
-        reconciled = 0.65 * ml_prob + 0.35 * llm_prob
+        # Moderate agreement — ML 75%, LLM 25%
+        reconciled = 0.75 * ml_prob + 0.25 * llm_prob
         tier = "MODERATE"
     elif gap < 0.40:
-        reconciled = 0.70 * ml_prob + 0.30 * llm_prob
+        # Low agreement — ML takes 80% (larger deviation, trust trained model more)
+        reconciled = 0.80 * ml_prob + 0.20 * llm_prob
         tier = "LOW"
     else:
-        # Block: show both but return midpoint as placeholder
-        reconciled = (ml_prob + llm_prob) / 2
+        # Critical disagreement — ML 75%, flag both extremes
+        reconciled = 0.75 * ml_prob + 0.25 * llm_prob
         tier = "CRITICAL"
 
     return round(min(reconciled, 0.97), 4), round(gap, 4), tier

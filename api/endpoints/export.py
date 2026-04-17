@@ -55,6 +55,30 @@ def _fmt_float(v, fmt: str = "+.4f", default: str = "0.0000") -> str:
         return default
 
 
+def _get_outcomes_list(data: dict) -> list:
+    """Normalize outcomes to a list of (label, probability_pct) tuples regardless of source format."""
+    # Prefer outcomes_list (set by frontend with full outcome objects)
+    outcomes_list = data.get("outcomes_list", [])
+    if outcomes_list and isinstance(outcomes_list, list):
+        result = []
+        for o in outcomes_list:
+            if isinstance(o, dict):
+                label = o.get("outcome", str(o))
+                prob_raw = o.get("probability", 0)
+                # probability may be 0-100 (frontend) or 0-1 (backend dict)
+                prob_pct = f"{float(prob_raw):.1f}%" if float(prob_raw) > 1 else f"{float(prob_raw)*100:.1f}%"
+                reasoning = o.get("reasoning", "")
+                result.append((label, prob_pct, reasoning))
+        if result:
+            return result
+
+    # Fallback: outcomes dict from prediction result
+    outcomes = data.get("outcomes", {})
+    if isinstance(outcomes, dict):
+        return [(label, _fmt_pct(prob), "") for label, prob in outcomes.items()]
+    return []
+
+
 class ExportRequest(BaseModel):
     prediction_id: Optional[str] = Field(None, example="SMB-2026-00001")
     domain:        Optional[str] = None
@@ -116,13 +140,11 @@ async def export_csv(req: ExportRequest, db: Session = Depends(get_db)):
     writer.writerow(["Agreement Gap",   _fmt_pct(data.get("gap"))])
     writer.writerow(["Warning Level",   data.get("warning_level", "CLEAR")])
     writer.writerow(["Mode",            data.get("mode", "")])
-    
+
     writer.writerow([])
-    writer.writerow(["Detailed Outcomes", "Probability"])
-    outcomes = data.get("outcomes", {})
-    if isinstance(outcomes, dict):
-        for label, prob in outcomes.items():
-            writer.writerow([label, _fmt_pct(prob)])
+    writer.writerow(["Multi-Outcome Predictions", "Probability", "Reasoning"])
+    for label, prob_pct, reasoning in _get_outcomes_list(data):
+        writer.writerow([label, prob_pct, reasoning])
 
     writer.writerow([])
     writer.writerow(["Input Parameter", "Value"])
@@ -195,6 +217,7 @@ async def export_xml(req: ExportRequest, db: Session = Depends(get_db)):
 async def export_pdf(req: ExportRequest, db: Session = Depends(get_db)):
     try:
         from reportlab.lib.pagesizes import A4
+        import datetime
         from reportlab.lib import colors
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
@@ -206,110 +229,114 @@ async def export_pdf(req: ExportRequest, db: Session = Depends(get_db)):
                                 leftMargin=2*cm, rightMargin=2*cm)
 
         styles = getSampleStyleSheet()
-        title_style = ParagraphStyle("title", parent=styles["Heading1"],
-                                     textColor=colors.HexColor("#c0c0c0"), fontSize=20, spaceAfter=6)
-        sub_style   = ParagraphStyle("sub", parent=styles["Normal"],
-                                     textColor=colors.HexColor("#a0a0a0"), fontSize=10, spaceAfter=12)
-        h2_style    = ParagraphStyle("h2", parent=styles["Heading2"],
-                                     textColor=colors.HexColor("#c0c0c0"), fontSize=13, spaceBefore=14, spaceAfter=6)
-        body_style  = ParagraphStyle("body", parent=styles["Normal"],
-                                     textColor=colors.HexColor("#e8e8e8"), fontSize=10, spaceAfter=4)
+        logo_style    = ParagraphStyle("logo", parent=styles["Heading1"],
+                                       textColor=colors.HexColor("#ffffff"), fontSize=22, spaceAfter=2,
+                                       fontName="Helvetica-Bold")
+        tagline_style = ParagraphStyle("tagline", parent=styles["Normal"],
+                                       textColor=colors.HexColor("#888888"), fontSize=9, spaceAfter=4)
+        h2_style      = ParagraphStyle("h2", parent=styles["Heading2"],
+                                       textColor=colors.HexColor("#cccccc"), fontSize=13, spaceBefore=14, spaceAfter=6,
+                                       fontName="Helvetica-Bold")
+        label_style   = ParagraphStyle("label", parent=styles["Normal"],
+                                       textColor=colors.HexColor("#999999"), fontSize=9)
+
+        TABLE_STYLE = TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, 0), colors.HexColor("#1a1a2e")),
+            ("TEXTCOLOR",     (0, 0), (-1, 0), colors.HexColor("#a0aec0")),
+            ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE",      (0, 0), (-1,-1), 9),
+            ("TEXTCOLOR",     (0, 1), (-1,-1), colors.HexColor("#e2e8f0")),
+            ("ROWBACKGROUNDS",(0, 1), (-1,-1), [colors.HexColor("#0d0d1a"), colors.HexColor("#111827")]),
+            ("GRID",          (0, 0), (-1,-1), 0.3, colors.HexColor("#2d3748")),
+            ("PADDING",       (0, 0), (-1,-1), 6),
+            ("VALIGN",        (0, 0), (-1,-1), "MIDDLE"),
+        ])
 
         story = []
-        story.append(Paragraph("Project Sambhav", title_style))
-        story.append(Paragraph("Uncertainty, Quantified — A Multi-Modal Probabilistic Inference Engine", sub_style))
-        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#333333")))
+
+        # ── Header Banner ──────────────────────────────────────────
+        header_bg = Table([[Paragraph("⚡ Project Sambhav", logo_style)]],
+                           colWidths=[17*cm])
+        header_bg.setStyle(TableStyle([
+            ("BACKGROUND",  (0,0), (-1,-1), colors.HexColor("#0a0a1a")),
+            ("PADDING",     (0,0), (-1,-1), 12),
+            ("ROUNDEDCORNERS", [4]),
+        ]))
+        story.append(header_bg)
+        story.append(Paragraph("Uncertainty, Quantified — Multi-Modal Probabilistic Inference Engine", tagline_style))
+        story.append(Paragraph(
+            f"Generated: {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}  ·  "
+            f"ID: {data.get('prediction_id', 'N/A')}",
+            label_style
+        ))
+        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#2d3748")))
         story.append(Spacer(1, 0.3*cm))
 
-        # Meta
-        story.append(Paragraph("Prediction Report", h2_style))
-        meta_data = [
-            ["Prediction ID", str(data.get("prediction_id", ""))],
-            ["Domain",        str(data.get("domain", "")).upper()],
-            ["Question",      str(data.get("question", ""))],
-            ["Mode",          str(data.get("mode", ""))],
-        ]
-        meta_table = Table(meta_data, colWidths=[4*cm, 13*cm])
-        meta_table.setStyle(TableStyle([
-            ("TEXTCOLOR",   (0,0), (-1,-1), colors.HexColor("#a0a0a0")),
-            ("FONTSIZE",    (0,0), (-1,-1), 9),
-            ("ROWBACKGROUNDS", (0,0), (-1,-1), [colors.HexColor("#0a0a0a"), colors.HexColor("#111111")]),
-            ("GRID",        (0,0), (-1,-1), 0.25, colors.HexColor("#222222")),
-            ("PADDING",     (0,0), (-1,-1), 5),
-        ]))
-        story.append(meta_table)
-        story.append(Spacer(1, 0.4*cm))
-
-        # Results
-        story.append(Paragraph("Prediction Results", h2_style))
+        # ── Prediction Summary ───────────────────────────────────────
+        story.append(Paragraph("Prediction Summary", h2_style))
         fp = data.get("final_probability", 0)
         ri = data.get("reliability_index", 0)
-        results_data = [
-            ["Final Probability",  _fmt_pct(fp)],
-            ["ML Probability",     _fmt_pct(data.get('ml_probability'))],
-            ["LLM Probability",    _fmt_pct(data.get('llm_probability'))],
-            ["Reliability Index",  _fmt_pct0(ri)],
-            ["Confidence Tier",    str(data.get("confidence_tier", ""))],
-            ["ML-LLM Gap",         _fmt_pct(data.get('gap'))],
+        meta_rows = [
+            ["Field", "Value"],
+            ["Domain",           str(data.get("domain", "")).upper()],
+            ["Question",         str(data.get("question", ""))],
+            ["Mode",             str(data.get("mode", ""))],
+            ["Final Probability",_fmt_pct(fp)],
+            ["ML Layer",         _fmt_pct(data.get('ml_probability'))],
+            ["LLM Layer",        _fmt_pct(data.get('llm_probability'))],
+            ["Reliability Index",_fmt_pct0(ri)],
+            ["Confidence Tier",  str(data.get("confidence_tier", ""))],
+            ["ML-LLM Gap",       _fmt_pct(data.get('gap'))],
         ]
-        r_table = Table(results_data, colWidths=[6*cm, 11*cm])
-        r_table.setStyle(TableStyle([
-            ("TEXTCOLOR",   (0,0), (0,-1), colors.HexColor("#a0a0a0")),
-            ("TEXTCOLOR",   (1,0), (1,-1), colors.HexColor("#e8e8e8")),
-            ("FONTSIZE",    (0,0), (-1,-1), 10),
-            ("ROWBACKGROUNDS", (0,0), (-1,-1), [colors.HexColor("#0a0a0a"), colors.HexColor("#111111")]),
-            ("GRID",        (0,0), (-1,-1), 0.25, colors.HexColor("#222222")),
-            ("PADDING",     (0,0), (-1,-1), 6),
-        ]))
-        story.append(r_table)
+        meta_t = Table(meta_rows, colWidths=[5*cm, 12*cm])
+        meta_t.setStyle(TABLE_STYLE)
+        story.append(meta_t)
         story.append(Spacer(1, 0.4*cm))
 
-        # Parameters
+        # ── Multi-Outcome Predictions ────────────────────────────────
+        outcome_items = _get_outcomes_list(data)
+        if outcome_items:
+            story.append(Paragraph("Multi-Outcome Predictions", h2_style))
+            o_rows = [["Outcome", "Probability", "Reasoning"]] + [
+                [label, prob_pct, (reasoning[:80] + "...") if len(reasoning) > 80 else reasoning]
+                for label, prob_pct, reasoning in outcome_items
+            ]
+            o_t = Table(o_rows, colWidths=[5*cm, 2.5*cm, 9.5*cm])
+            o_t.setStyle(TABLE_STYLE)
+            story.append(o_t)
+            story.append(Spacer(1, 0.4*cm))
+
+        # ── Input Parameters ─────────────────────────────────────────
         params = data.get("raw_parameters") or data.get("parameters") or {}
         if params:
             story.append(Paragraph("Input Parameters", h2_style))
-            p_data = [[str(k), str(v)] for k, v in params.items() if not str(k).startswith("_")]
+            p_data = [[str(k).replace("_"," ").title(), str(v)] for k, v in params.items() if not str(k).startswith("_")]
             if p_data:
                 p_table = Table([["Parameter", "Value"]] + p_data, colWidths=[8*cm, 9*cm])
-                p_table.setStyle(TableStyle([
-                    ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#1a1a1a")),
-                    ("TEXTCOLOR",  (0,0), (-1,0), colors.HexColor("#c0c0c0")),
-                    ("TEXTCOLOR",  (0,1), (-1,-1), colors.HexColor("#e8e8e8")),
-                    ("FONTSIZE",   (0,0), (-1,-1), 9),
-                    ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.HexColor("#0a0a0a"), colors.HexColor("#111111")]),
-                    ("GRID",       (0,0), (-1,-1), 0.25, colors.HexColor("#222222")),
-                    ("PADDING",    (0,0), (-1,-1), 5),
-                ]))
+                p_table.setStyle(TABLE_STYLE)
                 story.append(p_table)
 
-        # SHAP
+        # ── SHAP Feature Contributions ───────────────────────────────
         shap = data.get("shap_values", {})
         if shap:
             story.append(Spacer(1, 0.4*cm))
-            story.append(Paragraph("SHAP Feature Contributions", h2_style))
+            story.append(Paragraph("Feature Contributions (SHAP)", h2_style))
             s_data = sorted(shap.items(), key=lambda x: abs(float(x[1])) if isinstance(x[1], (int,float)) else 0, reverse=True)
-            s_rows = [[str(k), _fmt_float(v) if isinstance(v,(int,float)) else str(v)] for k,v in s_data[:10]]
-            s_table = Table([["Feature", "Contribution"]] + s_rows, colWidths=[10*cm, 7*cm])
-            s_table.setStyle(TableStyle([
-                ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#1a1a1a")),
-                ("TEXTCOLOR",  (0,0), (-1,0), colors.HexColor("#c0c0c0")),
-                ("TEXTCOLOR",  (0,1), (-1,-1), colors.HexColor("#e8e8e8")),
-                ("FONTSIZE",   (0,0), (-1,-1), 9),
-                ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.HexColor("#0a0a0a"), colors.HexColor("#111111")]),
-                ("GRID",       (0,0), (-1,-1), 0.25, colors.HexColor("#222222")),
-                ("PADDING",    (0,0), (-1,-1), 5),
-            ]))
+            s_rows = [[str(k).replace("_"," ").title(), _fmt_float(v) if isinstance(v,(int,float)) else str(v)] for k,v in s_data[:10]]
+            s_table = Table([["Feature", "Impact Score"]] + s_rows, colWidths=[10*cm, 7*cm])
+            s_table.setStyle(TABLE_STYLE)
             story.append(s_table)
 
-        # Disclaimer
+        # ── Footer Disclaimer ────────────────────────────────────────
         story.append(Spacer(1, 0.6*cm))
-        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#333333")))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#2d3748")))
         story.append(Spacer(1, 0.2*cm))
         story.append(Paragraph(
-            "⚠ Sambhav may be incorrect. Predictions are probabilistic estimates only. "
-            "Always verify important decisions independently with qualified professionals.",
+            "⚠️  Sambhav predictions are probabilistic estimates only and may be incorrect. "
+            "Always verify important decisions independently with qualified professionals. "
+            "Not a substitute for expert medical, legal, or financial advice.",
             ParagraphStyle("disclaimer", parent=styles["Normal"],
-                           textColor=colors.HexColor("#666666"), fontSize=8, spaceAfter=0)
+                           textColor=colors.HexColor("#555555"), fontSize=7.5, spaceAfter=0)
         ))
 
         doc.build(story)
@@ -338,25 +365,43 @@ async def export_word(req: ExportRequest, db: Session = Depends(get_db)):
         doc = Document()
 
         # Title
+        import datetime
         title = doc.add_heading("Project Sambhav — Prediction Report", 0)
         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        doc.add_paragraph("Uncertainty, Quantified · A Multi-Modal Probabilistic Inference Engine")
+        doc.add_paragraph("Uncertainty, Quantified  ·  A Multi-Modal Probabilistic Inference Engine")
+        doc.add_paragraph(f"Generated: {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}  ·  ID: {data.get('prediction_id', 'N/A')}")
 
         doc.add_heading("Prediction Summary", 1)
         fp = data.get("final_probability", 0)
-        table = doc.add_table(rows=6, cols=2)
-        table.style = "Table Grid"
         rows_data = [
-            ("Prediction ID",   str(data.get("prediction_id", ""))),
-            ("Domain",          str(data.get("domain", "")).upper()),
+            ("Prediction ID",    str(data.get("prediction_id", ""))),
+            ("Domain",           str(data.get("domain", "")).upper()),
             ("Final Probability", _fmt_pct(fp)),
+            ("ML Layer",         _fmt_pct(data.get('ml_probability'))),
+            ("LLM Layer",        _fmt_pct(data.get('llm_probability'))),
             ("Reliability Index", _fmt_pct0(data.get('reliability_index'))),
-            ("Confidence Tier", str(data.get("confidence_tier", ""))),
-            ("Question",        str(data.get("question", ""))),
+            ("Confidence Tier",  str(data.get("confidence_tier", ""))),
+            ("Question",         str(data.get("question", ""))),
         ]
+        table = doc.add_table(rows=len(rows_data), cols=2)
+        table.style = "Table Grid"
         for i, (label, value) in enumerate(rows_data):
             table.rows[i].cells[0].text = label
             table.rows[i].cells[1].text = value
+
+        # Multi-outcome table
+        outcome_items = _get_outcomes_list(data)
+        if outcome_items:
+            doc.add_heading("Multi-Outcome Predictions", 1)
+            o_table = doc.add_table(rows=1 + len(outcome_items), cols=3)
+            o_table.style = "Table Grid"
+            hdr = o_table.rows[0].cells
+            hdr[0].text, hdr[1].text, hdr[2].text = "Outcome", "Probability", "Reasoning"
+            for i, (label, prob_pct, reasoning) in enumerate(outcome_items, 1):
+                row = o_table.rows[i].cells
+                row[0].text = label
+                row[1].text = prob_pct
+                row[2].text = reasoning[:120] if reasoning else ""
 
         doc.add_heading("Input Parameters", 1)
         params = data.get("raw_parameters") or data.get("parameters") or {}
@@ -459,6 +504,18 @@ async def export_excel(req: ExportRequest, db: Session = Depends(get_db)):
         for i, (k, v) in enumerate(sorted(shap.items(), key=lambda x: abs(float(x[1])) if isinstance(x[1],(int,float)) else 0, reverse=True), 2):
             ws3.cell(i, 1, str(k)).font  = val_font
             ws3.cell(i, 2, float(v) if isinstance(v,(int,float)) else str(v)).font = val_font
+
+        # Sheet 4: Multi-Outcome Predictions
+        ws4 = wb.create_sheet("Outcomes")
+        for col_idx, col_header in enumerate(["Outcome", "Probability", "Reasoning"], 1):
+            ws4.cell(1, col_idx, col_header).font = header_font
+        for i, (label, prob_pct, reasoning) in enumerate(_get_outcomes_list(data), 2):
+            ws4.cell(i, 1, label).font    = val_font
+            ws4.cell(i, 2, prob_pct).font = val_font
+            ws4.cell(i, 3, reasoning).font = val_font
+        ws4.column_dimensions["A"].width = 35
+        ws4.column_dimensions["B"].width = 15
+        ws4.column_dimensions["C"].width = 60
 
         buf = io.BytesIO()
         wb.save(buf)
