@@ -563,21 +563,21 @@ def cross_validate(ml_prob: Optional[float], llm_prob: Optional[float]) -> tuple
 
     gap = abs(ml_prob - llm_prob)
 
-    if gap < 0.10:
-        # High agreement — ML 60%, LLM 40%
-        reconciled = 0.60 * ml_prob + 0.40 * llm_prob
+    if gap < 0.12:
+        # High agreement — ML 70%, LLM 30% (Decisive agreement)
+        reconciled = 0.70 * ml_prob + 0.30 * llm_prob
         tier = "HIGH"
     elif gap < 0.25:
         # Moderate agreement — ML 50%, LLM 50%
         reconciled = 0.50 * ml_prob + 0.50 * llm_prob
         tier = "MODERATE"
-    elif gap < 0.40:
-        # Low agreement — LLM takes 60% (LLM semantic inference is structurally better for novel complex parameters)
+    elif gap < 0.45:
+        # Low agreement — LLM semantic layer takes slightly more weight
         reconciled = 0.40 * ml_prob + 0.60 * llm_prob
         tier = "LOW"
     else:
-        # Critical disagreement — LLM 70%
-        reconciled = 0.30 * ml_prob + 0.70 * llm_prob
+        # Critical disagreement — LLM 75% (Semantic context override)
+        reconciled = 0.25 * ml_prob + 0.75 * llm_prob
         tier = "CRITICAL"
 
     return round(min(reconciled, 0.97), 4), round(gap, 4), tier
@@ -658,8 +658,8 @@ def predict(
             from db.database import get_user_calibration_bias
             bias = get_user_calibration_bias(db, user_id)
             # If bias is +0.10, user is overconfident (predicted > actual)
-            # We subtract a fraction of this bias to 'calibrate' the result
-            calibration_adjustment = -0.5 * bias
+            # We subtract a calibrated fraction of this bias
+            calibration_adjustment = -0.3 * bias
             log.info(f"[{domain}] Applying personal calibration bias adjustment: {calibration_adjustment:+.3f}")
         except Exception as e:
             log.warning(f"Calibration adjustment failed: {e}")
