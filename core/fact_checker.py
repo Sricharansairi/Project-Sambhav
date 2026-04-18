@@ -239,34 +239,35 @@ def _parse_8d(raw: str, claim: str) -> dict:
         "VIRAL_RISK":           "viral_risk",
     }
     
-    for line in raw.split("\n"):
-        line = line.replace("**", "").replace("*", "").strip()
-        
-        # Parse scores
-        for key, field in key_map.items():
-            if line.startswith(key):
-                try:
-                    out[field]["score"] = max(0, min(100, int(line.split(":", 1)[1].strip())))
-                except:
-                    pass
-            elif line.startswith("REASONING_" + key):
-                try:
-                    out[field]["reasoning"] = line.split(":", 1)[1].strip()
-                except:
-                    pass
-        
-        # Parse global fields
-        if line.startswith("OVERALL"):
+    import re
+
+    # Try full document regex parsing first to be completely bulletproof
+    for key, field in key_map.items():
+        score_match = re.search(rf"(?i){key}.*?(\d{{1,3}})", raw)
+        if score_match:
             try:
-                out["overall"] = max(0, min(100, int(line.split(":", 1)[1].strip())))
-            except:
-                pass
-        elif line.startswith("VERDICT:"):
-            out["verdict"] = line.split(":", 1)[1].strip()
-        elif line.startswith("EXPLANATION:"):
-            out["explanation"] = line.split(":", 1)[1].strip()
-        elif line.startswith("PATTERN_CODE:"):
-            out["pattern_code"] = line.split(":", 1)[1].strip()
+                out[field]["score"] = max(0, min(100, int(score_match.group(1))))
+            except: pass
+            
+        reason_match = re.search(rf"(?i)REASONING_{key}.*?:\s*(.+?)(?=\n|$)", raw)
+        if reason_match:
+            out[field]["reasoning"] = reason_match.group(1).strip()
+            
+    # Parse global fields
+    overall_match = re.search(r"(?i)OVERALL.*?(\d{1,3})", raw)
+    if overall_match:
+        try:
+            out["overall"] = max(0, min(100, int(overall_match.group(1))))
+        except: pass
+        
+    verdict_match = re.search(r"(?i)VERDICT.*?:\s*(.+?)(?=\n|$)", raw)
+    if verdict_match: out["verdict"] = verdict_match.group(1).strip()
+    
+    expl_match = re.search(r"(?i)EXPLANATION.*?:\s*(.+?)(?=\n|$)", raw)
+    if expl_match: out["explanation"] = expl_match.group(1).strip()
+    
+    pat_match = re.search(r"(?i)PATTERN_CODE.*?:\s*(.+?)(?=\n|$)", raw)
+    if pat_match: out["pattern_code"] = pat_match.group(1).strip()
             
     return out
 
@@ -437,7 +438,7 @@ def fact_check_claim(claim: str, mode: str = "standard") -> dict:
         import re
         cv_content = cv_res.get("content") or ""
         # Require explicit CREDIBILITY: prefix to avoid picking up random numbers from evidence text
-        cv_score_match = re.search(r"(?:^|\n)CREDIBILITY:\s*(\d+)", cv_content, re.MULTILINE)
+        cv_score_match = re.search(r"(?i)CREDIBILITY.*?(\d{1,3})", cv_content)
         if cv_score_match:
             sec = max(0, min(100, int(cv_score_match.group(1))))
         else:

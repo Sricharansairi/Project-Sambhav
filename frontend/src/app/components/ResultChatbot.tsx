@@ -81,13 +81,11 @@ export function ResultChatbot({ isOpen, onClose, context, mode, domain, title }:
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         transition={{ type: 'spring', damping: 20 }}
         onClick={e => e.stopPropagation()}
-        className="relative w-full max-w-lg h-[540px] flex flex-col rounded-2xl overflow-hidden shadow-2xl"
-        style={{ background: 'linear-gradient(135deg, rgba(15,15,25,0.97) 0%, rgba(20,20,35,0.97) 100%)', border: '1px solid rgba(99,102,241,0.25)' }}
+        className="relative w-full max-w-lg h-[540px] flex flex-col rounded-2xl overflow-hidden shadow-2xl bg-black/95 border border-white/10 support-backdrop-blur"
       >
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10"
-          style={{ background: 'linear-gradient(90deg, rgba(99,102,241,0.15) 0%, transparent 100%)' }}>
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 border border-primary/30">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 bg-white/5">
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white/10 border border-white/20">
             <Bot className="w-4 h-4 text-primary" />
           </div>
           <div className="flex-1 min-w-0">

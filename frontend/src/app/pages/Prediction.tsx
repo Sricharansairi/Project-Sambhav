@@ -20,6 +20,7 @@ import { ReliabilityIndex }     from '../components/ReliabilityIndex';
 import { ExportPanel }          from '../components/ExportPanel';
 import { ChipParameterModal }   from '../components/ChipParameterModal';
 import { PragmaChat }           from '../components/PragmaChat';
+import { PragmaDocumentation }  from '../components/PragmaDocumentation';
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
 import {
   getDomains, runPredict, runFreeInfer, getOutcomes, getTransparency, getInverseTransparency,
@@ -1034,6 +1035,11 @@ export function Prediction() {
             </div>
           )) : <p className="text-[11px] text-muted-foreground italic">No audit flags raised — parameters passed all checks.</p>}
         </div>
+        
+        <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 transition-all flex items-center justify-center gap-1.5 font-medium">
+          <MessageCircle className="w-4 h-4" /> Analyse this vulnerability with AI
+        </motion.button>
+        
         <p className="text-[9px] text-muted-foreground/60 italic text-center">Mode 10: Adversarial Mode — demonstrates fail-safe audit behaviour</p>
       </motion.div>
     );
@@ -1082,6 +1088,11 @@ export function Prediction() {
             );
           })}
         </div>
+
+        <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 transition-all flex items-center justify-center gap-1.5 font-medium">
+          <MessageCircle className="w-4 h-4" /> Discuss these scenarios with AI
+        </motion.button>
+
         <p className="text-[9px] text-muted-foreground/60 italic text-center">Mode 12: What-If Story — Section 8.14 Scenario Planning</p>
       </motion.div>
     );
@@ -1109,8 +1120,9 @@ export function Prediction() {
             </tr></thead>
             <tbody>
               {outcomes_.map((outcome: string, oi: number) => {
-                const row  = matrix[outcome] || {};
-                const vals = scenarios_.map((s: string) => row[s] ?? null);
+                const rowObj = Array.isArray(matrix) ? matrix.find((r:any) => r.outcome === outcome) : null;
+                const rowProbs = rowObj ? (rowObj.probabilities || {}) : (matrix[outcome] || {});
+                const vals = scenarios_.map((s: string) => rowProbs[s] ?? null);
                 const maxV = Math.max(...vals.filter((v: any) => v !== null));
                 const winI = vals.indexOf(maxV);
                 return (
@@ -1126,6 +1138,11 @@ export function Prediction() {
             </tbody>
           </table>
         </div>
+
+        <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 transition-all flex items-center justify-center gap-1.5 font-medium">
+          <MessageCircle className="w-4 h-4" /> Ask the AI to evaluate this comparison
+        </motion.button>
+
         <p className="text-[9px] text-muted-foreground/60 italic text-center">Mode 6: Comparative Inference — Section 8.7</p>
       </motion.div>
     );
@@ -1166,6 +1183,9 @@ export function Prediction() {
             {outcomes.map((o, i) => <OutcomeRow key={i} name={o.outcome} probability={o.probability} delay={i * 0.1} onWhyClick={() => handleWhyClick(i)} isAnimating={isAnimating} />)}
           </div>
         )}
+        <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 transition-all flex items-center justify-center gap-1.5 font-medium">
+          <MessageCircle className="w-4 h-4" /> Discuss this debate with the moderator
+        </motion.button>
         <p className="text-[9px] text-muted-foreground/60 italic text-center">Mode 11: Expert Consultation — Section 8.9 Multi-Agent Debate</p>
       </motion.div>
     );
@@ -1197,6 +1217,9 @@ export function Prediction() {
             {retroResult.lessons_learned.map((f: string, i: number) => <p key={i} className="text-[10px] text-muted-foreground mb-0.5">• {f}</p>)}
           </div>
         )}
+        <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 transition-all flex items-center justify-center gap-1.5 font-medium">
+          <MessageCircle className="w-4 h-4" /> Analyse this event retrospectively with AI
+        </motion.button>
         <p className="text-[9px] text-muted-foreground/60 italic text-center">Mode 7: Retrospective Analysis</p>
       </motion.div>
     );
@@ -1527,7 +1550,10 @@ export function Prediction() {
           </DialogContent>
         </Dialog>
 
-        <p className="text-[9px] text-muted-foreground/50 italic text-center">
+        {/* PRAGMA Documentation Rendering */}
+        <PragmaDocumentation />
+
+        <p className="text-[9px] text-muted-foreground/50 italic text-center mt-6">
           PRAGMA v17 — Research-grade forensic tool. Probabilistic — not a legal verdict. Always verify independently.
         </p>
       </motion.div>
