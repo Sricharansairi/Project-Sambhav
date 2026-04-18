@@ -550,13 +550,15 @@ export function Prediction() {
   
 
   const handleReset = () => {
-    setShowResults(false); setIsAnimating(false); /* transparency simple removed */
+    setShowResults(false); setIsAnimating(false);
     setExpandedOutcome(null); setApiError(null); setPredResult(null); setOutcomes([]); setWhyData({});
     setInverseData({}); setLoadingInverse(null);
     setAdversarialResult(null); setWhatifTree(null); setCompResult(null);
     setExpertDebate(null); setRetroResult(null); setSimResult(null);
+    setDocResult(null); setVoiceResult(null); setFreeInferResult(null);
     setConvMessages([]); setConvParams({}); setConvComplete(false); setConvStarted(false);
     setParamsConfirmed(false); setParameters({}); setDynamicParams([]);
+    setHybridExtracted({}); setInsufficientInfo(null); setRelevantKeys([]);
   };
 
   const activeWhyData = expandedOutcome !== null ? (whyData as any)[`${expandedOutcome}_full`] || null : null;
@@ -1652,7 +1654,9 @@ export function Prediction() {
           expert: expertDebate,
           retrospective: retroResult,
           simulation: simResult,
-          free_infer: freeInferResult
+          free_infer: freeInferResult,
+          document: docResult,
+          voice: voiceResult
         }}
         mode={selectedMode}
         domain={selectedDomain}
