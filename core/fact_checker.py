@@ -240,22 +240,25 @@ def _parse_8d(raw: str, claim: str) -> dict:
     }
     
     for line in raw.split("\n"):
-        line = line.strip()
+        line = line.replace("**", "").replace("*", "").strip()
         
         # Parse scores
         for key, field in key_map.items():
-            if line.startswith(key + ":"):
+            if line.startswith(key):
                 try:
-                    out[field]["score"] = max(0, min(100, int(line.split(":")[1].strip())))
+                    out[field]["score"] = max(0, min(100, int(line.split(":", 1)[1].strip())))
                 except:
                     pass
-            elif line.startswith("REASONING_" + key + ":"):
-                out[field]["reasoning"] = line.split(":", 1)[1].strip()
+            elif line.startswith("REASONING_" + key):
+                try:
+                    out[field]["reasoning"] = line.split(":", 1)[1].strip()
+                except:
+                    pass
         
         # Parse global fields
-        if line.startswith("OVERALL:"):
+        if line.startswith("OVERALL"):
             try:
-                out["overall"] = max(0, min(100, int(line.split(":")[1].strip())))
+                out["overall"] = max(0, min(100, int(line.split(":", 1)[1].strip())))
             except:
                 pass
         elif line.startswith("VERDICT:"):

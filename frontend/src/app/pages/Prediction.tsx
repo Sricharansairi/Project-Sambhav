@@ -1607,6 +1607,13 @@ export function Prediction() {
     <div className="min-h-screen relative overflow-hidden bg-background pb-12">
       <BackgroundLogo />
       <Navigation />
+      <ResultChatbot 
+        isOpen={chatOpen} 
+        onClose={() => setChatOpen(false)} 
+        context={predResult ? { prediction: predResult, outcomes } : { outcomes }}
+        mode={selectedMode}
+        domain={selectedDomain}
+      />
       {needsModal && domainInfo && (
         <ChipParameterModal isOpen={modalOpen} onClose={() => setModalOpen(false)}
           parameters={paramList.map(p => p.label || p.key)} currentStep={modalStep + 1} totalSteps={paramList.length}
