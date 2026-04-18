@@ -778,13 +778,14 @@ async def fact_chat(req: FactChatRequest):
         logger.error(f"Fact Chat Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-    logger.info(f"POST /predict/batch domain={req.domain} count={len# ── POST /predict/pragma-chat ──────────────────────────────────
+# ── POST /predict/pragma-chat ──────────────────────────────────
 class PragmaChatRequest(BaseModel):
     prediction_id: Optional[str] = None
     question: str
     context: str
     history: List[dict] = []
     parameters: dict = {}
+
 
 @router.post("/pragma-chat")
 async def pragma_chat(req: PragmaChatRequest):
