@@ -165,7 +165,7 @@ export function Prediction() {
   useEffect(() => {
     setConvMessages([]); setConvParams({}); setConvComplete(false); setConvStarted(false);
     setAdversarialResult(null); setWhatifTree(null); setCompResult(null); setExpertDebate(null);
-    setRetroResult(null); setSimResult(null); setDocResult(null);
+    setRetroResult(null); setSimResult(null); setDocResult(null); setFreeInferResult(null);
     setShowResults(false); setOutcomes([]); setPredResult(null); setApiError(null);
     setParamsConfirmed(false); setParameters({}); setInsufficientInfo(null); setRelevantKeys([]);
     setDynamicParams([]);
