@@ -1486,16 +1486,16 @@ export function Prediction() {
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
         {/* Header verdict */}
-        <div className={`p-3 rounded-xl border ${isDeceptive ? 'bg-destructive/10 border-destructive/30' : 'bg-success/10 border-success/30'}`}>
+        <div className={`p-3 rounded-xl border ${isDeceptive ? 'bg-[#ff6b6b]/10 border-[#ff6b6b]/30' : 'bg-[#c0c0c0]/10 border-[#c0c0c0]/30'}`}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">PRAGMA Forensic Verdict</p>
-              <p className={`text-sm font-bold ${isDeceptive ? 'text-destructive' : 'text-success'}`}>
+              <p className={`text-sm font-bold ${isDeceptive ? 'text-[#ff6b6b]' : 'text-[#c0c0c0]'}`}>
                 {isDeceptive ? 'Deceptive Communication Detected' : 'Communication Appears Genuine'}
               </p>
             </div>
             <div className="text-right">
-              <p className={`text-2xl font-bold ${isDeceptive ? 'text-destructive' : 'text-success'}`}>{deceptionPct}%</p>
+              <p className={`text-2xl font-bold ${isDeceptive ? 'text-[#ff6b6b]' : 'text-[#c0c0c0]'}`}>{deceptionPct}%</p>
               <p className="text-[9px] text-muted-foreground">Deception probability</p>
             </div>
           </div>
@@ -1708,24 +1708,25 @@ export function Prediction() {
         <div className="max-w-7xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
             <h1 className="text-xl font-bold mb-0.5">Prediction Analysis</h1>
+            {/* BUILD_STAMP: 2026-04-18_21:14 */}
             <p className="text-[11px] text-muted-foreground">
-              Mode: <span className="text-primary">{selectedMode}</span>
-              {selectedMode !== 'free' && selectedMode !== 'adversarial' && <> · Domain: <span className="text-primary">{selectedDomain.replace(/_/g,' ')}</span></>}
+              Mode: <span className="text-[#00fff2]">{selectedMode}</span>
+              {selectedMode !== 'free' && selectedMode !== 'adversarial' && <> · Domain: <span className="text-[#00fff2]">{selectedDomain.replace(/_/g,' ')}</span></>}
             </p>
           </motion.div>
           {domainInfo?.disclaimer && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-3 px-3 py-2 rounded-lg bg-warning/5 border border-warning/20 flex items-start gap-2">
-              <AlertCircle className="w-3 h-3 text-warning mt-0.5 shrink-0" />
-              <p className="text-[10px] text-warning/80">{domainInfo.disclaimer}</p>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-3 px-3 py-2 rounded-lg bg-[#ffb7c5]/5 border border-[#ffb7c5]/20 flex items-start gap-2">
+              <AlertCircle className="w-3 h-3 text-[#ffb7c5] mt-0.5 shrink-0" />
+              <p className="text-[10px] text-[#ffb7c5]/80">{domainInfo.disclaimer}</p>
             </motion.div>
           )}
           <ReliabilityIndex score={reliabilityScore} suggestions={reliabilitySuggestions} isVisible={!showResults && selectedMode !== 'conversational'} />
           <AnimatePresence>
             {apiError && (
               <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-                className="mb-3 px-3 py-2.5 rounded-lg bg-destructive/10 border border-destructive/30 flex items-start gap-2">
-                <AlertCircle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />
-                <p className="text-xs text-destructive">{apiError}</p>
+                className="mb-3 px-3 py-2.5 rounded-lg bg-[#ff6b6b]/10 border border-[#ff6b6b]/30 flex items-start gap-2">
+                <AlertCircle className="w-3.5 h-3.5 text-[#ff6b6b] mt-0.5 shrink-0" />
+                <p className="text-xs text-[#ff6b6b]">{apiError}</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -1777,12 +1778,12 @@ export function Prediction() {
                     <h4 className="text-[10px] font-medium text-muted-foreground mb-2">Dual-Layer Breakdown</h4>
                     <div className="space-y-1.5 text-[10px]">
                       {[
-                        ['ML Probability', predResult.ml_probability != null ? `${(predResult.ml_probability * 100).toFixed(1)}%` : '—', 'text-primary'],
-                        ['LLM Probability', predResult.llm_probability != null ? `${(predResult.llm_probability * 100).toFixed(1)}%` : '—', 'text-secondary'],
+                        ['ML Probability', predResult.ml_probability != null ? `${(predResult.ml_probability * 100).toFixed(1)}%` : '—', 'text-[#ffb7c5]'],
+                        ['LLM Probability', predResult.llm_probability != null ? `${(predResult.llm_probability * 100).toFixed(1)}%` : '—', 'text-[#00fff2]'],
                         ['Final (65/35)', `${(predResult.final_probability * 100).toFixed(1)}%`, 'text-foreground font-bold'],
-                        ['Confidence', predResult.confidence_tier, predResult.confidence_tier === 'CLEAR' ? 'text-success' : predResult.confidence_tier === 'MODERATE' ? 'text-warning' : 'text-destructive'],
+                        ['Confidence', predResult.confidence_tier, predResult.confidence_tier === 'CLEAR' ? 'text-[#c0c0c0]' : predResult.confidence_tier === 'MODERATE' ? 'text-[#ffb7c5]' : 'text-[#ff6b6b]'],
                         ['ML-LLM Gap', `${(predResult.gap * 100).toFixed(1)}%`, 'text-muted-foreground'],
-                        ['Reliability', `${(predResult.reliability_index * 100).toFixed(0)}%`, 'text-primary'],
+                        ['Reliability', `${(predResult.reliability_index * 100).toFixed(0)}%`, 'text-[#00fff2]'],
                       ].map(([l, v, c]) => (
                         <div key={l as string} className="flex justify-between"><span className="text-muted-foreground">{l as string}</span><span className={c as string}>{v as string}</span></div>
                       ))}
