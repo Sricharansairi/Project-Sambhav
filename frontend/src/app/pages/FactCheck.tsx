@@ -18,6 +18,7 @@ export function FactCheck() {
   const [showResults, setShowResults] = useState(false);
   const [result,      setResult]      = useState<FactCheckResult | null>(null);
   const [apiError,    setApiError]    = useState<string | null>(null);
+  const [chatOpen,    setChatOpen]    = useState(false);
 
   const handleAnalyze = async () => {
     const trimmed = statement.trim();
@@ -245,6 +246,28 @@ export function FactCheck() {
                     ))}
                   </div>
                 </div>
+
+                {/* Prediction Breakdown & Chatbot */}
+                <PredictionBreakdown 
+                  mode="factcheck"
+                  mlProbability={result.credibility_score}
+                  llmProbability={result.credibility_score}
+                  reliabilityIndex={Math.round((result.credibility_score + 100) / 2)}
+                  delay={0.6}
+                />
+
+                <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 mb-6 px-3 py-2 text-xs rounded-xl bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 transition-all flex items-center justify-center gap-1.5 font-medium">
+                  <MessageCircle className="w-4 h-4" /> Ask the Fact Checker
+                </motion.button>
+
+                <ResultChatbot 
+                  isOpen={chatOpen} 
+                  onClose={() => setChatOpen(false)} 
+                  context={result}
+                  mode="Fact Check"
+                  domain="General Fact Verification"
+                  title="Fact Verification Assistant"
+                />
 
                 {/* Weighted score note */}
                 <motion.p
