@@ -16,87 +16,132 @@ function getCtx() {
  * Procedural UI sounds to make the application feel alive.
  */
 export const sounds = {
-  /** Short, dry click for buttons/navigation */
+  /** 
+   * The "Tactile" Click 
+   * A professional, short percussive snap combining high-frequency noise and a low sine-thud.
+   */
   click: () => {
     const ctx = getCtx();
+    const now = ctx.currentTime;
+
+    // Part 1: High-end snap (filtered noise)
+    const bufferSize = ctx.sampleRate * 0.02;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    const noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = 'highpass';
+    noiseFilter.frequency.setValueAtTime(3000, now);
+    
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.04, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(ctx.destination);
+
+    // Part 2: Low-end "Thump" (sine)
     const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
+    const oscGain = ctx.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(1200, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.1);
+    osc.frequency.setValueAtTime(300, now);
+    osc.frequency.exponentialRampToValueAtTime(100, now + 0.04);
+    
+    oscGain.gain.setValueAtTime(0.06, now);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
 
-    gain.gain.setValueAtTime(0.1, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+    osc.connect(oscGain);
+    oscGain.connect(ctx.destination);
 
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start();
-    osc.stop(ctx.currentTime + 0.1);
+    noise.start(now);
+    osc.start(now);
+    osc.stop(now + 0.05);
   },
 
-  /** Soft melodic chime for successful completion */
+  /** 
+   * The "Crystalline" Success 
+   * A lush C Major 9 chord with a shimmering attack and soft exponential decay.
+   */
   success: () => {
     const ctx = getCtx();
     const now = ctx.currentTime;
     
-    const playNote = (freq: number, start: number, duration: number) => {
+    // Cmaj9 frequencies: C5, E5, G5, B5, D6
+    [523.25, 659.25, 783.99, 987.77, 1174.66].forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, start);
-      gain.gain.setValueAtTime(0, start);
-      gain.gain.linearRampToValueAtTime(0.08, start + 0.05);
-      gain.gain.exponentialRampToValueAtTime(0.01, start + duration);
+      
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + i * 0.02); // slight stagger
+      
+      gain.gain.setValueAtTime(0, now + i * 0.02);
+      gain.gain.linearRampToValueAtTime(0.03, now + i * 0.02 + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+      
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.start(start);
-      osc.stop(start + duration);
-    };
-
-    // Minor pentatonic uplift
-    playNote(659.25, now, 0.4);      // E5
-    playNote(880.00, now + 0.1, 0.5); // A5
+      
+      osc.start(now + i * 0.02);
+      osc.stop(now + 1.3);
+    });
   },
 
-  /** Notification "bloop" for mode switches/selections */
+  /** 
+   * The "Subtle" Notify
+   * A gentle resonant pop, designed to be helpful but non-intrusive.
+   */
   notify: () => {
     const ctx = getCtx();
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(440, now);
+    osc.frequency.exponentialRampToValueAtTime(880, now + 0.1);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(2000, now);
+    filter.frequency.exponentialRampToValueAtTime(500, now + 0.1);
+    filter.Q.setValueAtTime(10, now);
+
+    gain.gain.setValueAtTime(0.02, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.15);
+  },
+
+  /** 
+   * The "Haptic" Error
+   * A low-frequency damped thud that feels more like a mechanical vibration than a beep.
+   */
+  error: () => {
+    const ctx = getCtx();
+    const now = ctx.currentTime;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(200, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + 0.15);
+    osc.frequency.setValueAtTime(80, now);
+    osc.frequency.exponentialRampToValueAtTime(40, now + 0.2);
 
-    gain.gain.setValueAtTime(0.05, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start();
-    osc.stop(ctx.currentTime + 0.15);
-  },
-
-  /** Error or Warning sound */
-  error: () => {
-    const ctx = getCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'square'; // Buzzier
-    osc.frequency.setValueAtTime(150, ctx.currentTime);
-    osc.frequency.linearRampToValueAtTime(100, ctx.currentTime + 0.2);
-
-    gain.gain.setValueAtTime(0.03, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
 
     osc.connect(gain);
     gain.connect(ctx.destination);
 
-    osc.start();
-    osc.stop(ctx.currentTime + 0.2);
+    osc.start(now);
+    osc.stop(now + 0.2);
   }
 };
