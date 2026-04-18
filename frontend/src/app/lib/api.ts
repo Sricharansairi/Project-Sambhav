@@ -412,8 +412,7 @@ export async function analyzeDocument(file: File, domain: string, question?: str
   fd.append('file', file);
   fd.append('domain', domain);
   if (question) fd.append('question', question);
-  const BASE = (import.meta as any).env?.VITE_API_BASE ?? 'http://localhost:8000';
-  const resp = await fetch(`${BASE}/modes/document`, {
+  const resp = await fetch(`${API_BASE}/modes/document`, {
     method: 'POST',
     headers: _token ? { Authorization: `Bearer ${_token}` } : {},
     body: fd,
@@ -533,4 +532,40 @@ export async function runPragmaChat(payload: {
   if (!_token) await auth.guest();
   return _post('/predict/pragma-chat', payload);
 }
+
+export async function runResultChat(payload: {
+  question: string;
+  context: string;
+  mode: string;
+  domain: string;
+  history: any[];
+}) {
+  if (!_token) await auth.guest();
+  return _post('/predict/result-chat', payload);
+}
+
+export async function runFactChat(payload: {
+  question: string;
+  claim: string;
+  verdict: string;
+  score: number;
+  dimensions: any;
+  history: any[];
+}) {
+  if (!_token) await auth.guest();
+  return _post('/predict/fact-chat', payload);
+}
+
+export async function getAdversarialParams(domain: string, question?: string): Promise<{ success: boolean; adversarial_params: Record<string, any> }> {
+  if (!_token) await auth.guest();
+  const qs = new URLSearchParams({ domain });
+  if (question) qs.append('question', question);
+  const resp = await fetch(`${API_BASE}/modes/adversarial-params?${qs}`, {
+    method: 'POST',
+    headers: { ...((_token) ? { Authorization: `Bearer ${_token}` } : {}), 'Content-Type': 'application/json' },
+  });
+  if (!resp.ok) throw new Error(await resp.text());
+  return resp.json();
+}
+
 

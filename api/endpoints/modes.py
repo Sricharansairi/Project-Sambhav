@@ -136,6 +136,35 @@ def _run_prediction(domain: str, parameters: Dict[str, Any], question: str = Non
 # Endpoints
 # ---------------------------------------------------------------------------
 
+@router.post("/adversarial-params")
+async def adversarial_generate_params(domain: str, question: str = ""):
+    """
+    Dynamically generate adversarial stress-test parameters for ANY domain using LLM.
+    """
+    import json, re
+    try:
+        from llm.router import route
+        msgs = [
+            {"role": "system", "content": (
+                f"You are generating worst-case adversarial input parameters for the '{domain}' prediction domain. "
+                "Return a JSON object of parameter key-value pairs representing extreme, stress-test conditions. "
+                "Use realistic but worst-case values. Do NOT use generic keys. "
+                "Return ONLY a valid JSON object, no explanation."
+            )},
+            {"role": "user", "content": f"Generate adversarial parameters for: {question or domain}"}
+        ]
+        raw = route("conversational", msgs, max_tokens=300, temperature=0.1)
+        txt = raw.get("content", "")
+        txt = re.sub(r"<think>.*?</think>", "", txt, flags=re.DOTALL).strip()
+        if "{" in txt:
+            params = json.loads(txt[txt.find("{"):txt.rfind("}")+1])
+        else:
+            params = {"extreme_value": 100, "risk_factor": "maximum", "stability": 0}
+        return {"success": True, "domain": domain, "adversarial_params": params}
+    except Exception as e:
+        logger.warning(f"Adversarial param generation failed: {e}")
+        return {"success": True, "domain": domain, "adversarial_params": {"extreme_value": 100, "risk_factor": "maximum"}}
+
 @router.post("/whatif")
 async def whatif(payload: WhatIfRequest):
     """Run what-if scenario analysis with narrative simulation."""
@@ -187,31 +216,45 @@ async def whatif(payload: WhatIfRequest):
             "children": []
         })
 
-    # Generate LLM-based scenario branches for the question
+    # Generate deep LLM-based scenario branches (the question-specific ones)
     try:
         from llm.router import route
         q = payload.question or f"What if this {payload.domain} scenario changes?"
+        depth = min(payload.depth or 5, 8)
         msgs = [
             {"role": "system", "content": (
-                f"You are an expert in {payload.domain} prediction. Generate 2-3 specific what-if scenario branches."
+                f"You are an expert in {payload.domain} prediction and scenario planning."
                 f" Base probability: {base_pct}%. Question: {q}"
-                " Respond ONLY as JSON: {\"branches\": [{\"event\": \"...\", \"probability_shift\": 15, \"reasoning\": \"...\"}]}"
+                f" Generate {depth} specific, insightful what-if scenario branches with nested sub-branches."
+                " Each branch should have a 'children' list with 1-2 deeper sub-branches."
+                " Respond ONLY as JSON: {\"branches\": [{\"event\": \"...\", \"probability_shift\": 15, "
+                "\"reasoning\": \"...\", \"children\": [{\"event\": \"...\", \"probability_shift\": 8, \"reasoning\": \"...\"}]}]}"
             )},
-            {"role": "user", "content": f"Generate what-if branches for: {q}"}
+            {"role": "user", "content": f"Generate {depth} what-if branches with sub-branches for: {q}"}
         ]
-        raw = route("conversational", msgs, max_tokens=400, temperature=0.25)
+        raw = route("conversational", msgs, max_tokens=800, temperature=0.3)
         txt = raw.get("content", "")
         txt = re.sub(r"<think>.*?</think>", "", txt, flags=re.DOTALL).strip()
         if "{" in txt:
             d = json.loads(txt[txt.find("{"):txt.rfind("}")+1])
             for b in d.get("branches", []):
                 shift = float(b.get("probability_shift", 0))
+                children = []
+                for child in b.get("children", []):
+                    c_shift = float(child.get("probability_shift", 0))
+                    children.append({
+                        "event": child.get("event", "Sub-scenario"),
+                        "new_probability": min(99, max(1, round(base_pct + shift + c_shift, 1))),
+                        "probability_shift": round(c_shift, 1),
+                        "reasoning": child.get("reasoning", ""),
+                        "children": []
+                    })
                 branches.append({
                     "event": b.get("event", "Scenario"),
                     "new_probability": min(99, max(1, round(base_pct + shift, 1))),
                     "probability_shift": round(shift, 1),
                     "reasoning": b.get("reasoning", ""),
-                    "children": []
+                    "children": children
                 })
     except Exception as e:
         logger.warning(f"WhatIf branch generation failed: {e}")
@@ -488,47 +531,50 @@ async def document_analysis(
     domain: str = Form(...),
     file: UploadFile = File(...),
     question: Optional[str] = Form(None),
-    user=Depends(get_current_user)
+    user = Depends(get_current_user)
 ):
     """
     Advanced Document Analysis (Mode 5).
-    Uses NVIDIA NIM for high-accuracy parameter extraction.
+    Extracts text and parameters from uploaded document, then runs prediction.
     """
     import os, tempfile
-    from vision.document_pipeline import analyze_document
     from core.predictor import predict, generate_outcomes
-    
-    # Save to temp file for processing
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{file.filename}") as tmp:
         content = await file.read()
         tmp.write(content)
         tmp_path = tmp.name
 
     try:
-        # Step 1 — Analyze document
-        analysis = analyze_document(tmp_path, domain)
-        
-        if "error" in analysis:
-            raise HTTPException(status_code=400, detail=analysis["error"])
+        # Step 1: Try vision document pipeline first
+        try:
+            from vision.document_pipeline import analyze_document
+            analysis = analyze_document(tmp_path, domain)
+        except Exception as ve:
+            logger.warning(f"Vision pipeline failed ({ve}), falling back to LLM text extraction")
+            # Fallback: read raw text and use LLM to extract params
+            analysis = _llm_extract_from_file(tmp_path, domain, question)
 
-        # Step 2 — Check for insufficient info
+        if isinstance(analysis, dict) and "error" in analysis:
+            # Try LLM fallback
+            analysis = _llm_extract_from_file(tmp_path, domain, question)
+
         params = analysis.get("parameters", {})
-        if not params and domain != "sarvagna": # Sarvagna usually has text_input
+        if not params:
             return {
                 "success": True,
                 "insufficient_info": True,
-                "reason": f"The document does not contain clear domain-relevant signals for {domain}.",
+                "reason": f"Could not extract domain-relevant signals for '{domain}' from this document.",
                 "missing_info": ["Core parameter values"],
                 "analysis": analysis
             }
 
-        # Step 3 — Predict using extracted parameters
+        # Step 2: Predict using extracted parameters
         import concurrent.futures
-        _q = question or analysis.get("prediction_question")
+        _q = question or analysis.get("prediction_question") or f"What is the prediction for this {domain} case?"
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             pred_future = executor.submit(predict, domain=domain, parameters=params, question=_q)
             out_future  = executor.submit(generate_outcomes, domain=domain, parameters=params, question=_q)
-
             prediction = pred_future.result()
             outcomes   = out_future.result()
 
@@ -548,3 +594,61 @@ async def document_analysis(
     finally:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
+
+
+def _llm_extract_from_file(path: str, domain: str, question: Optional[str] = None) -> dict:
+    """Fallback: read file text and use LLM to extract prediction parameters."""
+    import os, json, re
+    try:
+        ext = os.path.splitext(path)[1].lower()
+        text = ""
+        if ext == ".pdf":
+            try:
+                import pdfminer.high_level as pdfminer
+                text = pdfminer.extract_text(path)
+            except Exception:
+                text = "[PDF content unreadable without pdfminer]"
+        elif ext in (".docx",):
+            try:
+                from docx import Document as DocxDoc
+                doc = DocxDoc(path)
+                text = "\n".join(p.text for p in doc.paragraphs)
+            except Exception:
+                text = "[DOCX content unreadable]"
+        elif ext in (".csv",):
+            try:
+                import csv
+                with open(path, "r", errors="ignore") as f:
+                    text = f.read()
+            except Exception:
+                text = "[CSV unreadable]"
+        else:
+            with open(path, "r", errors="ignore") as f:
+                text = f.read()
+
+        text = text[:3000]  # Limit for LLM context
+
+        from llm.router import route
+        msgs = [
+            {"role": "system", "content": (
+                f"Extract prediction-relevant parameters for the '{domain}' domain from the provided document text. "
+                f"Return a JSON object with 'parameters' key containing key-value pairs. "
+                f"Also include 'prediction_question' (1 sentence describing what to predict). "
+                "Return ONLY valid JSON."
+            )},
+            {"role": "user", "content": f"Document text:\n{text}\n\nQuestion context: {question or 'Predict outcome'}"}
+        ]
+        raw = route("llm_predict", msgs, max_tokens=500, temperature=0.1)
+        txt = raw.get("content", "")
+        txt = re.sub(r"<think>.*?</think>", "", txt, flags=re.DOTALL).strip()
+        if "{" in txt:
+            result = json.loads(txt[txt.find("{"):txt.rfind("}")+1])
+            return {
+                "parameters": result.get("parameters", {}),
+                "prediction_question": result.get("prediction_question", ""),
+                "extracted_text": text[:500],
+                "method": "llm_fallback"
+            }
+    except Exception as e:
+        logger.warning(f"LLM file extraction failed: {e}")
+    return {"parameters": {}, "prediction_question": "", "method": "failed"}

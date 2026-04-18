@@ -233,21 +233,25 @@ def generate_conversational_response(
 
     messages = [
         {"role": "system", "content": (
-            "You are Sambhav. Collect 1 info at a time for prediction.\n"
-            "Ask ONE focused question. Be concise.\n\n"
-            f"Domain: {domain} | Goal: {question}\n"
-            f"Params: {param_str or 'None'}\n"
-            f"RI: {reliability}%\n"
-            "If RI >= 75%, say 'Ready to predict'.\n"
-            "JSON ONLY:\n"
+            f"You are Sambhav, an intelligent prediction assistant. Collect relevant information one question at a time to make an accurate prediction.\n"
+            f"Domain: '{domain}' | Prediction goal: {question}\n"
+            f"Parameters already collected: {param_str or 'None yet'}\n"
+            f"Current reliability: {reliability}%\n\n"
+            "RULES:\n"
+            f"- Ask exactly ONE focused, specific question relevant to '{domain}' predictions\n"
+            "- Questions must be specific to the domain and situation described\n"
+            "- Do NOT default to student/academic questions unless the domain is 'student'\n"
+            "- Suggest 3-5 realistic option chips that the user can tap\n"
+            "- If reliability >= 75%, set ready_to_predict to true\n"
+            "- Return ONLY valid JSON:\n"
             "{\n"
-            '  "message": "...",\n'
-            '  "asking_for": "param_key",\n'
-            '  "ready_to_predict": bool,\n'
-            '  "suggested_options": ["opt1", "opt2"]\n'
+            '  "message": "Your specific question here?",\n'
+            '  "asking_for": "parameter_key",\n'
+            '  "ready_to_predict": false,\n'
+            '  "suggested_options": ["Option A", "Option B", "Option C"]\n'
             "}"
         )},
-        {"role": "user", "content": f"History:\n{history_str}\nNext?"}
+        {"role": "user", "content": f"Conversation so far:\n{history_str}\n\nWhat is the next most important question to ask?"}
     ]
 
     result = route("conversational", messages, max_tokens=100, temperature=0.1)

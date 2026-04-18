@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams }    from 'react-router';
 import {
-  Play, Loader2, ChevronRight, RotateCcw, AlertCircle, Info,
+  Play, Loader2, ChevronRight, RotateCcw, AlertCircle, Info, Zap,
   MessageCircle, Send, Plus, Minus, ShieldAlert, GitBranch,
   FileText, Users, History, FlaskConical, Activity,
 } from 'lucide-react';
@@ -12,8 +12,9 @@ import { GlassCard }            from '../components/GlassCard';
 import { FileUploadZone }       from '../components/FileUploadZone';
 import { LoadingAnimation }     from '../components/LoadingAnimation';
 import { OutcomeRow }           from '../components/OutcomeRow';
-import { TransparencyToggle }   from '../components/TransparencyToggle';
 import { SHAPChart }            from '../components/SHAPChart';
+import { PredictionBreakdown }  from '../components/PredictionBreakdown';
+import { ResultChatbot }        from '../components/ResultChatbot';
 import { AuditPanel }           from '../components/AuditPanel';
 import { ReliabilityIndex }     from '../components/ReliabilityIndex';
 import { ExportPanel }          from '../components/ExportPanel';
@@ -65,7 +66,9 @@ export function Prediction() {
   const [loadingMore,  setLoadingMore]  = useState(false);
 
   const [expandedOutcome,   setExpandedOutcome]   = useState<number | null>(null);
-  const [transparencyLevel, setTransparencyLevel] = useState<'simple'|'detailed'|'full'>('simple');
+  const [chatOpen,          setChatOpen]          = useState(false);
+  const [chatContext,       setChatContext]       = useState<any>(null);
+  
   const [whyData,           setWhyData]           = useState<Record<string, TransparencyResult>>({});
   const [inverseData,       setInverseData]       = useState<Record<string, any>>({});
   const [loadingWhy,        setLoadingWhy]        = useState<number | null>(null);
@@ -322,11 +325,15 @@ export function Prediction() {
         const text = inputText.trim();
         if (!text) { setApiError('Please describe a situation for Free Inference mode.'); return; }
         const res = await runFreeInfer(text, 5);
-        setOutcomes((res.result?.outcomes || []).map((o: any) => ({
+        const outcomesList = res.result?.outcomes || res.outcomes || res.result || [];
+        setOutcomes(outcomesList.map((o: any) => ({
           outcome: o.outcome || 'Unknown outcome', probability: o.probability || 50,
           probability_pct: o.probability_pct || `${o.probability || 50}%`,
           reasoning: o.reasoning || '', type: o.type || 'neutral', condition: null, has_transparency: true,
         })));
+        if (res.result && typeof res.result === 'object' && !Array.isArray(res.result) && Object.keys(res.result).length > 2) {
+          setPredResult(res.result);
+        }
         setShowResults(true); setTimeout(() => setIsAnimating(true), 100); return;
       }
 
@@ -376,7 +383,9 @@ export function Prediction() {
       }
 
       if (selectedMode === 'adversarial') {
-        const preset = ADVERSARIAL_PRESETS[selectedDomain] || ADVERSARIAL_PRESETS.default;
+        const { getAdversarialParams } = await import('../lib/api');
+        const paramsRes = await getAdversarialParams(selectedDomain, inputText || undefined);
+        const preset = paramsRes.adversarial_params;
         const res = await runAdversarial({ domain: selectedDomain, parameters: preset, question: inputText || undefined });
         setAdversarialResult(res); setShowResults(true); setTimeout(() => setIsAnimating(true), 100); return;
       }
@@ -475,21 +484,19 @@ export function Prediction() {
   const handleWhyClick = async (index: number) => {
     if (expandedOutcome === index) { setExpandedOutcome(null); return; }
     setExpandedOutcome(index);
-    const key = `${index}_${transparencyLevel}`;
+    const key = `${index}_full`;
     if ((whyData as any)[key]) return;
     setLoadingWhy(index);
     try {
       const outcome = outcomes[index];
-      // final_probability should be the probability of the specific outcome, scaled 0-1
       const outcomeProb = outcome.probability / 100;
-      
       const res = await getTransparency({ 
         domain: selectedDomain, 
         parameters, 
         final_probability: outcomeProb, 
         question: inputText || undefined, 
         outcome: outcome.outcome, 
-        level: transparencyLevel 
+        level: 'full'
       } as any);
       setWhyData(prev => ({ ...prev, [key]: res.result }));
     } catch (e) { console.error(e); } finally { setLoadingWhy(null); }
@@ -537,16 +544,10 @@ export function Prediction() {
     } catch (e) { console.error('Inverse error:', e); } finally { setLoadingInverse(null); }
   };
 
-  useEffect(() => {
-    // When transparency level changes AND an outcome is expanded, fetch data for that level
-    if (expandedOutcome !== null) {
-      fetchTransparencyData(expandedOutcome, transparencyLevel);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transparencyLevel, expandedOutcome]);
+  
 
   const handleReset = () => {
-    setShowResults(false); setIsAnimating(false); setTransparencyLevel('simple');
+    setShowResults(false); setIsAnimating(false); /* transparency simple removed */
     setExpandedOutcome(null); setApiError(null); setPredResult(null); setOutcomes([]); setWhyData({});
     setInverseData({}); setLoadingInverse(null);
     setAdversarialResult(null); setWhatifTree(null); setCompResult(null);
@@ -555,7 +556,7 @@ export function Prediction() {
     setParamsConfirmed(false); setParameters({}); setDynamicParams([]);
   };
 
-  const activeWhyData = expandedOutcome !== null ? (whyData as any)[`${expandedOutcome}_${transparencyLevel}`] || null : null;
+  const activeWhyData = expandedOutcome !== null ? (whyData as any)[`${expandedOutcome}_full`] || null : null;
 
   const reliabilityScore = predResult
     ? Math.round(predResult.reliability_index * 100)
@@ -600,9 +601,19 @@ export function Prediction() {
           <span>Start Conversation</span>
         </motion.button>
       ) : (
-        <div className="text-[10px] text-muted-foreground px-1">
-          <span className="text-primary">{Object.keys(convParams).length}</span> parameters collected
-          {convComplete && <span className="text-success ml-2">● Complete</span>}
+        <div className="flex flex-col gap-2">
+          <div className="text-[10px] text-muted-foreground px-1">
+            <span className="text-primary">{Object.keys(convParams).length}</span> parameters collected
+            {convComplete && <span className="text-success ml-2">● Complete</span>}
+          </div>
+          {convComplete && (
+            <motion.button onClick={handleConvPredict} disabled={isGenerating}
+              className="w-full px-3 py-2 text-xs rounded-lg bg-success text-black font-medium flex items-center justify-center gap-1.5 disabled:opacity-50"
+              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+              <span>Generate Prediction</span>
+            </motion.button>
+          )}
         </div>
       )}
     </div>
@@ -618,20 +629,24 @@ export function Prediction() {
             if (!files.length) return;
             setHybridLoading(true); setApiError(null); setInsufficientInfo(null);
             try {
-              const BASE = (import.meta as any).env?.VITE_API_BASE ?? 'http://localhost:8000';
+              const API_BASE = (import.meta as any).env?.VITE_API_URL ?? '/api';
+              const token = localStorage.getItem('sambhav_token');
               const fd = new FormData(); fd.append('file', files[0]); fd.append('domain', selectedDomain);
               const endpoint = files[0].type.startsWith('video') ? 'video' : 'image';
-              const resp = await fetch(`${BASE}/vision/${endpoint}`, { method: 'POST', body: fd });
+              const resp = await fetch(`${API_BASE}/vision/${endpoint}`, { 
+                method: 'POST', 
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+                body: fd 
+              });
               if (resp.ok) { 
                 const data = await resp.json(); 
                 if (data.insufficient_info) {
                   setInsufficientInfo({ reason: data.reason });
                 } else {
                   setHybridExtracted(data.result?.inferred_parameters || {}); 
-                  if (data.prediction) {
-                    setPredResult(data.prediction);
-                    setOutcomes(data.outcomes || []);
-                    setShowResults(true); setTimeout(() => setIsAnimating(true), 20);
+                  // Just store the params. Let the user click Generate.
+                  if (data.prediction || data.result) {
+                    // Vision successful. The parameters are loaded into hybridExtracted.
                   }
                 }
               }
@@ -640,11 +655,19 @@ export function Prediction() {
       </div>
       {hybridLoading && <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin" /><span>Extracting parameters…</span></div>}
       {Object.keys(hybridExtracted).length > 0 && (
-        <div className="space-y-1 text-[10px]">
-          <p className="text-muted-foreground font-medium">Vision-extracted:</p>
-          {Object.entries(hybridExtracted).map(([k, v]) => (
-            <div key={k} className="flex justify-between"><span className="text-muted-foreground">{k.replace(/_/g,' ')}</span><span className="text-primary">{String(v)}</span></div>
-          ))}
+        <div className="space-y-3">
+          <div className="space-y-1 text-[10px] max-h-32 overflow-y-auto pr-1">
+            <p className="text-muted-foreground font-medium sticky top-0 bg-[#0f0f19] pt-1 pb-1">Vision Extracted Parameters:</p>
+            {Object.entries(hybridExtracted).map(([k, v]) => (
+              <div key={k} className="flex justify-between"><span className="text-muted-foreground">{k.replace(/_/g,' ')}</span><span className="text-primary">{String(v)}</span></div>
+            ))}
+          </div>
+          <motion.button onClick={() => handleGenerate()} disabled={isGenerating}
+            className="w-full px-3 py-2 text-xs rounded-lg bg-primary text-black font-medium flex items-center justify-center gap-1.5 disabled:opacity-50"
+            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+            <span>Generate Prediction</span>
+          </motion.button>
         </div>
       )}
     </div>
@@ -669,17 +692,25 @@ export function Prediction() {
     <div className="space-y-3">
       <textarea className="w-full h-10 px-3 py-2 text-xs bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none placeholder:text-muted-foreground/50"
         placeholder="What outcome to compare across scenarios?" value={inputText} onChange={e => setInputText(e.target.value)} />
+      <motion.button onClick={async () => {
+        if (!inputText.trim()) return;
+        const { discoverParams } = await import('../lib/api');
+        const res = await discoverParams({ domain: selectedDomain, question: inputText });
+        if (res.success && res.parameters) setDynamicParams(res.parameters);
+      }} className="w-full px-2 py-1.5 text-[10px] rounded-lg bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-all flex items-center justify-center gap-1">
+         <Zap className="w-3 h-3" /> Auto-Generate Comparison Fields from Question
+      </motion.button>
       {compScenarios.map((s, i) => (
         <div key={i} className="p-2 rounded-lg bg-white/5 border border-white/10 space-y-1.5">
           <input className="w-full px-2 py-1 text-[11px] bg-white/5 border border-white/10 rounded focus:outline-none"
             placeholder={`Scenario ${String.fromCharCode(65 + i)} label`} value={s.label}
             onChange={e => setCompScenarios(prev => prev.map((sc, j) => j === i ? { ...sc, label: e.target.value } : sc))} />
           <div className="space-y-1">
-            {(paramList.length > 0 ? paramList.slice(0, 5) : [
+            {(dynamicParams.length > 0 ? dynamicParams.slice(0, 5) : (paramList.length > 0 ? paramList.slice(0, 5) : [
               { key: 'factor_1', label: 'Key Factor 1' },
               { key: 'factor_2', label: 'Key Factor 2' },
               { key: 'factor_3', label: 'Key Factor 3' },
-            ]).map((p: any) => (
+            ])).map((p: any) => (
               <div key={p.key} className="flex items-center gap-1.5">
                 <span className="text-[9px] text-muted-foreground/70 min-w-[80px] shrink-0 truncate">{(p.label || p.key).replace(/_/g,' ')}</span>
                 <input
@@ -1250,7 +1281,9 @@ export function Prediction() {
       <div className="flex items-start justify-between mb-3">
         <div><h3 className="text-sm font-bold mb-0.5">Multi-Outcome Results</h3>
           <p className="text-[10px] text-muted-foreground">{outcomes.length} outcomes · {new Date().toLocaleTimeString()}</p></div>
-        <TransparencyToggle value={transparencyLevel} onChange={setTransparencyLevel} />
+        <button onClick={() => setChatOpen(true)} className="px-3 py-1.5 text-[10px] rounded-lg bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 transition-all flex items-center gap-1.5 font-medium">
+          <MessageCircle className="w-3.5 h-3.5" /> Ask About This
+        </button>
       </div>
       <div className="space-y-3">
         {outcomes.map((outcome, idx) => (
@@ -1265,52 +1298,36 @@ export function Prediction() {
             <AnimatePresence>
               {expandedOutcome === idx && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                  className="mt-2 p-3 rounded-lg bg-white/5 border border-white/10 space-y-2">
+                  className="mt-2 p-3 rounded-lg bg-white/5 border border-white/10 space-y-3">
                   {loadingWhy === idx ? (
-                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin" /><span>Analysing ({transparencyLevel})…</span></div>
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin" /><span>Analysing…</span></div>
                   ) : activeWhyData ? (
-                    <>
+                    <div className="space-y-3">
                       {activeWhyData.simple?.one_line_reason && (
-                        <p className="text-[10px] text-muted-foreground leading-relaxed italic">"{activeWhyData.simple.one_line_reason}"</p>
+                        <p className="text-[11px] text-foreground font-medium border-b border-white/10 pb-2">"{activeWhyData.simple.one_line_reason}"</p>
                       )}
-                      {(transparencyLevel === 'detailed' || transparencyLevel === 'full') && (
-                        <div className="space-y-2 pt-1.5 border-t border-white/5">
-                          {activeWhyData.detailed ? (
-                            <>
-                              <div className="p-2 rounded-lg bg-primary/5 border border-primary/15">
-                                <p className="text-[9px] text-primary font-semibold mb-0.5 uppercase tracking-wide">Case FOR — {outcome.probability.toFixed(1)}%</p>
-                                <p className="text-[10px] text-muted-foreground leading-relaxed">{activeWhyData.detailed.case_for || "No supporting logic provided."}</p>
-                              </div>
-                              <div className="p-2 rounded-lg bg-secondary/5 border border-secondary/15">
-                                <p className="text-[9px] text-secondary font-semibold mb-0.5 uppercase tracking-wide">Case AGAINST — {(100 - outcome.probability).toFixed(1)}%</p>
-                                <p className="text-[10px] text-muted-foreground leading-relaxed">{activeWhyData.detailed.case_against || "No disputing logic provided."}</p>
-                              </div>
-                            </>
-                          ) : (
-                             <div className="p-2 text-center border border-white/5 rounded-lg">
-                               <p className="text-[10px] text-muted-foreground italic">Detailed breakdown unavailable.</p>
-                             </div>
-                          )}
+                      {activeWhyData.detailed && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="p-2 rounded-lg bg-primary/5 border border-primary/15">
+                            <p className="text-[9px] text-primary font-bold mb-1 uppercase tracking-wide">Case For ({outcome.probability.toFixed(0)}%)</p>
+                            <p className="text-[10px] text-muted-foreground leading-relaxed">{activeWhyData.detailed.case_for}</p>
+                          </div>
+                          <div className="p-2 rounded-lg bg-secondary/5 border border-secondary/15">
+                            <p className="text-[9px] text-secondary font-bold mb-1 uppercase tracking-wide">Case Against</p>
+                            <p className="text-[10px] text-muted-foreground leading-relaxed">{activeWhyData.detailed.case_against}</p>
+                          </div>
                         </div>
                       )}
-                      {transparencyLevel === 'full' && (
-                        <div className="pt-1.5 border-t border-white/5 space-y-1">
-                          {activeWhyData.full ? (
-                            <>
-                              {(activeWhyData.full.primary_driver) && <p className="text-[10px] text-muted-foreground"><span className="text-primary font-medium">Primary Driver: </span>{activeWhyData.full.primary_driver}</p>}
-                              {activeWhyData.full.intervention && <p className="text-[10px] text-muted-foreground"><span className="text-primary font-medium">Key Intervention: </span>{activeWhyData.full.intervention}</p>}
-                              {(activeWhyData.full.confidence_note || activeWhyData.full.confidence_factors) && <p className="text-[10px] text-muted-foreground"><span className="text-primary font-medium">Confidence: </span>{activeWhyData.full.confidence_note || activeWhyData.full.confidence_factors}</p>}
-                            </>
-                          ) : (
-                             <div className="p-2 text-center border border-white/5 rounded-lg">
-                               <p className="text-[10px] text-muted-foreground italic">Full breakdown unavailable.</p>
-                             </div>
-                          )}
+                      {activeWhyData.full && (
+                        <div className="space-y-1.5 pt-2 border-t border-white/10">
+                          {activeWhyData.full.primary_driver && <p className="text-[10px] text-muted-foreground"><span className="text-primary font-semibold">Primary Driver:</span> {activeWhyData.full.primary_driver}</p>}
+                          {activeWhyData.full.intervention && <p className="text-[10px] text-muted-foreground"><span className="text-primary font-semibold">Intervention:</span> {activeWhyData.full.intervention}</p>}
+                          {(activeWhyData.full.confidence_note || activeWhyData.full.confidence_factors) && <p className="text-[10px] text-muted-foreground"><span className="text-primary font-semibold">Confidence:</span> {activeWhyData.full.confidence_note || activeWhyData.full.confidence_factors}</p>}
                         </div>
                       )}
-                    </>
+                    </div>
                   ) : (
-                    <p className="text-[10px] text-muted-foreground/60 italic">Loading explanation…</p>
+                    <p className="text-[10px] text-muted-foreground/60 italic">Could not load explanation.</p>
                   )}
                 </motion.div>
               )}
@@ -1387,6 +1404,19 @@ export function Prediction() {
           audits={(predResult.audit_flags || []).map(f => ({ type: 'parameter' as const, status: f.severity === 'CRITICAL' ? 'fail' as const : f.severity === 'WARNING' ? 'warning' as const : 'pass' as const, label: `${f.code}: ${f.message}` }))}
           abnFlags={predResult.audit_flags?.map(f => f.code) || []}
           mlLlmAgreement={(predResult.gap || 0) < 0.08 ? 'high' : (predResult.gap || 0) < 0.20 ? 'moderate' : 'low'} delay={0.4} />
+      )}
+      {predResult && (
+        <PredictionBreakdown 
+          mode={selectedMode}
+          mlProbability={predResult.ml_probability !== undefined ? predResult.ml_probability * 100 : undefined}
+          llmProbability={predResult.llm_probability !== undefined ? predResult.llm_probability * 100 : undefined}
+          reconciledProbability={predResult.reconciled_probability !== undefined ? predResult.reconciled_probability * 100 : undefined}
+          reliabilityIndex={predResult.reliability_index !== undefined ? predResult.reliability_index * 100 : undefined}
+          gap={predResult.gap}
+          reconciliationMethod={predResult.reconciliation_method}
+          shapValues={predResult.shap_values}
+          delay={0.6}
+        />
       )}
       {exportPayload && <ExportPanel payload={exportPayload} delay={1.0} />}
     </motion.div>

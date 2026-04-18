@@ -1,46 +1,66 @@
 import { motion } from 'motion/react';
-import { FileText, FileSpreadsheet, FileJson, FileCode, Image, Share2, Download, Database, Loader2 } from 'lucide-react';
+import { FileText, FileSpreadsheet, FileJson, FileCode, Image, Share2, Download, Database, Loader2, CheckCircle2 } from 'lucide-react';
 import { useState } from 'react';
 import { exports, type ExportPayload, SambhavAPIError } from '../lib/api';
 
 interface ExportPanelProps {
-  payload:  ExportPayload;   // prediction data to export
-  delay?:   number;
+  payload: ExportPayload;
+  delay?: number;
 }
 
-const exportFormats = [
-  { id: 'pdf',   label: 'PDF',    icon: FileText,        handler: (p: ExportPayload) => exports.pdf(p) },
-  { id: 'word',  label: 'Word',   icon: FileText,        handler: (p: ExportPayload) => exports.word(p) },
-  { id: 'excel', label: 'Excel',  icon: FileSpreadsheet, handler: (p: ExportPayload) => exports.excel(p) },
-  { id: 'json',  label: 'JSON',   icon: FileJson,        handler: (p: ExportPayload) => exports.json(p) },
-  { id: 'csv',   label: 'CSV',    icon: FileSpreadsheet, handler: (p: ExportPayload) => exports.csv(p) },
-  { id: 'xml',   label: 'XML',    icon: FileCode,        handler: (p: ExportPayload) => exports.xml(p) },
-  { id: 'png',   label: 'PNG',    icon: Image,           handler: (p: ExportPayload) => exports.png(p) },
-  { id: 'api',   label: 'API Link',icon: Database,       handler: async (p: ExportPayload) => {
-      const res = await exports.apiLink(p);
-      await navigator.clipboard.writeText(res.api_url || '').catch(() => {});
-      return res;
-    }
+const exportGroups = [
+  {
+    title: 'Document Reports',
+    description: 'Beautifully formatted documents for presentations and sharing.',
+    formats: [
+      { id: 'pdf', label: 'PDF Report', icon: FileText, handler: exports.pdf },
+      { id: 'word', label: 'Word Doc', icon: FileText, handler: exports.word },
+      { id: 'excel', label: 'Excel Sheet', icon: FileSpreadsheet, handler: exports.excel },
+    ],
+  },
+  {
+    title: 'Raw Data & Code',
+    description: 'Structured data for engineering and external pipelines.',
+    formats: [
+      { id: 'json', label: 'JSON Data', icon: FileJson, handler: exports.json },
+      { id: 'csv', label: 'CSV Table', icon: FileSpreadsheet, handler: exports.csv },
+      { id: 'xml', label: 'XML File', icon: FileCode, handler: exports.xml },
+    ],
+  },
+  {
+    title: 'Visuals & Cloud',
+    description: 'Export as images or integrate via live API URLs.',
+    formats: [
+      { id: 'png', label: 'PNG Image', icon: Image, handler: exports.png },
+      {
+        id: 'api',
+        label: 'API Link',
+        icon: Database,
+        handler: async (p: ExportPayload) => {
+          const res = await exports.apiLink(p);
+          if (res.api_url) await navigator.clipboard.writeText(res.api_url).catch(() => {});
+          return res;
+        },
+      },
+    ],
   },
 ];
 
 export function ExportPanel({ payload, delay = 0 }: ExportPanelProps) {
   const [loading, setLoading] = useState<string | null>(null);
-  const [error,   setError]   = useState<string | null>(null);
-  const [copied,  setCopied]  = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  const handleExport = async (format: typeof exportFormats[0]) => {
-    setLoading(format.id);
+  const handleExport = async (formatId: string, handler: (p: ExportPayload) => Promise<any>) => {
+    setLoading(formatId);
     setError(null);
+    setSuccess(null);
     try {
-      const result = await format.handler(payload);
-      if (format.id === 'api' && result?.api_url) {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      }
+      await handler(payload);
+      setSuccess(formatId);
+      setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      const msg = err instanceof SambhavAPIError ? err.message : 'Export failed';
-      setError(`${format.label}: ${msg}`);
+      setError(err instanceof SambhavAPIError ? err.message : 'Export failed due to a sudden error.');
       setTimeout(() => setError(null), 4000);
     } finally {
       setLoading(null);
@@ -49,53 +69,81 @@ export function ExportPanel({ payload, delay = 0 }: ExportPanelProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
-      className="p-3 rounded-lg bg-white/5 border border-white/10"
+      className="rounded-2xl overflow-hidden border border-white/10"
+      style={{ background: 'linear-gradient(135deg, rgba(15,15,30,0.8) 0%, rgba(20,20,40,0.8) 100%)' }}
     >
-      <div className="flex items-center justify-between mb-2">
-        <h5 className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
-          <Download className="w-3 h-3" />
-          Export Results
-        </h5>
-        {copied && (
-          <span className="text-[10px] text-primary">API link copied!</span>
-        )}
-        {error && (
-          <span className="text-[10px] text-destructive truncate max-w-[140px]">{error}</span>
-        )}
+      <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-bold text-foreground">Export Results</h3>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Download your prediction data in multiple robust formats.</p>
+        </div>
+        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+          <Download className="w-5 h-5 text-primary" />
+        </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-1.5">
-        {exportFormats.map((format, idx) => {
-          const Icon      = format.icon;
-          const isLoading = loading === format.id;
-          return (
-            <motion.button
-              key={format.id}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: delay + idx * 0.05 }}
-              onClick={() => handleExport(format)}
-              disabled={!!loading}
-              className="flex flex-col items-center gap-1 p-2 rounded-lg bg-white/5
-                       border border-white/10 hover:bg-white/10 hover:border-primary/30
-                       transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
-              whileHover={!loading ? { scale: 1.05 } : {}}
-              whileTap={!loading ? { scale: 0.95 } : {}}
+      <div className="p-5 space-y-5">
+        {error && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/30 text-[11px] text-destructive font-medium text-center">
+            {error}
+          </motion.div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {exportGroups.map((group, gIdx) => (
+            <motion.div
+              key={group.title}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: delay + gIdx * 0.1 + 0.2 }}
+              className="space-y-3"
             >
-              {isLoading ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-              ) : (
-                <Icon className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
-              )}
-              <span className="text-[9px] text-muted-foreground group-hover:text-foreground transition-colors">
-                {format.label}
-              </span>
-            </motion.button>
-          );
-        })}
+              <div>
+                <p className="text-[11px] font-bold text-foreground uppercase tracking-wider">{group.title}</p>
+                <p className="text-[9px] text-muted-foreground/70 mt-0.5 leading-tight">{group.description}</p>
+              </div>
+              <div className="space-y-2">
+                {group.formats.map((fmt) => {
+                  const Icon = fmt.icon;
+                  const isLoading = loading === fmt.id;
+                  const isSuccess = success === fmt.id;
+
+                  return (
+                    <motion.button
+                      key={fmt.id}
+                      onClick={() => handleExport(fmt.id, fmt.handler)}
+                      disabled={!!loading}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border transition-all group disabled:opacity-50 disabled:cursor-not-allowed
+                        ${isSuccess ? 'bg-success/10 border-success/30' : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-primary/30'}`}
+                      whileHover={!loading && !isSuccess ? { scale: 1.02 } : {}}
+                      whileTap={!loading && !isSuccess ? { scale: 0.98 } : {}}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0
+                          ${isSuccess ? 'bg-success/20' : 'bg-white/5 group-hover:bg-primary/20 transition-colors'}`}>
+                          {isLoading ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                          ) : isSuccess ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+                          ) : (
+                            <Icon className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                          )}
+                        </div>
+                        <span className={`text-[11px] font-medium truncate transition-colors
+                          ${isSuccess ? 'text-success' : 'text-muted-foreground group-hover:text-foreground'}`}>
+                          {isSuccess ? (fmt.id === 'api' ? 'Copied Link!' : 'Exported!') : fmt.label}
+                        </span>
+                      </div>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          ))}
+        </div>
       </div>
     </motion.div>
   );

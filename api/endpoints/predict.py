@@ -648,7 +648,137 @@ async def get_domain_outcomes(domain: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ── POST /predict/pragma-chat ──────────────────────────────────
+
+# ── POST /predict/pragma-chat ─────────────────────────────────
+class PragmaChatRequest(BaseModel):
+    prediction_id: Optional[str] = None
+    question: str
+    context: str
+    history: List[dict] = []
+    parameters: dict = {}
+
+@router.post("/pragma-chat")
+async def pragma_chat(req: PragmaChatRequest):
+    """Veteran Forensic Psychological Profiler chatbot for Pragma mode."""
+    try:
+        from llm.router import route
+        import re
+
+        system_prompt = (
+            "You are Dr. Elias Vance, a veteran Forensic Psychological Profiler with 30+ years of experience "
+            "in deception detection, linguistic micro-expression analysis, and cognitive load mapping. "
+            "You speak with clinical precision and deep psychological insight. "
+            "ONLY answer about the forensic analysis of the provided text/prediction context. "
+            "If asked about unrelated topics, politely redirect to the forensic analysis. "
+            "Keep answers concise (max 4 sentences) unless deep analysis is explicitly requested."
+        )
+
+        messages = [{"role": "system", "content": system_prompt}]
+        if len(req.history) == 0:
+            ctx = f"Forensic Context:\n{req.context[:1500]}\nParameters: {str(req.parameters)[:500]}"
+            messages.append({"role": "user", "content": f"{ctx}\n\nQuestion: {req.question}"})
+        else:
+            for msg in req.history[-6:]:
+                messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+            messages.append({"role": "user", "content": req.question})
+
+        raw = route("llm_predict", messages, max_tokens=400, temperature=0.3)
+        reply = raw.get("content", "I cannot answer that question at this time.")
+        reply = re.sub(r"<think>.*?</think>", "", reply, flags=re.DOTALL).strip()
+        return {"success": True, "reply": reply}
+    except Exception as e:
+        logger.error(f"Pragma Chat Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Profiler unavailable: {str(e)}")
+
+
+# ── POST /predict/result-chat ─────────────────────────────────
+class ResultChatRequest(BaseModel):
+    question: str
+    context: str
+    mode: str = "guided"
+    domain: str = "general"
+    history: List[dict] = []
+
+@router.post("/result-chat")
+async def result_chat(req: ResultChatRequest):
+    """Universal chatbot for any mode's prediction result. Safe — redirects off-topic."""
+    try:
+        from llm.router import route
+        import re
+
+        system_prompt = (
+            f"You are Sambhav's expert analysis assistant for {req.domain} predictions. "
+            f"The user received a prediction from the '{req.mode}' mode. "
+            "Answer ONLY questions about this specific prediction result. "
+            "If asked about irrelevant/harmful/off-topic matters, respond: "
+            "'I can only help you understand this specific prediction result.' "
+            "Be concise (2-4 sentences) and reference actual data provided."
+        )
+
+        messages = [{"role": "system", "content": system_prompt}]
+        if len(req.history) == 0:
+            ctx = f"Prediction Result Context:\n{req.context[:2000]}"
+            messages.append({"role": "user", "content": f"{ctx}\n\nQuestion: {req.question}"})
+        else:
+            for msg in req.history[-8:]:
+                messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+            messages.append({"role": "user", "content": req.question})
+
+        raw = route("conversational", messages, max_tokens=350, temperature=0.25)
+        reply = raw.get("content", "I cannot process that request at this time.")
+        reply = re.sub(r"<think>.*?</think>", "", reply, flags=re.DOTALL).strip()
+        return {"success": True, "reply": reply}
+    except Exception as e:
+        logger.error(f"Result Chat Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── POST /predict/fact-chat ───────────────────────────────────
+class FactChatRequest(BaseModel):
+    question: str
+    claim: str
+    verdict: str
+    score: float = 0.0
+    dimensions: dict = {}
+    history: List[dict] = []
+
+@router.post("/fact-chat")
+async def fact_chat(req: FactChatRequest):
+    """Fact-check chatbot — only answers about the specific fact-check result."""
+    try:
+        from llm.router import route
+        import re
+
+        system_prompt = (
+            "You are Sambhav's Fact-Verification Expert. "
+            "Answer ONLY questions about the specific fact-check result provided. "
+            "Reference actual dimension scores and evidence. Redirect off-topic questions. "
+            "Be concise — 2-4 sentences unless deep explanation is requested."
+        )
+
+        messages = [{"role": "system", "content": system_prompt}]
+        if len(req.history) == 0:
+            ctx = (
+                f"Claim: {req.claim}\n"
+                f"Verdict: {req.verdict}\n"
+                f"Credibility Score: {req.score:.1f}%\n"
+                f"Dimension Breakdown: {str(req.dimensions)[:800]}"
+            )
+            messages.append({"role": "user", "content": f"{ctx}\n\nQuestion: {req.question}"})
+        else:
+            for msg in req.history[-6:]:
+                messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+            messages.append({"role": "user", "content": req.question})
+
+        raw = route("conversational", messages, max_tokens=300, temperature=0.2)
+        reply = raw.get("content", "I cannot answer that right now.")
+        reply = re.sub(r"<think>.*?</think>", "", reply, flags=re.DOTALL).strip()
+        return {"success": True, "reply": reply}
+    except Exception as e:
+        logger.error(f"Fact Chat Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    logger.info(f"POST /predict/batch domain={req.domain} count={len# ── POST /predict/pragma-chat ──────────────────────────────────
 class PragmaChatRequest(BaseModel):
     prediction_id: Optional[str] = None
     question: str
@@ -659,36 +789,134 @@ class PragmaChatRequest(BaseModel):
 @router.post("/pragma-chat")
 async def pragma_chat(req: PragmaChatRequest):
     """
-    A dedicated Chatbot endpoint acting as a veteran forensic psychological profiler 
-    to answer deep follow-up questions about a Pragma deception/genuineness prediction.
+    Veteran Forensic Psychological Profiler chatbot for Pragma mode results.
+    Uses llm.router.route() — no broken imports.
     """
     try:
-        from llm.providers import call_llm
-        from core.prompts import _build_prompt
-        
-        system_prompt = """You are Dr. Elias Vance, a globally recognized veteran Forensic Psychological Profiler with 30 years of experience in deception detection, linguistic micro-expression analysis, and cognitive load mapping. You speak with extreme authority, clinical precision, and deep psychological insight, but remain accessible. 
-Your goal is to answer the user's specific follow-up questions regarding the PRAGMA forensic analysis of their provided text. Do not break character. Do not be overly verbose unless deep clinical explanation is requested. Draw explicitly from the provided baseline parameters and linguistic context."""
+        from llm.router import route
+        import re
 
-        conversation_context = f"Forensic Context/Text Analyzed:\n{req.context}\n\nExtracted Parameters:\n{req.parameters}\n"
-        
+        system_prompt = (
+            "You are Dr. Elias Vance, a veteran Forensic Psychological Profiler with 30+ years of experience "
+            "in deception detection, linguistic micro-expression analysis, and cognitive load mapping. "
+            "You speak with clinical precision and deep psychological insight. "
+            "ONLY answer about the forensic analysis of the provided text/prediction context. "
+            "If asked about unrelated topics, politely redirect to the forensic analysis. "
+            "Keep answers concise (max 4 sentences) unless deep analysis is explicitly requested."
+        )
+
         messages = [{"role": "system", "content": system_prompt}]
-        for msg in req.history:
-            messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
         
-        # Add the latest question wrapped with the forensic context if this is the first interaction, otherwise just the question
+        # On first message, inject the forensic context
         if len(req.history) == 0:
-            messages.append({"role": "user", "content": f"{conversation_context}\nUser Question: {req.question}"})
+            ctx = f"Forensic Context:\n{req.context[:1500]}\nParameters: {str(req.parameters)[:500]}"
+            messages.append({"role": "user", "content": f"{ctx}\n\nQuestion: {req.question}"})
         else:
+            for msg in req.history[-6:]:
+                messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
             messages.append({"role": "user", "content": req.question})
 
-        response = call_llm(
-            messages=messages,
-            temperature=0.4,
-            max_tokens=600
-        )
-        
-        return {"success": True, "reply": response}
+        raw = route("llm_predict", messages, max_tokens=400, temperature=0.3)
+        reply = raw.get("content", "I cannot answer that question at this time.")
+        reply = re.sub(r"<think>.*?</think>", "", reply, flags=re.DOTALL).strip()
+
+        return {"success": True, "reply": reply}
     except Exception as e:
         logger.error(f"Pragma Chat Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Profiler unavailable: {str(e)}")
+
+
+# ── POST /predict/result-chat ──────────────────────────────────
+class ResultChatRequest(BaseModel):
+    question: str
+    context: str          # JSON string of the full prediction result
+    mode: str = "guided"
+    domain: str = "general"
+    history: List[dict] = []
+
+@router.post("/result-chat")
+async def result_chat(req: ResultChatRequest):
+    """
+    Universal chatbot for any mode's prediction result.
+    Only answers questions about the specific provided prediction.
+    Safe — redirects off-topic questions.
+    """
+    try:
+        from llm.router import route
+        import re
+
+        system_prompt = (
+            f"You are Sambhav's expert analysis assistant for {req.domain} predictions. "
+            f"The user has just received a prediction result from the '{req.mode}' mode. "
+            "Answer ONLY questions about this specific prediction result. "
+            "If asked about irrelevant/harmful/off-topic matters, say: "
+            "'I can only help you understand this specific prediction result.' "
+            "Be concise (2-4 sentences), accurate, and reference the actual data provided."
+        )
+
+        messages = [{"role": "system", "content": system_prompt}]
+
+        if len(req.history) == 0:
+            ctx = f"Prediction Result Context:\n{req.context[:2000]}"
+            messages.append({"role": "user", "content": f"{ctx}\n\nQuestion: {req.question}"})
+        else:
+            for msg in req.history[-8:]:
+                messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+            messages.append({"role": "user", "content": req.question})
+
+        raw = route("conversational", messages, max_tokens=350, temperature=0.25)
+        reply = raw.get("content", "I cannot process that request at this time.")
+        reply = re.sub(r"<think>.*?</think>", "", reply, flags=re.DOTALL).strip()
+
+        return {"success": True, "reply": reply}
+    except Exception as e:
+        logger.error(f"Result Chat Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ── POST /predict/fact-chat ──────────────────────────────────
+class FactChatRequest(BaseModel):
+    question: str
+    claim: str
+    verdict: str
+    score: float = 0.0
+    dimensions: dict = {}
+    history: List[dict] = []
+
+@router.post("/fact-chat")
+async def fact_chat(req: FactChatRequest):
+    """Fact-check chatbot — answers questions about a specific fact-check result."""
+    try:
+        from llm.router import route
+        import re
+
+        system_prompt = (
+            "You are Sambhav's Fact-Verification Expert. "
+            "Answer ONLY questions about the specific fact-check result provided. "
+            "Reference actual dimension scores. Redirect off-topic questions politely. "
+            "Be concise — 2-4 sentences unless deep explanation is requested."
+        )
+
+        messages = [{"role": "system", "content": system_prompt}]
+
+        if len(req.history) == 0:
+            ctx = (
+                f"Claim: {req.claim}\n"
+                f"Verdict: {req.verdict}\n"
+                f"Credibility Score: {req.score:.1f}%\n"
+                f"Dimension Breakdown: {str(req.dimensions)[:800]}"
+            )
+            messages.append({"role": "user", "content": f"{ctx}\n\nQuestion: {req.question}"})
+        else:
+            for msg in req.history[-6:]:
+                messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+            messages.append({"role": "user", "content": req.question})
+
+        raw = route("conversational", messages, max_tokens=300, temperature=0.2)
+        reply = raw.get("content", "I cannot answer that right now.")
+        reply = re.sub(r"<think>.*?</think>", "", reply, flags=re.DOTALL).strip()
+
+        return {"success": True, "reply": reply}
+    except Exception as e:
+        logger.error(f"Fact Chat Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

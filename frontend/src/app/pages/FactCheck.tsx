@@ -6,6 +6,9 @@ import { Navigation } from '../components/Navigation';
 import { GlassCard } from '../components/GlassCard';
 import { ProbabilityBar } from '../components/ProbabilityBar';
 import { LoadingAnimation } from '../components/LoadingAnimation';
+import { ResultChatbot } from '../components/ResultChatbot';
+import { PredictionBreakdown } from '../components/PredictionBreakdown';
+import { MessageCircle } from 'lucide-react';
 import { CREDIBILITY_DIMENSIONS } from '../lib/constants';
 import { factCheck, SambhavAPIError, type FactCheckResult, type FactCheckSource } from '../lib/api';
 
