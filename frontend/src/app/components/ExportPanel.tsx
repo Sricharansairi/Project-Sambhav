@@ -68,7 +68,6 @@ export function ExportPanel({ payload, delay = 0 }: ExportPanelProps) {
   };
 
   return (
-  return (
     <motion.div
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
