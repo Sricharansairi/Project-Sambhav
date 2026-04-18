@@ -31,7 +31,7 @@ export function AuditPanel({ audits, abnFlags, mlLlmAgreement, delay = 0 }: Audi
   const getAgreementColor = (level: string) => {
     switch (level) {
       case 'high':
-        return 'text-[#00fff2] border-[#00fff2]/30 bg-[#00fff2]/10';
+        return 'text-[#ffb7c5] border-[#ffb7c5]/30 bg-[#ffb7c5]/10';
       case 'moderate':
         return 'text-[#c0c0c0] border-white/20 bg-white/5';
       case 'low':
@@ -114,7 +114,7 @@ export function AuditPanel({ audits, abnFlags, mlLlmAgreement, delay = 0 }: Audi
           ${getAgreementColor(mlLlmAgreement)}
         `}>
           <div className={`w-1.5 h-1.5 rounded-full ${
-            mlLlmAgreement === 'high' ? 'bg-[#00fff2]' :
+            mlLlmAgreement === 'high' ? 'bg-[#ffb7c5]' :
             mlLlmAgreement === 'moderate' ? 'bg-[#c0c0c0]' : 'bg-[#ff6b6b]'
           }`} />
           <span className="uppercase tracking-wide">

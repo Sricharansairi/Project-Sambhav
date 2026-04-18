@@ -59,7 +59,7 @@ export function ResultsCard({ result, title = 'Prediction Results' }: ResultsCar
             initial={{ scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', bounce: 0.4, delay: 0.2 }}
-            className="text-6xl font-bold text-[#00fff2] mb-2"
+            className="text-6xl font-bold text-[#ffb7c5] mb-2"
           >
             {result.prediction.toFixed(1)}%
           </motion.div>
@@ -131,7 +131,7 @@ export function ResultsCard({ result, title = 'Prediction Results' }: ResultsCar
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 1.2, type: 'spring' }}
-            className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-[#00fff2] rounded-full border-2 border-black"
+            className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-[#ffb7c5] rounded-full border-2 border-black"
             style={{ left: `${result.prediction}%`, marginLeft: '-8px' }}
           />
         </div>
@@ -189,7 +189,7 @@ export function ResultsCard({ result, title = 'Prediction Results' }: ResultsCar
       {result.recommendations && result.recommendations.length > 0 && (
         <GlassCard variant="elevated" className="p-6">
           <div className="flex items-center gap-2 mb-4">
-            <Info className="w-5 h-5 text-[#00fff2]" />
+            <Info className="w-5 h-5 text-[#ffb7c5]" />
             <h4 className="font-medium">Recommendations</h4>
           </div>
           <div className="space-y-3">
@@ -201,7 +201,7 @@ export function ResultsCard({ result, title = 'Prediction Results' }: ResultsCar
                 transition={{ delay: 1.7 + i * 0.1 }}
                 className="flex gap-3 text-sm"
               >
-                <div className="w-1.5 h-1.5 rounded-full bg-[#00fff2] mt-2 shrink-0" />
+                <div className="w-1.5 h-1.5 rounded-full bg-[#ffb7c5] mt-2 shrink-0" />
                 <span className="text-foreground/80">{rec}</span>
               </motion.div>
             ))}

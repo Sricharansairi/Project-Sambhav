@@ -75,7 +75,7 @@ export function FileUploadZone({
           relative border-2 border-dashed rounded-xl p-12 
           transition-all duration-300 cursor-pointer
           ${isDragging 
-            ? 'border-primary bg-[#00fff2]/5 scale-[1.02]' 
+            ? 'border-primary bg-[#ffb7c5]/5 scale-[1.02]' 
             : 'border-white/20 hover:border-white/40 bg-white/[0.02]'
           }
         `}
@@ -115,7 +115,7 @@ export function FileUploadZone({
                   transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
                 />
                 <div className="absolute inset-2 bg-black rounded-full flex items-center justify-center">
-                  <File className="w-12 h-12 text-[#00fff2]" />
+                  <File className="w-12 h-12 text-[#ffb7c5]" />
                 </div>
               </div>
               
@@ -163,13 +163,13 @@ export function FileUploadZone({
                   ease: 'easeInOut',
                 }}
               >
-                <Upload className="w-16 h-16 text-[#00fff2]/50" />
+                <Upload className="w-16 h-16 text-[#ffb7c5]/50" />
               </motion.div>
               
               <div className="text-center space-y-2">
                 <p className="text-lg">
                   Drop files here or{' '}
-                  <span className="text-[#00fff2] cursor-pointer hover:underline">
+                  <span className="text-[#ffb7c5] cursor-pointer hover:underline">
                     browse
                   </span>
                 </p>
@@ -212,7 +212,7 @@ export function FileUploadZone({
                 className="flex items-center justify-between p-3 bg-white/[0.03] border border-white/10 rounded-lg"
               >
                 <div className="flex items-center gap-3">
-                  <File className="w-5 h-5 text-[#00fff2]" />
+                  <File className="w-5 h-5 text-[#ffb7c5]" />
                   <div>
                     <p className="text-sm">{file.name}</p>
                     <p className="text-xs text-muted-foreground">

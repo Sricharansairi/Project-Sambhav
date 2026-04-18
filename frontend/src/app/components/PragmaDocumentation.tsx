@@ -5,16 +5,16 @@ export function PragmaDocumentation() {
   return (
     <div className="mt-8 p-6 rounded-2xl bg-[#08080c] border border-white/10 text-muted-foreground space-y-6">
       <div className="flex items-center gap-3 border-b border-white/10 pb-4">
-        <Shield className="w-8 h-8 text-[#00fff2]" />
+        <Shield className="w-8 h-8 text-[#ffb7c5]" />
         <div>
           <h2 className="text-xl font-bold text-foreground">PRAGMA: Forensic Psychological Profiling Engine</h2>
-          <p className="text-xs uppercase tracking-widest text-[#00fff2]/80 font-semibold">Technical Architecture & Methodology Guide</p>
+          <p className="text-xs uppercase tracking-widest text-[#ffb7c5]/80 font-semibold">Technical Architecture & Methodology Guide</p>
         </div>
       </div>
 
       <div className="prose prose-invert prose-sm max-w-none text-xs leading-relaxed space-y-6">
         <section>
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2 mb-2"><Brain className="w-4 h-4 text-[#00fff2]" /> 1. Introduction to PRAGMA</h3>
+          <h3 className="text-sm font-semibold text-white flex items-center gap-2 mb-2"><Brain className="w-4 h-4 text-[#ffb7c5]" /> 1. Introduction to PRAGMA</h3>
           <p>
             The PRAGMA (Pattern Recognition and Applied Geopolitical/Mental Analysis) engine represents the pinnacle of Project Sambhav’s multi-modal inference capabilities. Originally designed to interface with high-stakes adversarial negotiation environments, PRAGMA functions as a comprehensive forensic psychological profiler. Unlike traditional sentiment analysis engines that map binary emotional vectors (positive/negative), PRAGMA leverages a unified, state-of-the-art neuro-linguistic architecture to detect deception, cognitive load, underlying motives, and suppressed behavioral traits. 
             <br/><br/>
@@ -23,7 +23,7 @@ export function PragmaDocumentation() {
         </section>
 
         <section>
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2 mb-2"><Activity className="w-4 h-4 text-[#00fff2]" /> 2. Core Methodologies: The Deception Detection Matrix</h3>
+          <h3 className="text-sm font-semibold text-white flex items-center gap-2 mb-2"><Activity className="w-4 h-4 text-[#ffb7c5]" /> 2. Core Methodologies: The Deception Detection Matrix</h3>
           <p>
             PRAGMA approaches human deception through the lens of cognitive load-theory. Lying or obfuscating the truth requires significantly higher cognitive processing power than recounting a factual memory. The brain must simultaneously construct a plausible fabricated narrative, sequence it logically, monitor the recipient's reaction, and suppress the genuine memory. PRAGMA identifies this cognitive friction through four primary pillars:
           </p>
@@ -36,7 +36,7 @@ export function PragmaDocumentation() {
         </section>
 
         <section>
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2 mb-2"><FileSearch className="w-4 h-4 text-[#00fff2]" /> 3. The 8-Dimension Cognitive Audit</h3>
+          <h3 className="text-sm font-semibold text-white flex items-center gap-2 mb-2"><FileSearch className="w-4 h-4 text-[#ffb7c5]" /> 3. The 8-Dimension Cognitive Audit</h3>
           <p>
             When processing a statement, PRAGMA does not simply output a "Lie/Truth" baseline. It executes an incredibly dense 8-dimensional cognitive audit, mapping probabilities across the following vectors:
           </p>
@@ -63,7 +63,7 @@ export function PragmaDocumentation() {
         </section>
 
         <section>
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2 mb-2"><Eye className="w-4 h-4 text-[#00fff2]" /> 4. Actionable Intervention & Interview Strategy</h3>
+          <h3 className="text-sm font-semibold text-white flex items-center gap-2 mb-2"><Eye className="w-4 h-4 text-[#ffb7c5]" /> 4. Actionable Intervention & Interview Strategy</h3>
           <p>
             PRAGMA surpasses traditional theoretical analysis by providing explicitly actionable intervention guidelines. If the system detects a 78% probability of timeline fabrication, the engine actively synthesizes an "Interview Strategy." 
             <br/><br/>
@@ -72,7 +72,7 @@ export function PragmaDocumentation() {
         </section>
 
         <section>
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2 mb-2"><Database className="w-4 h-4 text-[#00fff2]" /> 5. Deep Learning Architecture</h3>
+          <h3 className="text-sm font-semibold text-white flex items-center gap-2 mb-2"><Database className="w-4 h-4 text-[#ffb7c5]" /> 5. Deep Learning Architecture</h3>
           <p>
             The backend engine of PRAGMA relies on the Project Sambhav Route Engine. It initializes a "Devil's Advocate" context loop when generating the psychological profile. The primary LLM attempts to validate the truthfulness of the statement, while a secondary background agent acts adversarially, actively attempting to poke holes in the statement's logic.
             <br/><br/>

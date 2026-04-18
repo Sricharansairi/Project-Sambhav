@@ -19,7 +19,7 @@ export function SHAPChart({ features, delay = 0 }: SHAPChartProps) {
         <h5 className="text-[11px] font-medium text-muted-foreground">Feature Contributions (SHAP)</h5>
         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
           <span className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-sm bg-[#00fff2]/60" />
+            <div className="w-2 h-2 rounded-sm bg-[#ffb7c5]/60" />
             Positive
           </span>
           <span className="flex items-center gap-1">
@@ -43,7 +43,7 @@ export function SHAPChart({ features, delay = 0 }: SHAPChartProps) {
           >
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-foreground/80">{feature.name}</span>
-              <span className={`text-[10px] font-medium ${isPositive ? 'text-[#00fff2]' : 'text-[#ff6b6b]'}`}>
+              <span className={`text-[10px] font-medium ${isPositive ? 'text-[#ffb7c5]' : 'text-[#ff6b6b]'}`}>
                 {isPositive ? '+' : ''}{feature.value.toFixed(3)}
               </span>
             </div>
@@ -80,7 +80,7 @@ export function SHAPChart({ features, delay = 0 }: SHAPChartProps) {
                       duration: 0.8,
                       ease: [0.25, 0.1, 0.25, 1]
                     }}
-                    className="h-1.5 bg-[#00fff2]/60 rounded-r-full"
+                    className="h-1.5 bg-[#ffb7c5]/60 rounded-r-full"
                   />
                 )}
               </div>

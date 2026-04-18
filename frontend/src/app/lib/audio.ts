@@ -70,24 +70,43 @@ export const sounds = {
     const ctx = getCtx();
     const now = ctx.currentTime;
     
-    // Cmaj9 frequencies: C5, E5, G5, B5, D6
-    [523.25, 659.25, 783.99, 987.77, 1174.66].forEach((freq, i) => {
+  /** 
+   * The "Professional Ping" Success 
+   * A crisp, tech-aligned notification built from three staggered high-frequency 
+   * bursts and a clean resonant tail. Higher feedback, less music.
+   */
+  success: () => {
+    const ctx = getCtx();
+    const now = ctx.currentTime;
+    
+    const playBurst = (delay: number, freq: number, q: number) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      
+      const filter = ctx.createBiquadFilter();
+
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, now + i * 0.02); // slight stagger
+      osc.frequency.setValueAtTime(freq, now + delay);
       
-      gain.gain.setValueAtTime(0, now + i * 0.02);
-      gain.gain.linearRampToValueAtTime(0.03, now + i * 0.02 + 0.05);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(freq, now + delay);
+      filter.Q.setValueAtTime(q, now + delay);
+
+      gain.gain.setValueAtTime(0, now + delay);
+      gain.gain.linearRampToValueAtTime(0.04, now + delay + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.15);
       
-      osc.connect(gain);
+      osc.connect(filter);
+      filter.connect(gain);
       gain.connect(ctx.destination);
       
-      osc.start(now + i * 0.02);
-      osc.stop(now + 1.3);
-    });
+      osc.start(now + delay);
+      osc.stop(now + delay + 0.2);
+    };
+
+    // Staggered crisp pings for a "data-ready" feel
+    playBurst(0.00, 1200, 5);
+    playBurst(0.04, 1800, 10);
+    playBurst(0.12, 1200, 2);
   },
 
   /** 

@@ -624,7 +624,7 @@ export function Prediction() {
         }} />
       {!convStarted ? (
         <motion.button onClick={handleStartConversation} disabled={convLoading}
-          className="w-full px-3 py-2 text-xs rounded-lg bg-[#00fff2] text-black font-medium flex items-center justify-center gap-1.5 disabled:opacity-50"
+          className="w-full px-3 py-2 text-xs rounded-lg bg-[#ffb7c5] text-black font-medium flex items-center justify-center gap-1.5 disabled:opacity-50"
           whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
           {convLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageCircle className="w-3 h-3" />}
           <span>Start Conversation</span>
@@ -632,7 +632,7 @@ export function Prediction() {
       ) : (
         <div className="flex flex-col gap-2">
           <div className="text-[10px] text-muted-foreground px-1">
-            <span className="text-[#00fff2]">{Object.keys(convParams).length}</span> parameters collected
+            <span className="text-[#ffb7c5]">{Object.keys(convParams).length}</span> parameters collected
             {convComplete && <span className="text-[#c0c0c0] ml-2">● Complete</span>}
           </div>
           {convComplete && (
@@ -693,11 +693,11 @@ export function Prediction() {
           <div className="space-y-1 text-[10px] max-h-32 overflow-y-auto pr-1">
             <p className="text-muted-foreground font-medium sticky top-0 bg-[#0f0f19] pt-1 pb-1">Vision Extracted Parameters:</p>
             {Object.entries(hybridExtracted).map(([k, v]) => (
-              <div key={k} className="flex justify-between"><span className="text-muted-foreground">{k.replace(/_/g,' ')}</span><span className="text-[#00fff2]">{String(v)}</span></div>
+              <div key={k} className="flex justify-between"><span className="text-muted-foreground">{k.replace(/_/g,' ')}</span><span className="text-[#ffb7c5]">{String(v)}</span></div>
             ))}
           </div>
           <motion.button onClick={() => handleGenerate()} disabled={isGenerating}
-            className="w-full px-3 py-2 text-xs rounded-lg bg-[#00fff2] text-black font-medium flex items-center justify-center gap-1.5 disabled:opacity-50"
+            className="w-full px-3 py-2 text-xs rounded-lg bg-[#ffb7c5] text-black font-medium flex items-center justify-center gap-1.5 disabled:opacity-50"
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
             <span>Generate Prediction</span>
@@ -731,7 +731,7 @@ export function Prediction() {
         const { discoverParams } = await import('../lib/api');
         const res = await discoverParams({ domain: selectedDomain, question: inputText });
         if (res.success && res.parameters) setDynamicParams(res.parameters);
-      }} className="w-full px-2 py-1.5 text-[10px] rounded-lg bg-[#00fff2]/10 border border-primary/20 text-[#00fff2] hover:bg-[#00fff2]/20 transition-all flex items-center justify-center gap-1">
+      }} className="w-full px-2 py-1.5 text-[10px] rounded-lg bg-[#ffb7c5]/10 border border-primary/20 text-[#ffb7c5] hover:bg-[#ffb7c5]/20 transition-all flex items-center justify-center gap-1">
          <Zap className="w-3 h-3" /> Auto-Generate Comparison Fields from Question
       </motion.button>
       {compScenarios.map((s, i) => (
@@ -800,7 +800,7 @@ export function Prediction() {
                 setMonSession({ ...res, updates: [] });
               } catch (e: any) { setApiError(e.message); } finally { setMonLoading(false); }
             }}
-            className="w-full px-3 py-2 text-xs rounded-lg bg-[#00fff2] text-black font-medium flex items-center justify-center gap-1.5 disabled:opacity-50"
+            className="w-full px-3 py-2 text-xs rounded-lg bg-[#ffb7c5] text-black font-medium flex items-center justify-center gap-1.5 disabled:opacity-50"
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             {monLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3" />}
             <span>Start Monitoring</span>
@@ -809,7 +809,7 @@ export function Prediction() {
       ) : (
         <>
           <div className="text-[10px] space-y-1">
-            {[['Session', monSession.name, 'text-[#00fff2]'], ['Baseline', `${monSession.baseline}%`, 'font-medium'], ['Updates', String(monSession.updates.length), '']].map(([l, v, c]) => (
+            {[['Session', monSession.name, 'text-[#ffb7c5]'], ['Baseline', `${monSession.baseline}%`, 'font-medium'], ['Updates', String(monSession.updates.length), '']].map(([l, v, c]) => (
               <div key={l as string} className="flex justify-between"><span className="text-muted-foreground">{l as string}</span><span className={c as string}>{v as string}</span></div>
             ))}
           </div>
@@ -872,7 +872,7 @@ export function Prediction() {
           className="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 hover:border-primary/30 transition-all flex items-center justify-between"
           whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
           <span className="text-muted-foreground">{Object.keys(parameters).length > 0 ? `✓ ${Object.keys(parameters).length} parameters` : '▶ Add Domain Parameters'}</span>
-          <Users className="w-3 h-3 text-[#00fff2]" />
+          <Users className="w-3 h-3 text-[#ffb7c5]" />
         </motion.button>
       )}
       <p className="text-[10px] text-muted-foreground/70"><Users className="w-3 h-3 inline mr-1" />4 agents: Optimist · Pessimist · Realist · Devil's Advocate</p>
@@ -892,8 +892,8 @@ export function Prediction() {
 
   const renderSimulationInput = () => (
     <div className="space-y-3">
-      <div className="p-2 rounded-lg bg-[#00fff2]/5 border border-primary/20">
-        <p className="text-[10px] text-[#00fff2]/80"><FlaskConical className="w-3 h-3 inline mr-1" />Hypothetical scenario — Monte Carlo simulation with 200 runs.</p>
+      <div className="p-2 rounded-lg bg-[#ffb7c5]/5 border border-primary/20">
+        <p className="text-[10px] text-[#ffb7c5]/80"><FlaskConical className="w-3 h-3 inline mr-1" />Hypothetical scenario — Monte Carlo simulation with 200 runs.</p>
       </div>
       <textarea className="w-full h-16 px-3 py-2 text-xs bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none placeholder:text-muted-foreground/50"
         placeholder="Describe your hypothetical scenario…" value={inputText} onChange={e => setInputText(e.target.value)}
@@ -908,7 +908,7 @@ export function Prediction() {
           className="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 hover:border-primary/30 transition-all flex items-center justify-between"
           whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
           <span className="text-muted-foreground">{Object.keys(parameters).length > 0 ? `✓ ${Object.keys(parameters).length} parameters` : '▶ Configure Scenario Parameters'}</span>
-          <ChevronRight className="w-3 h-3 text-[#00fff2]" />
+          <ChevronRight className="w-3 h-3 text-[#ffb7c5]" />
         </motion.button>
       )}
     </div>
@@ -934,13 +934,13 @@ export function Prediction() {
               ? `✓ ${Object.keys(parameters).filter(k => parameters[k] != null).length} of ${paramList.length} parameters configured`
               : '▶ Configure Parameters (Guided Mode)'}
           </span>
-          <ChevronRight className="w-3 h-3 text-[#00fff2]" />
+          <ChevronRight className="w-3 h-3 text-[#ffb7c5]" />
         </motion.button>
       )}
       {selectedMode === 'guided' && Object.keys(parameters).length > 0 && (
         <div className="text-[10px] text-muted-foreground/70 space-y-0.5 max-h-20 overflow-y-auto">
           {Object.entries(parameters).slice(0, 6).map(([k, v]) => v != null && (
-            <div key={k} className="flex justify-between"><span>{k.replace(/_/g,' ')}</span><span className="text-[#00fff2]/80">{String(v)}</span></div>
+            <div key={k} className="flex justify-between"><span>{k.replace(/_/g,' ')}</span><span className="text-[#ffb7c5]/80">{String(v)}</span></div>
           ))}
         </div>
       )}
@@ -994,8 +994,8 @@ export function Prediction() {
         <div className="flex-1 overflow-y-auto space-y-3 pr-1 mb-3">
           {convMessages.length === 0 && !convStarted && (
             <div className="flex flex-col items-center justify-center h-64 text-center">
-              <div className="w-12 h-12 rounded-full bg-[#00fff2]/10 flex items-center justify-center mb-3">
-                <MessageCircle className="w-6 h-6 text-[#00fff2]" />
+              <div className="w-12 h-12 rounded-full bg-[#ffb7c5]/10 flex items-center justify-center mb-3">
+                <MessageCircle className="w-6 h-6 text-[#ffb7c5]" />
               </div>
               <h3 className="text-sm font-medium mb-1">Conversational Mode</h3>
               <p className="text-xs text-muted-foreground max-w-xs">Sambhav asks one question at a time — like an expert advisor. Click "Start Conversation" to begin.</p>
@@ -1004,8 +1004,8 @@ export function Prediction() {
           {convMessages.map((msg, i) => (
             <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${msg.role === 'sambhav' ? 'bg-white/5 border border-white/10 text-foreground' : 'bg-[#00fff2]/20 border border-primary/30 text-[#00fff2]'}`}>
-                {msg.role === 'sambhav' && <span className="text-[9px] text-[#00fff2]/60 font-medium block mb-0.5">Sambhav</span>}
+              <div className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${msg.role === 'sambhav' ? 'bg-white/5 border border-white/10 text-foreground' : 'bg-[#ffb7c5]/20 border border-primary/30 text-[#ffb7c5]'}`}>
+                {msg.role === 'sambhav' && <span className="text-[9px] text-[#ffb7c5]/60 font-medium block mb-0.5">Sambhav</span>}
                 {msg.content}
               </div>
             </motion.div>
@@ -1014,7 +1014,7 @@ export function Prediction() {
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap gap-1.5 pl-1">
               {currentOptions.map((opt, oi) => (
                 <motion.button key={oi} onClick={() => handleConvAnswer(opt, currentKey)}
-                  className="px-2.5 py-1 text-[10px] rounded-full bg-white/5 border border-white/15 hover:bg-[#00fff2]/15 hover:border-primary/40 transition-all"
+                  className="px-2.5 py-1 text-[10px] rounded-full bg-white/5 border border-white/15 hover:bg-[#ffb7c5]/15 hover:border-primary/40 transition-all"
                   whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>{opt}</motion.button>
               ))}
               <motion.button onClick={() => handleConvAnswer('', currentKey, true)}
@@ -1036,7 +1036,7 @@ export function Prediction() {
               placeholder="Or type your own answer…" value={convInput} onChange={e => setConvInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && convInput.trim()) handleConvAnswer(convInput.trim(), currentKey); }} />
             <motion.button onClick={() => convInput.trim() && handleConvAnswer(convInput.trim(), currentKey)} disabled={!convInput.trim()}
-              className="px-2.5 py-2 rounded-lg bg-[#00fff2] text-black disabled:opacity-40"
+              className="px-2.5 py-2 rounded-lg bg-[#ffb7c5] text-black disabled:opacity-40"
               whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}><Send className="w-3 h-3" /></motion.button>
           </div>
         )}
@@ -1063,13 +1063,13 @@ export function Prediction() {
           <p className="text-[10px] font-medium text-muted-foreground mb-2">Engines run: {adversarialResult.engines_run?.join(' · ')}</p>
           {flags.length > 0 ? flags.map((f: any, i: number) => (
             <div key={i} className="flex items-start gap-2 mb-2 p-2 rounded-lg bg-white/5 border border-white/10">
-              <div className={`w-1.5 h-1.5 rounded-full mt-1 shrink-0 ${f.severity === 'CRITICAL' ? 'bg-[#ff6b6b]' : f.severity === 'WARNING' ? 'bg-warning' : 'bg-[#00fff2]/50'}`} />
+              <div className={`w-1.5 h-1.5 rounded-full mt-1 shrink-0 ${f.severity === 'CRITICAL' ? 'bg-[#ff6b6b]' : f.severity === 'WARNING' ? 'bg-warning' : 'bg-[#ffb7c5]/50'}`} />
               <div><span className="text-[10px] font-mono font-medium">{f.code} — {f.severity}</span><p className="text-[10px] text-muted-foreground">{f.message}</p></div>
             </div>
           )) : <p className="text-[11px] text-muted-foreground italic">No audit flags raised — parameters passed all checks.</p>}
         </div>
         
-        <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-[#00fff2]/10 text-[#00fff2] hover:bg-[#00fff2]/20 border border-primary/20 transition-all flex items-center justify-center gap-1.5 font-medium">
+        <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-[#ffb7c5]/10 text-[#ffb7c5] hover:bg-[#ffb7c5]/20 border border-primary/20 transition-all flex items-center justify-center gap-1.5 font-medium">
           <MessageCircle className="w-4 h-4" /> Analyse this vulnerability with AI
         </motion.button>
         
@@ -1086,7 +1086,7 @@ export function Prediction() {
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
         <div className="p-3 rounded-xl bg-white/5 border border-white/10">
           <p className="text-[10px] text-muted-foreground">Base probability</p>
-          <p className="text-2xl font-bold text-[#00fff2]">{basePct}%</p>
+          <p className="text-2xl font-bold text-[#ffb7c5]">{basePct}%</p>
           {whatifTree.description && <p className="text-[10px] text-muted-foreground mt-1">{whatifTree.description}</p>}
         </div>
         <div className="space-y-2">
@@ -1097,7 +1097,7 @@ export function Prediction() {
             return (
               <div key={i} className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5"><GitBranch className="w-3 h-3 text-[#00fff2]/60" /><span className="text-[11px] font-medium">{b.event || b.scenario || `Branch ${i+1}`}</span></div>
+                  <div className="flex items-center gap-1.5"><GitBranch className="w-3 h-3 text-[#ffb7c5]/60" /><span className="text-[11px] font-medium">{b.event || b.scenario || `Branch ${i+1}`}</span></div>
                   <div className="flex items-center gap-1.5">
                     <span className={`text-[10px] font-mono ${shift >= 0 ? 'text-[#c0c0c0]' : 'text-[#ff6b6b]'}`}>{shift >= 0 ? '+' : ''}{Math.round(shift)}%</span>
                     <span className="text-xs font-bold">{Math.round(newProb)}%</span>
@@ -1123,7 +1123,7 @@ export function Prediction() {
         </div>
 
         <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-white/5 text-muted-foreground hover:text-foreground border border-white/10 hover:bg-white/10 transition-all flex items-center justify-center gap-1.5 font-medium">
-          <MessageCircle className="w-4 h-4 text-[#00fff2]" /> Discuss these scenarios with AI
+          <MessageCircle className="w-4 h-4 text-[#ffb7c5]" /> Discuss these scenarios with AI
         </motion.button>
 
         <p className="text-[9px] text-muted-foreground/60 italic text-center">Mode 12: What-If Story — Section 8.14 Scenario Planning</p>
@@ -1139,8 +1139,8 @@ export function Prediction() {
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
         {compResult.recommendation && (
-          <div className="p-3 rounded-xl bg-[#00fff2]/10 border border-primary/30">
-            <p className="text-[10px] text-[#00fff2]/80 font-medium">Recommendation</p>
+          <div className="p-3 rounded-xl bg-[#ffb7c5]/10 border border-primary/30">
+            <p className="text-[10px] text-[#ffb7c5]/80 font-medium">Recommendation</p>
             <p className="text-xs mt-0.5">{compResult.recommendation}</p>
           </div>
         )}
@@ -1162,7 +1162,7 @@ export function Prediction() {
                   <tr key={oi} className="border-t border-white/5">
                     <td className="py-1.5 pr-3 text-muted-foreground">{outcome}</td>
                     {vals.map((v: any, vi: number) => (
-                      <td key={vi} className={`py-1.5 px-2 text-center font-mono ${vi === winI ? 'text-[#00fff2] font-bold' : ''}`}>{v !== null ? `${Math.round(v)}%` : '—'}</td>
+                      <td key={vi} className={`py-1.5 px-2 text-center font-mono ${vi === winI ? 'text-[#ffb7c5] font-bold' : ''}`}>{v !== null ? `${Math.round(v)}%` : '—'}</td>
                     ))}
                     <td className="py-1.5 pl-2 text-center text-[#c0c0c0] font-medium">{winI >= 0 ? scenarios_[winI] : '—'}</td>
                   </tr>
@@ -1173,7 +1173,7 @@ export function Prediction() {
         </div>
 
         <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-white/5 text-muted-foreground hover:text-foreground border border-white/10 hover:bg-white/10 transition-all flex items-center justify-center gap-1.5 font-medium">
-          <MessageCircle className="w-4 h-4 text-[#00fff2]" /> Ask the AI to evaluate this comparison
+          <MessageCircle className="w-4 h-4 text-[#ffb7c5]" /> Ask the AI to evaluate this comparison
         </motion.button>
 
         <p className="text-[9px] text-muted-foreground/60 italic text-center">Mode 6: Comparative Inference — Section 8.7</p>
@@ -1182,7 +1182,7 @@ export function Prediction() {
   };
 
   const renderExpertPanel = () => {
-    const agentColors: Record<string, string>  = { optimist: 'text-[#c0c0c0]', pessimist: 'text-[#ff6b6b]', realist: 'text-[#00fff2]', devils_advocate: 'text-[#ffb7c5]' };
+    const agentColors: Record<string, string>  = { optimist: 'text-[#c0c0c0]', pessimist: 'text-[#ff6b6b]', realist: 'text-[#ffb7c5]', devils_advocate: 'text-[#ffb7c5]' };
     const agentLabels: Record<string, string>  = { optimist: 'The Optimist', pessimist: 'The Pessimist', realist: 'The Realist (Final)', devils_advocate: "Devil's Advocate" };
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
@@ -1191,7 +1191,7 @@ export function Prediction() {
             {expertDebate.final_probability != null && (
               <div className="p-3 rounded-xl bg-white/5 border border-white/10">
                 <p className="text-[10px] text-muted-foreground">Reconciled Probability (Realist)</p>
-                <p className="text-2xl font-bold text-[#00fff2]">{Math.round(expertDebate.final_probability * 100)}%</p>
+                <p className="text-2xl font-bold text-[#ffb7c5]">{Math.round(expertDebate.final_probability * 100)}%</p>
               </div>
             )}
             <div className="space-y-2">
@@ -1217,7 +1217,7 @@ export function Prediction() {
           </div>
         )}
         <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-white/5 text-muted-foreground hover:text-foreground border border-white/10 hover:bg-white/10 transition-all flex items-center justify-center gap-1.5 font-medium">
-          <MessageCircle className="w-4 h-4 text-[#00fff2]" /> Discuss this debate with the moderator
+          <MessageCircle className="w-4 h-4 text-[#ffb7c5]" /> Discuss this debate with the moderator
         </motion.button>
         <p className="text-[9px] text-muted-foreground/60 italic text-center">Mode 11: Expert Consultation — Section 8.9 Multi-Agent Debate</p>
       </motion.div>
@@ -1230,7 +1230,7 @@ export function Prediction() {
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
         <div className="p-3 rounded-xl bg-white/5 border border-white/10">
           <p className="text-[10px] text-muted-foreground">Probability at the time</p>
-          <p className="text-2xl font-bold text-[#00fff2]">{retroResult.probability_at_time ?? '?'}%</p>
+          <p className="text-2xl font-bold text-[#ffb7c5]">{retroResult.probability_at_time ?? '?'}%</p>
         </div>
         {[['Root Cause', retroResult.root_cause], ['Prevention Point', retroResult.prevention_point]].map(([l, v]) => v && (
           <div key={l as string} className="p-3 rounded-xl bg-white/5 border border-white/10">
@@ -1251,7 +1251,7 @@ export function Prediction() {
           </div>
         )}
         <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-white/5 text-muted-foreground hover:text-foreground border border-white/10 hover:bg-white/10 transition-all flex items-center justify-center gap-1.5 font-medium">
-          <MessageCircle className="w-4 h-4 text-[#00fff2]" /> Analyse this event retrospectively with AI
+          <MessageCircle className="w-4 h-4 text-[#ffb7c5]" /> Analyse this event retrospectively with AI
         </motion.button>
         <p className="text-[9px] text-muted-foreground/60 italic text-center">Mode 7: Retrospective Analysis</p>
       </motion.div>
@@ -1269,7 +1269,7 @@ export function Prediction() {
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
         <div className="flex gap-3">
-          {[['Baseline', `${monSession.baseline}%`, 'text-muted-foreground'], ['Current', `${pts[pts.length-1].probability}%`, 'text-[#00fff2]'], ['Updates', String(monSession.updates.length), '']].map(([l, v, c]) => (
+          {[['Baseline', `${monSession.baseline}%`, 'text-muted-foreground'], ['Current', `${pts[pts.length-1].probability}%`, 'text-[#ffb7c5]'], ['Updates', String(monSession.updates.length), '']].map(([l, v, c]) => (
             <div key={l as string} className="flex-1 p-2 rounded-xl bg-white/5 border border-white/10 text-center">
               <p className="text-[9px] text-muted-foreground">{l as string}</p><p className={`text-sm font-bold ${c as string}`}>{v as string}</p>
             </div>
@@ -1310,7 +1310,7 @@ export function Prediction() {
               ['Runs', String(mc.n_runs ?? 200)],
             ].map(([l, v]) => (
               <div key={l} className="p-2 rounded-xl bg-white/5 border border-white/10 text-center">
-                <p className="text-[9px] text-muted-foreground">{l}</p><p className="text-sm font-bold text-[#00fff2]">{v}</p>
+                <p className="text-[9px] text-muted-foreground">{l}</p><p className="text-sm font-bold text-[#ffb7c5]">{v}</p>
               </div>
             ))}
           </div>
@@ -1337,7 +1337,7 @@ export function Prediction() {
       <div className="flex items-start justify-between mb-3">
         <div><h3 className="text-sm font-bold mb-0.5">Multi-Outcome Results</h3>
           <p className="text-[10px] text-muted-foreground">{outcomes.length} outcomes · {new Date().toLocaleTimeString()}</p></div>
-        <button onClick={() => setChatOpen(true)} className="px-3 py-1.5 text-[10px] rounded-lg bg-[#00fff2]/20 text-[#00fff2] border border-primary/30 hover:bg-[#00fff2]/30 transition-all flex items-center gap-1.5 font-medium">
+        <button onClick={() => setChatOpen(true)} className="px-3 py-1.5 text-[10px] rounded-lg bg-[#ffb7c5]/20 text-[#ffb7c5] border border-primary/30 hover:bg-[#ffb7c5]/30 transition-all flex items-center gap-1.5 font-medium">
           <MessageCircle className="w-3.5 h-3.5" /> Ask About This
         </button>
       </div>
@@ -1364,8 +1364,8 @@ export function Prediction() {
                       )}
                       {activeWhyData.detailed && (
                         <div className="grid grid-cols-2 gap-2">
-                          <div className="p-2 rounded-lg bg-[#00fff2]/5 border border-primary/15">
-                            <p className="text-[9px] text-[#00fff2] font-bold mb-1 uppercase tracking-wide">Case For ({outcome.probability.toFixed(0)}%)</p>
+                          <div className="p-2 rounded-lg bg-[#ffb7c5]/5 border border-primary/15">
+                            <p className="text-[9px] text-[#ffb7c5] font-bold mb-1 uppercase tracking-wide">Case For ({outcome.probability.toFixed(0)}%)</p>
                             <p className="text-[10px] text-muted-foreground leading-relaxed">{activeWhyData.detailed.case_for}</p>
                           </div>
                           <div className="p-2 rounded-lg bg-[#ffb7c5]/5 border border-secondary/15">
@@ -1376,9 +1376,9 @@ export function Prediction() {
                       )}
                       {activeWhyData.full && (
                         <div className="space-y-1.5 pt-2 border-t border-white/10">
-                          {activeWhyData.full.primary_driver && <p className="text-[10px] text-muted-foreground"><span className="text-[#00fff2] font-semibold">Primary Driver:</span> {activeWhyData.full.primary_driver}</p>}
-                          {activeWhyData.full.intervention && <p className="text-[10px] text-muted-foreground"><span className="text-[#00fff2] font-semibold">Intervention:</span> {activeWhyData.full.intervention}</p>}
-                          {(activeWhyData.full.confidence_note || activeWhyData.full.confidence_factors) && <p className="text-[10px] text-muted-foreground"><span className="text-[#00fff2] font-semibold">Confidence:</span> {activeWhyData.full.confidence_note || activeWhyData.full.confidence_factors}</p>}
+                          {activeWhyData.full.primary_driver && <p className="text-[10px] text-muted-foreground"><span className="text-[#ffb7c5] font-semibold">Primary Driver:</span> {activeWhyData.full.primary_driver}</p>}
+                          {activeWhyData.full.intervention && <p className="text-[10px] text-muted-foreground"><span className="text-[#ffb7c5] font-semibold">Intervention:</span> {activeWhyData.full.intervention}</p>}
+                          {(activeWhyData.full.confidence_note || activeWhyData.full.confidence_factors) && <p className="text-[10px] text-muted-foreground"><span className="text-[#ffb7c5] font-semibold">Confidence:</span> {activeWhyData.full.confidence_note || activeWhyData.full.confidence_factors}</p>}
                         </div>
                       )}
                     </div>
@@ -1446,7 +1446,7 @@ export function Prediction() {
           whileHover={!loadingMore ? { scale: 1.01 } : {}} whileTap={!loadingMore ? { scale: 0.99 } : {}}>
           {loadingMore ? <Loader2 className="w-3 h-3 animate-spin" /> : <>
             <span className="text-muted-foreground group-hover:text-foreground transition-colors">Generate More Outcomes</span>
-            <ChevronRight className="w-3 h-3 text-[#00fff2]" /></>}
+            <ChevronRight className="w-3 h-3 text-[#ffb7c5]" /></>}
         </motion.button>
         <p className="text-[9px] text-muted-foreground text-center italic">* Probabilities are independent and do not sum to 100%</p>
       </div>
@@ -1508,17 +1508,17 @@ export function Prediction() {
         <Dialog>
           <DialogTrigger asChild>
             <button className="w-full relative overflow-hidden group p-4 rounded-xl bg-gradient-to-br from-white/5 to-white/5 border border-white/20 hover:border-primary/50 transition-all text-left">
-              <div className="absolute inset-0 bg-[#00fff2]/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div className="absolute inset-0 bg-[#ffb7c5]/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
               <div className="flex items-center justify-between relative z-10">
                 <div>
-                  <p className="text-[11px] text-[#00fff2] font-semibold uppercase tracking-widest mb-1 flex items-center gap-2">
+                  <p className="text-[11px] text-[#ffb7c5] font-semibold uppercase tracking-widest mb-1 flex items-center gap-2">
                     <History className="w-3.5 h-3.5" /> Comprehensive Forensic Profile
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Expand to view linguistic stress markers, cognitive load analysis, and discuss findings with the AI Profiler.
                   </p>
                 </div>
-                <div className="text-[#00fff2] group-hover:translate-x-1 transition-transform">
+                <div className="text-[#ffb7c5] group-hover:translate-x-1 transition-transform">
                   <ChevronRight className="w-5 h-5" />
                 </div>
               </div>
@@ -1528,7 +1528,7 @@ export function Prediction() {
           <DialogContent className="max-w-2xl bg-[#0a0a0f] border-white/10 p-0 text-white overflow-hidden max-h-[85vh] flex flex-col">
             <DialogHeader className="p-5 border-b border-white/10 shrink-0">
               <DialogTitle className="text-lg font-bold flex items-center gap-2">
-                <ShieldAlert className="w-5 h-5 text-[#00fff2]" /> PRAGMA Complete Analysis
+                <ShieldAlert className="w-5 h-5 text-[#ffb7c5]" /> PRAGMA Complete Analysis
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
                 Deep multi-modal forensic evaluation of textual and psychological markers.
@@ -1538,7 +1538,7 @@ export function Prediction() {
             <div className="p-5 overflow-y-auto space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                  <p className="text-[10px] text-[#00fff2] font-semibold uppercase tracking-wider mb-2">Primary Motive / Trigger</p>
+                  <p className="text-[10px] text-[#ffb7c5] font-semibold uppercase tracking-wider mb-2">Primary Motive / Trigger</p>
                   <p className="text-xs leading-relaxed text-muted-foreground">
                     {isDeceptive 
                       ? 'Self-preservation or concealment of information detected. Communication exhibits stress-induced linguistic distancing.'
@@ -1546,7 +1546,7 @@ export function Prediction() {
                   </p>
                 </div>
                 <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                  <p className="text-[10px] text-[#00fff2] font-semibold uppercase tracking-wider mb-2">Psychological State</p>
+                  <p className="text-[10px] text-[#ffb7c5] font-semibold uppercase tracking-wider mb-2">Psychological State</p>
                   <p className="text-xs leading-relaxed text-muted-foreground">
                     {isDeceptive
                       ? 'Elevated cognitive load indicators suggesting active information suppression or fabrication.'
@@ -1554,7 +1554,7 @@ export function Prediction() {
                   </p>
                 </div>
                 <div className="p-4 rounded-lg bg-white/5 border border-white/10 col-span-2">
-                  <p className="text-[10px] text-[#00fff2] font-semibold uppercase tracking-wider mb-2">Linguistic Breakdown</p>
+                  <p className="text-[10px] text-[#ffb7c5] font-semibold uppercase tracking-wider mb-2">Linguistic Breakdown</p>
                   <p className="text-xs leading-relaxed text-muted-foreground mb-3">
                     {isDeceptive
                       ? 'Increased hedging language, pronoun distancing ("they", "one"), over-qualification ("to be perfectly honest"), and non-committed phrasing detected in text embedding analysis.'
@@ -1571,7 +1571,7 @@ export function Prediction() {
 
               {/* Chatbot Interface inside Dialog */}
               <div>
-                <p className="text-[10px] text-[#00fff2] font-semibold uppercase tracking-wider mb-3">Consult the Profiler</p>
+                <p className="text-[10px] text-[#ffb7c5] font-semibold uppercase tracking-wider mb-3">Consult the Profiler</p>
                 <PragmaChat 
                    predictionId={predId} 
                    contextParams={parameters} 
@@ -1597,8 +1597,8 @@ export function Prediction() {
     if (selectedMode === 'conversational') {
       return showResults ? (
         <div className="space-y-4">
-          <div className="p-3 rounded-xl bg-[#00fff2]/10 border border-primary/20 mb-2">
-            <p className="text-[10px] text-[#00fff2]/80">● Conversation complete — prediction from {Object.keys(convParams).length} parameters</p>
+          <div className="p-3 rounded-xl bg-[#ffb7c5]/10 border border-primary/20 mb-2">
+            <p className="text-[10px] text-[#ffb7c5]/80">● Conversation complete — prediction from {Object.keys(convParams).length} parameters</p>
           </div>
           {renderStandardResults()}
         </div>
@@ -1637,7 +1637,7 @@ export function Prediction() {
     };
     return (
       <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full flex flex-col items-center justify-center text-center">
-        <div className="w-16 h-16 rounded-full bg-[#00fff2]/10 flex items-center justify-center mb-3"><Play className="w-8 h-8 text-[#00fff2]" /></div>
+        <div className="w-16 h-16 rounded-full bg-[#ffb7c5]/10 flex items-center justify-center mb-3"><Play className="w-8 h-8 text-[#ffb7c5]" /></div>
         <h3 className="text-sm font-medium mb-1">Ready to Predict</h3>
         <p className="text-xs text-muted-foreground max-w-sm">{hints[selectedMode] || 'Configure your input and click Generate'}</p>
       </motion.div>
@@ -1710,8 +1710,8 @@ export function Prediction() {
             <h1 className="text-xl font-bold mb-0.5">Prediction Analysis</h1>
             {/* BUILD_STAMP: 2026-04-18_21:14 */}
             <p className="text-[11px] text-muted-foreground">
-              Mode: <span className="text-[#00fff2]">{selectedMode}</span>
-              {selectedMode !== 'free' && selectedMode !== 'adversarial' && <> · Domain: <span className="text-[#00fff2]">{selectedDomain.replace(/_/g,' ')}</span></>}
+              Mode: <span className="text-[#ffb7c5]">{selectedMode}</span>
+              {selectedMode !== 'free' && selectedMode !== 'adversarial' && <> · Domain: <span className="text-[#ffb7c5]">{selectedDomain.replace(/_/g,' ')}</span></>}
             </p>
           </motion.div>
           {domainInfo?.disclaimer && (
@@ -1737,7 +1737,7 @@ export function Prediction() {
                 {isAnalyzing && (
                   <div className="absolute inset-0 z-50 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
                     <LoadingAnimation durationMs={1500} />
-                    <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-4 text-xs font-medium text-[#00fff2]">
+                    <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-4 text-xs font-medium text-[#ffb7c5]">
                       {hybridLoading ? 'Analyzing Visual Cues...' : docLoading ? 'Processing Large Context Document...' : 'Transcribing & Analyzing Voice...'}
                     </motion.p>
                   </div>
@@ -1760,7 +1760,7 @@ export function Prediction() {
                 {!hideGenBtn && selectedMode !== 'conversational' && (
                   <div className="mt-3 flex gap-2">
                     <motion.button onClick={() => handleGenerate()} disabled={isGenerating}
-                      className="flex-1 px-3 py-2 text-xs rounded-lg bg-[#00fff2] text-black font-medium flex items-center justify-center gap-1.5 disabled:opacity-50"
+                      className="flex-1 px-3 py-2 text-xs rounded-lg bg-[#ffb7c5] text-black font-medium flex items-center justify-center gap-1.5 disabled:opacity-50"
                       whileHover={!isGenerating ? { scale: 1.02 } : {}} whileTap={!isGenerating ? { scale: 0.98 } : {}}>
                       {isGenerating ? <><Loader2 className="w-3 h-3 animate-spin" /><span>Generating…</span></> : <><Play className="w-3 h-3" /><span>{genLabel[selectedMode] || 'Generate'}</span></>}
                     </motion.button>
@@ -1783,7 +1783,7 @@ export function Prediction() {
                         ['Final (65/35)', `${(predResult.final_probability * 100).toFixed(1)}%`, 'text-foreground font-bold'],
                         ['Confidence', predResult.confidence_tier, predResult.confidence_tier === 'CLEAR' ? 'text-[#c0c0c0]' : predResult.confidence_tier === 'MODERATE' ? 'text-[#ffb7c5]' : 'text-[#ff6b6b]'],
                         ['ML-LLM Gap', `${(predResult.gap * 100).toFixed(1)}%`, 'text-muted-foreground'],
-                        ['Reliability', `${(predResult.reliability_index * 100).toFixed(0)}%`, 'text-[#00fff2]'],
+                        ['Reliability', `${(predResult.reliability_index * 100).toFixed(0)}%`, 'text-[#ffb7c5]'],
                       ].map(([l, v, c]) => (
                         <div key={l as string} className="flex justify-between"><span className="text-muted-foreground">{l as string}</span><span className={c as string}>{v as string}</span></div>
                       ))}

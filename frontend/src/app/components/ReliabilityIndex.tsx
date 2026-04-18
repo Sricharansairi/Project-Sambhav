@@ -9,7 +9,7 @@ interface ReliabilityIndexProps {
 
 export function ReliabilityIndex({ score, suggestions, isVisible }: ReliabilityIndexProps) {
   const getScoreColor = (score: number) => {
-    if (score >= 75) return 'text-[#00fff2]'; // Cyan (Clear)
+    if (score >= 75) return 'text-[#ffb7c5]'; // Cyan (Clear)
     if (score >= 50) return 'text-[#c0c0c0]'; // Silver (Moderate)
     if (score >= 30) return 'text-[#ffb7c5]'; // Pink/Red (Low)
     return 'text-[#ff6b6b]'; // Critical Red
@@ -86,7 +86,7 @@ export function ReliabilityIndex({ score, suggestions, isVisible }: ReliabilityI
           className="space-y-1.5"
         >
           <div className="flex items-center gap-1.5">
-            <TrendingUp className="w-3 h-3 text-[#00fff2]" />
+            <TrendingUp className="w-3 h-3 text-[#ffb7c5]" />
             <span className="text-[10px] font-medium text-muted-foreground">
               Suggestions to Improve Accuracy
             </span>
@@ -100,7 +100,7 @@ export function ReliabilityIndex({ score, suggestions, isVisible }: ReliabilityI
                 transition={{ delay: 0.5 + idx * 0.1 }}
                 className="flex gap-2 text-[10px] text-foreground/70"
               >
-                <div className="w-1 h-1 rounded-full bg-[#00fff2] mt-1 shrink-0" />
+                <div className="w-1 h-1 rounded-full bg-[#ffb7c5] mt-1 shrink-0" />
                 <span>{suggestion}</span>
               </motion.div>
             ))}

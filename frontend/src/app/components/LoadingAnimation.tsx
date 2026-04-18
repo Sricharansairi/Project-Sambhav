@@ -57,8 +57,8 @@ export function LoadingAnimation({ durationMs = 800 }: { durationMs?: number }) 
           animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.5, 1, 0.5] }}
           transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
         >
-          <div className="w-8 h-8 rounded-full bg-[#00fff2]/20 blur-sm" />
-          <div className="absolute w-3 h-3 rounded-full bg-[#00fff2]" />
+          <div className="w-8 h-8 rounded-full bg-[#ffb7c5]/20 blur-sm" />
+          <div className="absolute w-3 h-3 rounded-full bg-[#ffb7c5]" />
         </motion.div>
       </div>
 
@@ -81,7 +81,7 @@ export function LoadingAnimation({ durationMs = 800 }: { durationMs?: number }) 
                     <CheckCircle2 className="w-4 h-4 text-[#c0c0c0]" />
                   </motion.div>
                 ) : isActive ? (
-                  <Loader2 className="w-4 h-4 text-[#00fff2] animate-spin" />
+                  <Loader2 className="w-4 h-4 text-[#ffb7c5] animate-spin" />
                 ) : (
                   <div className="w-1.5 h-1.5 rounded-full bg-white/10" />
                 )}
@@ -109,7 +109,7 @@ export function LoadingAnimation({ durationMs = 800 }: { durationMs?: number }) 
                       className="w-full bg-white/10 overflow-hidden mt-1.5 rounded-full"
                     >
                       <motion.div 
-                        className="h-full bg-[#00fff2] rounded-full"
+                        className="h-full bg-[#ffb7c5] rounded-full"
                         initial={{ width: "0%" }}
                         animate={{ width: "100%" }}
                         transition={{ duration: durationMs / PIPELINE_STAGES.length / 1000, ease: "linear" }}

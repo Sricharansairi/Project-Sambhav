@@ -31,7 +31,7 @@ export function TransparencyToggle({ value, onChange }: TransparencyToggleProps)
           {value === option.id && (
             <motion.div
               layoutId="active-toggle"
-              className="absolute inset-0 bg-[#00fff2] rounded-md"
+              className="absolute inset-0 bg-[#ffb7c5] rounded-md"
               transition={{ type: 'spring', stiffness: 400, damping: 30 }}
             />
           )}

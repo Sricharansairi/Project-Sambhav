@@ -121,7 +121,7 @@ export function ExportPanel({ payload, delay = 0 }: ExportPanelProps) {
                   ) : isSuccess ? (
                     <CheckCircle2 className="w-5 h-5 text-[#c0c0c0]" />
                   ) : (
-                    <Icon className={`w-5 h-5 transition-colors group-hover:text-[#00fff2] ${fmt.id === 'pdf' ? 'text-[#ffb7c5]' : 'text-muted-foreground'}`} />
+                    <Icon className={`w-5 h-5 transition-colors group-hover:text-[#ffb7c5] ${fmt.id === 'pdf' ? 'text-[#ffb7c5]' : 'text-muted-foreground'}`} />
                   )}
                 </div>
                 

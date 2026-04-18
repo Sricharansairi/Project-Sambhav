@@ -28,8 +28,8 @@ export function OutcomeRow({ name, probability, delay, onWhyClick, isAnimating }
           <span className="text-xs text-foreground/90">{name}</span>
           <motion.button
             onClick={() => { sounds.click(); onWhyClick(); }}
-            className="px-1.5 py-0.5 text-[10px] rounded bg-[#00fff2]/10 border border-primary/30 
-                     text-[#00fff2] hover:bg-[#00fff2]/20 transition-colors flex items-center gap-1"
+            className="px-1.5 py-0.5 text-[10px] rounded bg-[#ffb7c5]/10 border border-primary/30 
+                     text-[#ffb7c5] hover:bg-[#ffb7c5]/20 transition-colors flex items-center gap-1"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
@@ -41,7 +41,7 @@ export function OutcomeRow({ name, probability, delay, onWhyClick, isAnimating }
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: delay + 0.1 }}
-          className="text-xs font-medium text-[#00fff2]"
+          className="text-xs font-medium text-[#ffb7c5]"
         >
           {probability.toFixed(1)}%
         </motion.span>
