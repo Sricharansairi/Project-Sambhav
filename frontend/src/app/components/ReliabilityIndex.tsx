@@ -9,10 +9,10 @@ interface ReliabilityIndexProps {
 
 export function ReliabilityIndex({ score, suggestions, isVisible }: ReliabilityIndexProps) {
   const getScoreColor = (score: number) => {
-    if (score >= 75) return 'text-success'; // CLEAR
-    if (score >= 50) return 'text-warning'; // MODERATE
-    if (score >= 30) return 'text-warning opacity-80'; // LOW (using warning with opacity or secondary if available)
-    return 'text-destructive'; // CRITICAL
+    if (score >= 75) return 'text-[#00fff2]'; // Cyan (Clear)
+    if (score >= 50) return 'text-[#c0c0c0]'; // Silver (Moderate)
+    if (score >= 30) return 'text-[#ffb7c5]'; // Pink/Red (Low)
+    return 'text-[#ff6b6b]'; // Critical Red
   };
 
   const getScoreLabel = (score: number) => {

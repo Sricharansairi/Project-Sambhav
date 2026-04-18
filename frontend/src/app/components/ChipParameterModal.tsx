@@ -3,6 +3,7 @@ import { X, ChevronRight, ChevronLeft, SkipForward, Check } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { GlassCard } from './GlassCard';
 import type { DomainParam } from '../lib/api';
+import { sounds } from '../lib/audio';
 
 interface ParamConfig extends DomainParam {
   key: string;
@@ -136,14 +137,17 @@ export function ChipParameterModal({
     setAnswers(updated);
 
     if (isLast) {
+      sounds.success();
       onComplete(updated);
     } else {
+      sounds.click();
       // Pass string representation to parent's onNext for legacy compatibility
       onNext(value != null ? [String(value)] : []);
     }
   };
 
   const handleChipClick = (opt: ChipOption) => {
+    sounds.click();
     // Toggle: clicking the same chip deselects it
     setSelectedLabel(prev => prev === opt.label ? '' : opt.label);
     setFreeText(''); // clear free text when a chip is selected
@@ -289,7 +293,7 @@ export function ChipParameterModal({
                 <div className="flex items-center gap-2">
                   {/* Back */}
                   <motion.button
-                    onClick={onPrevious}
+                    onClick={() => { sounds.click(); onPrevious(); }}
                     disabled={currentStep <= 1}
                     className="px-3 py-2 text-xs rounded-lg bg-white/5 border border-white/10
                                hover:bg-white/10 transition-colors disabled:opacity-30

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Send, Loader2, Bot, User } from 'lucide-react';
 import { runPragmaChat } from '../lib/api';
+import { sounds } from '../lib/audio';
 
 interface PragmaChatProps {
   predictionId?: string;
@@ -28,6 +29,7 @@ export function PragmaChat({ predictionId, contextParams, baselinePrediction }: 
     if (!input.trim() || isLoading) return;
     
     const userMsg = input.trim();
+    sounds.click();
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setIsLoading(true);
@@ -43,6 +45,7 @@ export function PragmaChat({ predictionId, contextParams, baselinePrediction }: 
       });
       
       setMessages(prev => [...prev, { role: 'assistant', content: res.reply }]);
+      sounds.notify();
     } catch (e) {
       console.error(e);
       setMessages(prev => [...prev, { role: 'assistant', content: "Error communicating with profiler system. Please try again." }]);

@@ -18,11 +18,11 @@ export function AuditPanel({ audits, abnFlags, mlLlmAgreement, delay = 0 }: Audi
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pass':
-        return <CheckCircle2 className="w-3 h-3 text-success" />;
+        return <CheckCircle2 className="w-3 h-3 text-[#c0c0c0]" />;
       case 'warning':
-        return <AlertTriangle className="w-3 h-3 text-warning" />;
+        return <AlertTriangle className="w-3 h-3 text-[#ffb7c5]" />;
       case 'fail':
-        return <AlertCircle className="w-3 h-3 text-destructive" />;
+        return <AlertCircle className="w-3 h-3 text-[#ff6b6b]" />;
       default:
         return null;
     }
@@ -31,11 +31,11 @@ export function AuditPanel({ audits, abnFlags, mlLlmAgreement, delay = 0 }: Audi
   const getAgreementColor = (level: string) => {
     switch (level) {
       case 'high':
-        return 'text-success border-success/30 bg-success/10';
+        return 'text-[#00fff2] border-[#00fff2]/30 bg-[#00fff2]/10';
       case 'moderate':
-        return 'text-warning border-warning/30 bg-warning/10';
+        return 'text-[#c0c0c0] border-white/20 bg-white/5';
       case 'low':
-        return 'text-destructive border-destructive/30 bg-destructive/10';
+        return 'text-[#ff6b6b] border-[#ff6b6b]/30 bg-[#ff6b6b]/10';
       default:
         return 'text-muted-foreground border-white/10 bg-white/5';
     }
@@ -61,12 +61,12 @@ export function AuditPanel({ audits, abnFlags, mlLlmAgreement, delay = 0 }: Audi
             </div>
             <div className="flex items-center gap-1">
               <div className={`w-1.5 h-1.5 rounded-full ${
-                audit.status === 'pass' ? 'bg-success' :
-                audit.status === 'warning' ? 'bg-warning' : 'bg-destructive'
+                audit.status === 'pass' ? 'bg-[#c0c0c0]' :
+                audit.status === 'warning' ? 'bg-[#ffb7c5]' : 'bg-[#ff6b6b]'
               }`} />
               <span className={`text-[9px] uppercase font-medium ${
-                audit.status === 'pass' ? 'text-success' :
-                audit.status === 'warning' ? 'text-warning' : 'text-destructive'
+                audit.status === 'pass' ? 'text-[#c0c0c0]' :
+                audit.status === 'warning' ? 'text-[#ffb7c5]' : 'text-[#ff6b6b]'
               }`}>
                 {audit.status}
               </span>
@@ -114,8 +114,8 @@ export function AuditPanel({ audits, abnFlags, mlLlmAgreement, delay = 0 }: Audi
           ${getAgreementColor(mlLlmAgreement)}
         `}>
           <div className={`w-1.5 h-1.5 rounded-full ${
-            mlLlmAgreement === 'high' ? 'bg-success' :
-            mlLlmAgreement === 'moderate' ? 'bg-warning' : 'bg-destructive'
+            mlLlmAgreement === 'high' ? 'bg-[#00fff2]' :
+            mlLlmAgreement === 'moderate' ? 'bg-[#c0c0c0]' : 'bg-[#ff6b6b]'
           }`} />
           <span className="uppercase tracking-wide">
             {mlLlmAgreement} Consistency

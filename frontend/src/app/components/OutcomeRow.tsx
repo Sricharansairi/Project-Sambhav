@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { useState } from 'react';
 import { HelpCircle } from 'lucide-react';
+import { sounds } from '../lib/audio';
 
 interface OutcomeRowProps {
   name: string;
@@ -26,7 +27,7 @@ export function OutcomeRow({ name, probability, delay, onWhyClick, isAnimating }
         <div className="flex items-center gap-2">
           <span className="text-xs text-foreground/90">{name}</span>
           <motion.button
-            onClick={onWhyClick}
+            onClick={() => { sounds.click(); onWhyClick(); }}
             className="px-1.5 py-0.5 text-[10px] rounded bg-primary/10 border border-primary/30 
                      text-primary hover:bg-primary/20 transition-colors flex items-center gap-1"
             whileHover={{ scale: 1.05 }}
