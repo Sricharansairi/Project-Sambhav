@@ -1649,7 +1649,7 @@ export function Prediction() {
           comparative: compResult,
           expert: expertDebate,
           retrospective: retroResult,
-          simulation: simTree,
+          simulation: simResult,
           free_infer: freeInferResult
         }}
         mode={selectedMode}
