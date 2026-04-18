@@ -124,6 +124,7 @@ export function Prediction() {
   const [retroDesc,         setRetroDesc]         = useState('');
   const [retroOutcome,      setRetroOutcome]      = useState('');
   const [simResult,         setSimResult]         = useState<any>(null);
+  const [freeInferResult,   setFreeInferResult]   = useState<any>(null);
   const [paramsConfirmed,   setParamsConfirmed]   = useState(false);
   const [insufficientInfo, setInsufficientInfo] = useState<{ reason: string; missing?: string[] } | null>(null);
   const [relevantKeys,     setRelevantKeys]     = useState<string[]>([]);
@@ -334,6 +335,7 @@ export function Prediction() {
         })));
         if (res.result && typeof res.result === 'object' && !Array.isArray(res.result) && Object.keys(res.result).length > 2) {
           setPredResult(res.result);
+          setFreeInferResult(res.result);
         }
         setShowResults(true); setTimeout(() => setIsAnimating(true), 100); return;
       }
