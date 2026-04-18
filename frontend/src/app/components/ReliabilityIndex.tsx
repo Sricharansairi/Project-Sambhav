@@ -86,7 +86,7 @@ export function ReliabilityIndex({ score, suggestions, isVisible }: ReliabilityI
           className="space-y-1.5"
         >
           <div className="flex items-center gap-1.5">
-            <TrendingUp className="w-3 h-3 text-primary" />
+            <TrendingUp className="w-3 h-3 text-[#00fff2]" />
             <span className="text-[10px] font-medium text-muted-foreground">
               Suggestions to Improve Accuracy
             </span>
@@ -100,7 +100,7 @@ export function ReliabilityIndex({ score, suggestions, isVisible }: ReliabilityI
                 transition={{ delay: 0.5 + idx * 0.1 }}
                 className="flex gap-2 text-[10px] text-foreground/70"
               >
-                <div className="w-1 h-1 rounded-full bg-primary mt-1 shrink-0" />
+                <div className="w-1 h-1 rounded-full bg-[#00fff2] mt-1 shrink-0" />
                 <span>{suggestion}</span>
               </motion.div>
             ))}

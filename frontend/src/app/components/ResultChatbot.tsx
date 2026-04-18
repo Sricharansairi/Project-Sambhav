@@ -142,7 +142,7 @@ export function ResultChatbot({ isOpen, onClose, context, mode, domain, title }:
             </motion.div>
           )}
           {error && (
-            <p className="text-[10px] text-destructive/80 text-center italic">{error}</p>
+            <p className="text-[10px] text-[#ff6b6b]/80 text-center italic">{error}</p>
           )}
           <div ref={bottomRef} />
         </div>

@@ -57,7 +57,7 @@ export function PragmaChat({ predictionId, contextParams, baselinePrediction }: 
   return (
     <div className="flex flex-col h-[400px] bg-background/50 border border-white/10 rounded-lg overflow-hidden relative">
       <div className="bg-white/5 border-b border-white/10 px-3 py-2 flex items-center gap-2">
-        <Bot className="w-4 h-4 text-primary" />
+        <Bot className="w-4 h-4 text-[#00fff2]" />
         <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Dr. Vance (Expert Profiler)</span>
       </div>
       
@@ -69,10 +69,10 @@ export function PragmaChat({ predictionId, contextParams, baselinePrediction }: 
             key={i} 
             className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
           >
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${msg.role === 'user' ? 'bg-primary/20 text-primary' : 'bg-white/10 text-muted-foreground'}`}>
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${msg.role === 'user' ? 'bg-[#00fff2]/20 text-[#00fff2]' : 'bg-white/10 text-muted-foreground'}`}>
               {msg.role === 'user' ? <User className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
             </div>
-            <div className={`text-xs leading-relaxed max-w-[85%] p-3 rounded-lg ${msg.role === 'user' ? 'bg-primary/10 border border-primary/20 text-primary-foreground' : 'bg-white/5 border border-white/10 text-muted-foreground'}`}>
+            <div className={`text-xs leading-relaxed max-w-[85%] p-3 rounded-lg ${msg.role === 'user' ? 'bg-[#00fff2]/10 border border-primary/20 text-[#00fff2]-foreground' : 'bg-white/5 border border-white/10 text-muted-foreground'}`}>
               {msg.content}
             </div>
           </motion.div>
@@ -103,7 +103,7 @@ export function PragmaChat({ predictionId, contextParams, baselinePrediction }: 
           <button 
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground hover:text-[#00fff2] transition-colors disabled:opacity-50"
           >
             <Send className="w-4 h-4" />
           </button>

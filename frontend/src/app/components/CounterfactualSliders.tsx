@@ -56,14 +56,14 @@ export function CounterfactualSliders({ parameters, onParameterChange, delay = 0
                   {param.current}{param.unit}
                 </span>
                 <span className="text-white/30">→</span>
-                <span className={hasChanged ? 'text-primary font-medium' : 'text-muted-foreground'}>
+                <span className={hasChanged ? 'text-[#00fff2] font-medium' : 'text-muted-foreground'}>
                   {currentValue}{param.unit}
                 </span>
                 {hasChanged && (
                   <motion.span
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="text-secondary font-medium"
+                    className="text-[#ffb7c5] font-medium"
                   >
                     = {delta}%
                   </motion.span>
@@ -83,7 +83,7 @@ export function CounterfactualSliders({ parameters, onParameterChange, delay = 0
                 <Slider.Range className="absolute bg-gradient-to-r from-primary/60 to-secondary/40 rounded-full h-full" />
               </Slider.Track>
               <Slider.Thumb 
-                className="block w-3 h-3 bg-primary rounded-full hover:bg-primary/90 
+                className="block w-3 h-3 bg-[#00fff2] rounded-full hover:bg-[#00fff2]/90 
                          focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-grab active:cursor-grabbing
                          transition-colors shadow-lg"
                 aria-label={param.name}

@@ -90,7 +90,7 @@ export function ExportPanel({ payload, delay = 0 }: ExportPanelProps) {
 
       <div className="p-4 space-y-4">
         {error && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/30 text-[11px] text-destructive font-medium text-center">
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="px-3 py-2 rounded-lg bg-[#ff6b6b]/10 border border-destructive/30 text-[11px] text-[#ff6b6b] font-medium text-center">
             {error}
           </motion.div>
         )}

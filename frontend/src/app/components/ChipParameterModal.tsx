@@ -217,11 +217,11 @@ export function ChipParameterModal({
                         ? 'Select one option below'
                         : 'Enter a value')}
                     {cfg.weight === 'high' && (
-                      <span className="ml-2 text-primary">• High impact</span>
+                      <span className="ml-2 text-[#00fff2]">• High impact</span>
                     )}
                     {/* Required indicator */}
                     {(cfg as any).required && (
-                      <span className="ml-2 text-destructive/70">• Required</span>
+                      <span className="ml-2 text-[#ff6b6b]/70">• Required</span>
                     )}
                   </p>
                 </div>
@@ -239,7 +239,7 @@ export function ChipParameterModal({
                             px-3 py-1.5 rounded-lg text-xs border transition-all
                             flex items-center gap-1.5
                             ${isSelected
-                              ? 'bg-primary/20 border-primary text-primary'
+                              ? 'bg-[#00fff2]/20 border-primary text-[#00fff2]'
                               : 'bg-white/5 border-white/10 text-muted-foreground hover:border-white/30 hover:text-foreground'
                             }
                           `}
@@ -329,7 +329,7 @@ export function ChipParameterModal({
                       !selectedLabel &&
                       !freeText.trim()
                     }
-                    className="flex-1 px-3 py-2 text-xs rounded-lg bg-primary text-black font-medium
+                    className="flex-1 px-3 py-2 text-xs rounded-lg bg-[#00fff2] text-black font-medium
                                flex items-center justify-center gap-1
                                disabled:opacity-40 disabled:cursor-not-allowed"
                     whileHover={{ scale: 1.02 }}
@@ -351,7 +351,7 @@ export function ChipParameterModal({
                         .map(([k, v]) => (
                           <span
                             key={k}
-                            className="px-2 py-0.5 rounded text-[10px] bg-primary/10 text-primary border border-primary/20"
+                            className="px-2 py-0.5 rounded text-[10px] bg-[#00fff2]/10 text-[#00fff2] border border-primary/20"
                           >
                             {k.replace(/_/g, ' ')}: {String(v)}
                           </span>

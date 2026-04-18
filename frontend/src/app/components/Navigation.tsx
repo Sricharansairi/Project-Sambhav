@@ -86,7 +86,7 @@ export function Navigation() {
                           px-3 py-1.5 rounded-lg flex items-center gap-1.5
                           transition-colors duration-200
                           ${isActive
-                            ? 'text-primary'
+                            ? 'text-[#00fff2]'
                             : 'text-muted-foreground hover:text-foreground'
                           }
                         `}
@@ -99,7 +99,7 @@ export function Navigation() {
                       {isActive && (
                         <motion.div
                           layoutId="activeTab"
-                          className="absolute inset-0 bg-primary/10 rounded-lg border border-primary/30"
+                          className="absolute inset-0 bg-[#00fff2]/10 rounded-lg border border-primary/30"
                           transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
                         />
                       )}
@@ -109,7 +109,7 @@ export function Navigation() {
                 {isLoggedIn ? (
                   <motion.button
                     onClick={handleLogout}
-                    className="ml-3 px-3 py-1.5 text-sm rounded-lg bg-white/5 border border-white/10 text-destructive font-medium flex items-center gap-1.5 hover:bg-destructive/10"
+                    className="ml-3 px-3 py-1.5 text-sm rounded-lg bg-white/5 border border-white/10 text-[#ff6b6b] font-medium flex items-center gap-1.5 hover:bg-[#ff6b6b]/10"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
@@ -119,7 +119,7 @@ export function Navigation() {
                 ) : (
                   <Link to="/auth">
                     <motion.button
-                      className="ml-3 px-3 py-1.5 text-sm rounded-lg bg-primary text-black font-medium"
+                      className="ml-3 px-3 py-1.5 text-sm rounded-lg bg-[#00fff2] text-black font-medium"
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                     >
@@ -164,7 +164,7 @@ export function Navigation() {
                     className={`
                       px-3 py-2 text-sm rounded-lg flex items-center gap-2
                       ${isActive
-                        ? 'bg-primary/10 text-primary border border-primary/30'
+                        ? 'bg-[#00fff2]/10 text-[#00fff2] border border-primary/30'
                         : 'text-muted-foreground hover:bg-white/5'
                       }
                     `}
@@ -177,7 +177,7 @@ export function Navigation() {
               {isLoggedIn ? (
                 <button
                   onClick={handleLogout}
-                  className="px-3 py-2 text-sm rounded-lg flex items-center gap-2 text-destructive hover:bg-destructive/10"
+                  className="px-3 py-2 text-sm rounded-lg flex items-center gap-2 text-[#ff6b6b] hover:bg-[#ff6b6b]/10"
                 >
                   <LogOut size={16} />
                   <span>Logout</span>
@@ -186,7 +186,7 @@ export function Navigation() {
                 <Link
                   to="/auth"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="px-3 py-2 text-sm rounded-lg flex items-center gap-2 text-primary hover:bg-primary/10"
+                  className="px-3 py-2 text-sm rounded-lg flex items-center gap-2 text-[#00fff2] hover:bg-[#00fff2]/10"
                 >
                   <User size={16} />
                   <span>Sign In</span>
