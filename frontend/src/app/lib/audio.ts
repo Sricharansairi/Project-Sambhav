@@ -64,16 +64,8 @@ export const sounds = {
 
   /** 
    * The "Crystalline" Success 
-   * A lush C Major 9 chord with a shimmering attack and soft exponential decay.
-   */
-  success: () => {
-    const ctx = getCtx();
-    const now = ctx.currentTime;
-    
-  /** 
-   * The "Professional Ping" Success 
-   * A crisp, tech-aligned notification built from three staggered high-frequency 
-   * bursts and a clean resonant tail. Higher feedback, less music.
+   * A short percussive snap combining high-frequency noise and a low sine-thud.
+   * Note: This is now the "Professional Ping" implementation.
    */
   success: () => {
     const ctx = getCtx();
