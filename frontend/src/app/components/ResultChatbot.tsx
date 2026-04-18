@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageCircle, Send, Loader2, Bot, User, X, ShieldAlert } from 'lucide-react';
 import { runResultChat } from '../lib/api';
+import { sounds } from '../lib/audio';
 
 interface Message { role: 'user' | 'assistant'; content: string; }
 
@@ -40,6 +41,7 @@ export function ResultChatbot({ isOpen, onClose, context, mode, domain, title }:
   const handleSend = async () => {
     const q = input.trim();
     if (!q || loading) return;
+    sounds.click();
     setInput('');
     setError(null);
 
@@ -59,6 +61,7 @@ export function ResultChatbot({ isOpen, onClose, context, mode, domain, title }:
         history,
       });
       setMessages(prev => [...prev, { role: 'assistant', content: res.reply || 'No response received.' }]);
+      sounds.notify();
     } catch (e: any) {
       setError('Failed to get a response. Please try again.');
     } finally {

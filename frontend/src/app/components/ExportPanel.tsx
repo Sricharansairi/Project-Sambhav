@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import { FileText, FileSpreadsheet, FileJson, FileCode, Image, Share2, Download, Database, Loader2, CheckCircle2 } from 'lucide-react';
 import { useState } from 'react';
 import { exports, type ExportPayload, SambhavAPIError } from '../lib/api';
+import { sounds } from '../lib/audio';
 
 interface ExportPanelProps {
   payload: ExportPayload;
@@ -55,11 +56,14 @@ export function ExportPanel({ payload, delay = 0 }: ExportPanelProps) {
     setLoading(formatId);
     setError(null);
     setSuccess(null);
+    sounds.notify();
     try {
       await handler(payload);
       setSuccess(formatId);
+      sounds.success();
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
+      sounds.error();
       setError(err instanceof SambhavAPIError ? err.message : 'Export failed due to a sudden error.');
       setTimeout(() => setError(null), 4000);
     } finally {
@@ -91,9 +95,7 @@ export function ExportPanel({ payload, delay = 0 }: ExportPanelProps) {
           </motion.div>
         )}
 
-        <div className="flex flex-col gap-2 relative">
-          <div className="absolute left-4 top-4 bottom-4 w-px bg-white/5 z-0 hidden sm:block" />
-          
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 relative z-10">
           {exportGroups.flatMap(g => g.formats).map((fmt, fIdx) => {
             const Icon = fmt.icon;
             const isLoading = loading === fmt.id;
@@ -104,39 +106,33 @@ export function ExportPanel({ payload, delay = 0 }: ExportPanelProps) {
                 key={fmt.id}
                 onClick={() => handleExport(fmt.id, fmt.handler)}
                 disabled={!!loading}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: delay + fIdx * 0.05 + 0.1 }}
-                className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all z-10 group disabled:opacity-50 disabled:cursor-not-allowed
-                  ${isSuccess ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-[#0f0f15] border-white/5 hover:bg-white/5 hover:border-white/10'}`}
-                whileHover={!loading && !isSuccess ? { scale: 1.01 } : {}}
-                whileTap={!loading && !isSuccess ? { scale: 0.99 } : {}}
+                className={`flex flex-col items-center justify-center p-5 rounded-xl border transition-all group disabled:opacity-50 disabled:cursor-not-allowed
+                  ${isSuccess ? 'bg-[#c0c0c0]/10 border-[#c0c0c0]/30' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'}`}
+                whileHover={!loading && !isSuccess ? { scale: 1.02, y: -2 } : {}}
+                whileTap={!loading && !isSuccess ? { scale: 0.98 } : {}}
               >
-                <div className="flex items-center gap-4">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0
-                    ${isSuccess ? 'bg-emerald-500/20' : 'bg-white/5 group-hover:bg-white/10 transition-colors'}`}>
-                    {isLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-foreground" />
-                    ) : isSuccess ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    ) : (
-                      <Icon className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                    )}
-                  </div>
-                  <div className="text-left">
-                    <p className={`text-[12px] font-semibold transition-colors
-                      ${isSuccess ? 'text-emerald-400' : 'text-foreground/90 group-hover:text-foreground'}`}>
-                      {fmt.label}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground capitalize">
-                      {fmt.id === 'api' ? 'Generate Live API JSON URL' : `Download ${fmt.id.toUpperCase()} file`}
-                    </p>
-                  </div>
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3
+                  ${isSuccess ? 'bg-[#c0c0c0]/20' : 'bg-black/20 group-hover:bg-black/30 transition-colors'}`}>
+                  {isLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-foreground" />
+                  ) : isSuccess ? (
+                    <CheckCircle2 className="w-5 h-5 text-[#c0c0c0]" />
+                  ) : (
+                    <Icon className={`w-5 h-5 transition-colors group-hover:text-[#00fff2] ${fmt.id === 'pdf' ? 'text-[#ffb7c5]' : 'text-muted-foreground'}`} />
+                  )}
                 </div>
-
-                <div className="pr-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Download className="w-4 h-4 text-muted-foreground" />
-                </div>
+                
+                <p className={`text-[12px] font-semibold text-center mb-1 transition-colors
+                  ${isSuccess ? 'text-[#c0c0c0]' : 'text-foreground/90 group-hover:text-foreground'}`}>
+                  {fmt.label}
+                </p>
+                
+                <p className="text-[9px] text-muted-foreground text-center leading-tight">
+                  {fmt.id === 'api' ? 'Live JSON Link' : `${fmt.id.toUpperCase()} Format`}
+                </p>
               </motion.button>
             );
           })}

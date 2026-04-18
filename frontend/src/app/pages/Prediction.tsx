@@ -21,6 +21,7 @@ import { ExportPanel }          from '../components/ExportPanel';
 import { ChipParameterModal }   from '../components/ChipParameterModal';
 import { PragmaChat }           from '../components/PragmaChat';
 import { PragmaDocumentation }  from '../components/PragmaDocumentation';
+import { sounds } from '../lib/audio';
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
 import {
   getDomains, runPredict, runFreeInfer, getOutcomes, getTransparency, getInverseTransparency,
@@ -260,6 +261,7 @@ export function Prediction() {
 
   // ── Main generate handler ────────────────────────────────────────────────
   const handleGenerate = useCallback(async (isConfirmed = false) => {
+    sounds.click();
     setApiError(null); 
     
     // Only reset state if not confirmed (starting a new prediction)
@@ -337,7 +339,12 @@ export function Prediction() {
           setPredResult(res.result);
           setFreeInferResult(res.result);
         }
-        setShowResults(true); setTimeout(() => setIsAnimating(true), 100); return;
+        setShowResults(true); 
+        setTimeout(() => {
+          setIsAnimating(true);
+          sounds.success();
+        }, 100); 
+        return;
       }
 
       if (selectedMode === 'document') {
@@ -350,9 +357,16 @@ export function Prediction() {
           } else {
             setDocResult(res);
             if (res.prediction) setPredResult(res.prediction);
-            if (res.outcomes) { setOutcomes(res.outcomes); setShowResults(true); setTimeout(() => setIsAnimating(true), 20); }
+            if (res.outcomes) { 
+              setOutcomes(res.outcomes); 
+              setShowResults(true); 
+              setTimeout(() => {
+                setIsAnimating(true);
+                sounds.success();
+              }, 20); 
+            }
           }
-        } catch (e: any) { setApiError(e.message || 'Document analysis failed'); } 
+        } catch (e: any) { setApiError(e.message || 'Document analysis failed'); sounds.error(); } 
         finally { setDocLoading(false); }
         return;
       }
@@ -373,14 +387,18 @@ export function Prediction() {
               if (data.prediction) {
                 setPredResult(data.prediction);
                 if (data.outcomes) setOutcomes(data.outcomes);
-                setShowResults(true); setTimeout(() => setIsAnimating(true), 20);
+                setShowResults(true); 
+                setTimeout(() => {
+                  setIsAnimating(true);
+                  sounds.success();
+                }, 20);
               }
             }
           } else {
             const err = await resp.json().catch(() => ({ detail: resp.statusText }));
             throw new Error(err.detail || 'Voice analysis failed');
           }
-        } catch (e: any) { setApiError(e.message || 'Voice analysis failed'); } 
+        } catch (e: any) { setApiError(e.message || 'Voice analysis failed'); sounds.error(); } 
         finally { setVoiceLoading(false); }
         return;
       }
@@ -467,9 +485,14 @@ export function Prediction() {
       ]);
       setPredResult(predRes.prediction); setPredId(predRes.prediction_id || '');
       setOutcomes(outcomeRes.result?.outcomes || []);
-        setShowResults(true); setTimeout(() => setIsAnimating(true), 20);
+      setShowResults(true); 
+      setTimeout(() => {
+        setIsAnimating(true);
+        sounds.success();
+      }, 20);
 
     } catch (err) {
+      sounds.error();
       if (err instanceof SambhavAPIError) {
         setApiError(err.isInputQuality ? (JSON.parse(err.message)?.error ?? err.message) : `Error ${err.status}: ${err.message}`);
       } else { setApiError('Prediction failed. Is the backend running?'); }
@@ -550,6 +573,7 @@ export function Prediction() {
   
 
   const handleReset = () => {
+    sounds.click();
     setShowResults(false); setIsAnimating(false);
     setExpandedOutcome(null); setApiError(null); setPredResult(null); setOutcomes([]); setWhyData({});
     setInverseData({}); setLoadingInverse(null);

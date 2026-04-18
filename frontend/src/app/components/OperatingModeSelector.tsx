@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { GlassCard } from './GlassCard';
 import { AnimatedIcon } from './AnimatedIcon';
+import { sounds } from '../lib/audio';
 
 const iconMap: Record<string, LucideIcon> = {
   navigation: Navigation,
@@ -70,7 +71,7 @@ export function OperatingModeSelector({ modes, selectedMode, onSelectMode }: Ope
               style={{
                 borderColor: isSelected ? color : 'rgba(255, 255, 255, 0.1)',
               }}
-              onClick={() => onSelectMode(mode.id)}
+              onClick={() => { sounds.notify(); onSelectMode(mode.id); }}
               whileHover={{ scale: 1.02, y: -2 }}
               whileTap={{ scale: 0.98 }}
             >

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { AnimatedIcon } from './AnimatedIcon';
 import logoImage from '../../assets/066d6bda782cfe271b2a192b0848783b83987f2e.png';
 import { getToken, clearToken } from '../lib/api';
+import { sounds } from '../lib/audio';
 
 const navItems = [
   { path: '/',            label: 'Home',       icon: Home },
@@ -26,6 +27,7 @@ export function Navigation() {
   }, [location.pathname]);
 
   const handleLogout = () => {
+    sounds.click();
     clearToken();
     localStorage.removeItem('sambhav_user');
     setIsLoggedIn(false);
@@ -78,7 +80,7 @@ export function Navigation() {
                 {navItems.map((item) => {
                   const isActive = location.pathname === item.path;
                   return (
-                    <Link key={item.path} to={item.path} className="relative">
+                    <Link key={item.path} to={item.path} className="relative" onClick={() => sounds.click()}>
                       <motion.div
                         className={`
                           px-3 py-1.5 rounded-lg flex items-center gap-1.5

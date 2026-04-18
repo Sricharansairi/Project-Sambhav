@@ -81,9 +81,9 @@ export function PredictionBreakdown({
           {/* Mini inline bars */}
           <div className="hidden sm:flex items-center gap-1 w-24">
             <span className="text-[8px] text-muted-foreground shrink-0">ML</span>
-            <Bar value={mlPct} color="#38bdf8" delay={delay + 0.2} />
+            <Bar value={mlPct} color="#ffb7c5" delay={delay + 0.2} />
             <span className="text-[8px] text-muted-foreground shrink-0">LLM</span>
-            <Bar value={llmPct} color="#818cf8" delay={delay + 0.3} />
+            <Bar value={llmPct} color="#00fff2" delay={delay + 0.3} />
           </div>
           {expanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
         </div>
@@ -101,9 +101,9 @@ export function PredictionBreakdown({
           {/* Three-column stat grid */}
           <div className="grid grid-cols-3 gap-2">
             {[
-              { label: 'ML Model', value: `${mlPct.toFixed(1)}%`, icon: Brain, color: '#38bdf8', bar: mlPct },
-              { label: 'LLM Layer', value: `${llmPct.toFixed(1)}%`, icon: Zap, color: '#818cf8', bar: llmPct },
-              { label: 'Reconciled', value: `${recPct.toFixed(1)}%`, icon: GitMerge, color: '#2dd4bf', bar: recPct },
+              { label: 'ML Model', value: `${mlPct.toFixed(1)}%`, icon: Brain, color: '#ffb7c5', bar: mlPct },
+              { label: 'LLM Layer', value: `${llmPct.toFixed(1)}%`, icon: Zap, color: '#00fff2', bar: llmPct },
+              { label: 'Reconciled', value: `${recPct.toFixed(1)}%`, icon: GitMerge, color: '#c0c0c0', bar: recPct },
             ].map(({ label, value, icon: Icon, color, bar }) => (
               <div key={label} className="rounded-lg bg-black/20 border border-white/5 p-2.5 space-y-2">
                 <div className="flex items-center gap-1.5">
@@ -128,24 +128,24 @@ export function PredictionBreakdown({
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-lg bg-black/20 border border-white/5 p-2.5">
               <div className="flex items-center gap-1.5 mb-1.5">
-                <TrendingUp className="w-3 h-3 text-emerald-400" />
+                <TrendingUp className="w-3 h-3 text-[#f0f0f0]" />
                 <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Reliability Index</p>
               </div>
               <div className="flex items-center gap-2">
-                <p className="text-sm font-bold text-emerald-400">{ri.toFixed(0)}%</p>
+                <p className="text-sm font-bold text-[#f0f0f0]">{ri.toFixed(0)}%</p>
                 <div className="flex-1 h-1 rounded-full bg-white/5 overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${ri}%` }}
                     transition={{ delay: 0.2, duration: 0.7 }}
-                    className="h-full rounded-full bg-emerald-400"
+                    className="h-full rounded-full bg-[#f0f0f0]"
                   />
                 </div>
               </div>
             </div>
             <div className="rounded-lg bg-black/20 border border-white/5 p-2.5">
               <p className="text-[9px] text-muted-foreground uppercase tracking-wide mb-1.5">ML↔LLM Gap</p>
-              <p className={`text-sm font-bold ${gapAbs > 20 ? 'text-amber-400' : 'text-emerald-400'}`}>
+              <p className={`text-sm font-bold ${gapAbs > 20 ? 'text-[#ff6b6b]' : 'text-[#f0f0f0]'}`}>
                 {gapAbs.toFixed(1)}%
               </p>
               <p className="text-[9px] text-muted-foreground/70 mt-0.5 leading-tight">{method}</p>
@@ -168,10 +168,10 @@ export function PredictionBreakdown({
                         animate={{ width: `${Math.min(100, pct * 5)}%` }}
                         transition={{ duration: 0.6 }}
                         className="h-full rounded-full"
-                        style={{ background: positive ? '#10b981' : '#ef4444' }}
+                        style={{ background: positive ? '#c0c0c0' : '#ff6b6b' }}
                       />
                     </div>
-                    <span className={`text-[9px] font-medium ${positive ? 'text-emerald-400' : 'text-red-400'}`}>
+                    <span className={`text-[9px] font-medium ${positive ? 'text-[#c0c0c0]' : 'text-[#ff6b6b]'}`}>
                       {positive ? '+' : ''}{(v as number).toFixed(3)}
                     </span>
                   </div>

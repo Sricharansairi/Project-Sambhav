@@ -227,6 +227,7 @@ async def export_xml(req: ExportRequest, db: Session = Depends(get_db)):
 async def export_pdf(req: ExportRequest, db: Session = Depends(get_db)):
     try:
         from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import cm
         import datetime
         from reportlab.lib import colors
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
