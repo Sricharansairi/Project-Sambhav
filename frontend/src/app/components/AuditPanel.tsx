@@ -92,7 +92,7 @@ export function AuditPanel({ audits, abnFlags, mlLlmAgreement, delay = 0 }: Audi
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: delay + 0.4 + idx * 0.05 }}
                 className="px-2 py-0.5 text-[9px] font-medium rounded-full 
-                         bg-warning/20 border border-warning/40 text-warning"
+                         bg-[#ffb7c5]/20 border border-[#ffb7c5]/40 text-[#ffb7c5]"
               >
                 {flag}
               </motion.span>
@@ -138,7 +138,7 @@ export function AuditPanel({ audits, abnFlags, mlLlmAgreement, delay = 0 }: Audi
             'Low sample size in edge case scenarios'
           ].map((scenario, idx) => (
             <div key={idx} className="flex gap-2 text-[10px] text-foreground/70">
-              <div className="w-1 h-1 rounded-full bg-destructive/60 mt-1 shrink-0" />
+              <div className="w-1 h-1 rounded-full bg-[#ff6b6b]/60 mt-1 shrink-0" />
               <span>{scenario}</span>
             </div>
           ))}

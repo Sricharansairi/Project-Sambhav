@@ -39,11 +39,11 @@ interface OperatingModeSelectorProps {
 
 export function OperatingModeSelector({ modes, selectedMode, onSelectMode }: OperatingModeSelectorProps) {
   const colorMap: Record<string, string> = {
-    primary: '#00fff2',
-    secondary: '#9d4eff',
-    accent: '#00d9ff',
-    success: '#00ff88',
-    warning: '#ff6b35',
+    primary: '#00fff2',   // Cyan
+    secondary: '#ffb7c5', // Sakura Red
+    accent: '#00fff2',    // Cyan Highlighting
+    success: '#c0c0c0',   // Silver Reconciled
+    warning: '#ffb7c5',   // Sakura Warning
   };
 
   return (
