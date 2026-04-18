@@ -101,7 +101,7 @@ export function PredictionBreakdown({
           {/* Three-column stat grid */}
           <div className="grid grid-cols-3 gap-2">
             {[
-              { label: 'ML Model', value: `${mlPct.toFixed(1)}%`, icon: Brain, color: '#ffb7c5', bar: mlPct },
+              { label: 'ML Model', value: `${mlPct.toFixed(1)}%`, icon: Brain, color: '#c0c0c0', bar: mlPct },
               { label: 'LLM Layer', value: `${llmPct.toFixed(1)}%`, icon: Zap, color: '#00fff2', bar: llmPct },
               { label: 'Reconciled', value: `${recPct.toFixed(1)}%`, icon: GitMerge, color: '#c0c0c0', bar: recPct },
             ].map(({ label, value, icon: Icon, color, bar }) => (

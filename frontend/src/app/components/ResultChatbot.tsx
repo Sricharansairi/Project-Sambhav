@@ -88,7 +88,7 @@ export function ResultChatbot({ isOpen, onClose, context, mode, domain, title }:
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 bg-white/5">
           <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white/10 border border-white/20">
-            <Bot className="w-4 h-4 text-[#ffb7c5]" />
+            <Bot className="w-4 h-4 text-[#c0c0c0]" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground truncate">{title || 'Sambhav Analysis Assistant'}</p>
@@ -111,14 +111,14 @@ export function ResultChatbot({ isOpen, onClose, context, mode, domain, title }:
             <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
               className={`flex gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
               <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center
-                ${msg.role === 'user' ? 'bg-[#ffb7c5]/20 border border-[#ffb7c5]/30' : 'bg-white/10 border border-white/15'}`}>
+                ${msg.role === 'user' ? 'bg-[#ffb7c5]/20 border border-[#c0c0c0]/30' : 'bg-white/10 border border-white/15'}`}>
                 {msg.role === 'user'
-                  ? <User className="w-3 h-3 text-[#ffb7c5]" />
+                  ? <User className="w-3 h-3 text-[#c0c0c0]" />
                   : <Bot className="w-3 h-3 text-muted-foreground" />}
               </div>
               <div className={`max-w-[82%] rounded-xl px-3 py-2 text-[11px] leading-relaxed
                 ${msg.role === 'user'
-                  ? 'bg-[#ffb7c5]/20 border border-[#ffb7c5]/20 text-foreground'
+                  ? 'bg-[#ffb7c5]/20 border border-[#c0c0c0]/20 text-foreground'
                   : 'bg-white/5 border border-white/10 text-muted-foreground'}`}>
                 {msg.content.split('**').map((part, j) =>
                   j % 2 === 0 ? part : <strong key={j} className="text-foreground font-semibold">{part}</strong>
@@ -158,7 +158,7 @@ export function ResultChatbot({ isOpen, onClose, context, mode, domain, title }:
               disabled={loading}
               placeholder="Ask about this prediction result…"
               rows={2}
-              className="flex-1 px-3 py-2 text-[11px] bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#ffb7c5]/50 focus:border-[#ffb7c5]/30 transition-all resize-none placeholder:text-muted-foreground/50 disabled:opacity-50"
+              className="flex-1 px-3 py-2 text-[11px] bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#ffb7c5]/50 focus:border-[#c0c0c0]/30 transition-all resize-none placeholder:text-muted-foreground/50 disabled:opacity-50"
             />
             <motion.button
               onClick={handleSend}

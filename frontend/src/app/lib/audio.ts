@@ -67,38 +67,56 @@ export const sounds = {
    * A short percussive snap combining high-frequency noise and a low sine-thud.
    * Note: This is now the "Professional Ping" implementation.
    */
+  /** 
+   * The "Super-Crisp" Success
+   * A high-fidelity percussive snap designed to feel immediate and professional.
+   * Mirrors the responsiveness of the skip/click interaction but with a double-tap signature.
+   */
   success: () => {
     const ctx = getCtx();
     const now = ctx.currentTime;
     
-    const playBurst = (delay: number, freq: number, q: number) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const filter = ctx.createBiquadFilter();
+    const playSnap = (delay: number, freq: number, noiseVol: number) => {
+      // Part 1: High-end snap (filtered noise)
+      const bufferSize = ctx.sampleRate * 0.01;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
 
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      const f = ctx.createBiquadFilter();
+      f.type = 'highpass';
+      f.frequency.setValueAtTime(5000, now + delay);
+      
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(noiseVol, now + delay);
+      g.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.01);
+
+      noise.connect(f);
+      f.connect(g);
+      g.connect(ctx.destination);
+      noise.start(now + delay);
+
+      // Part 2: Tonal click (sine)
+      const osc = ctx.createOscillator();
+      const og = ctx.createGain();
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, now + delay);
+      osc.frequency.exponentialRampToValueAtTime(100, now + delay + 0.02);
       
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(freq, now + delay);
-      filter.Q.setValueAtTime(q, now + delay);
+      og.gain.setValueAtTime(0.05, now + delay);
+      og.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.02);
 
-      gain.gain.setValueAtTime(0, now + delay);
-      gain.gain.linearRampToValueAtTime(0.04, now + delay + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.15);
-      
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(ctx.destination);
-      
+      osc.connect(og);
+      og.connect(ctx.destination);
       osc.start(now + delay);
-      osc.stop(now + delay + 0.2);
+      osc.stop(now + delay + 0.03);
     };
 
-    // Staggered crisp pings for a "data-ready" feel
-    playBurst(0.00, 1200, 5);
-    playBurst(0.04, 1800, 10);
-    playBurst(0.12, 1200, 2);
+    // Fast double-tap snap signature
+    playSnap(0.00, 1500, 0.05);
+    playSnap(0.04, 1800, 0.03);
   },
 
   /** 
