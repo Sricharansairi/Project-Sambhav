@@ -63,16 +63,15 @@ export function PredictionBreakdown({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
-      className="rounded-xl overflow-hidden border border-white/10"
-      style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.05) 0%, rgba(15,15,30,0.6) 100%)' }}
+      className="rounded-xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur-md"
     >
       {/* Header row — always visible */}
       <button
         onClick={() => setExpanded(p => !p)}
-        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left"
+        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 transition-colors text-left"
       >
-        <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-primary/15 border border-primary/20">
-          <Info className="w-3.5 h-3.5 text-primary" />
+        <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-white/5 border border-white/10">
+          <Info className="w-3.5 h-3.5 text-muted-foreground" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[11px] font-semibold text-foreground/90">How was this generated?</p>
@@ -81,10 +80,10 @@ export function PredictionBreakdown({
         <div className="flex items-center gap-2">
           {/* Mini inline bars */}
           <div className="hidden sm:flex items-center gap-1 w-24">
-            <span className="text-[8px] text-blue-400 shrink-0">ML</span>
-            <Bar value={mlPct} color="#6366f1" delay={delay + 0.2} />
-            <span className="text-[8px] text-violet-400 shrink-0">LLM</span>
-            <Bar value={llmPct} color="#8b5cf6" delay={delay + 0.3} />
+            <span className="text-[8px] text-muted-foreground shrink-0">ML</span>
+            <Bar value={mlPct} color="#38bdf8" delay={delay + 0.2} />
+            <span className="text-[8px] text-muted-foreground shrink-0">LLM</span>
+            <Bar value={llmPct} color="#818cf8" delay={delay + 0.3} />
           </div>
           {expanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
         </div>
@@ -97,21 +96,21 @@ export function PredictionBreakdown({
           animate={{ height: 'auto', opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
           transition={{ duration: 0.25 }}
-          className="px-4 pb-4 space-y-4 border-t border-white/8"
+          className="px-4 pb-4 space-y-4 border-t border-white/10 pt-3"
         >
           {/* Three-column stat grid */}
-          <div className="grid grid-cols-3 gap-2 pt-3">
+          <div className="grid grid-cols-3 gap-2">
             {[
-              { label: 'ML Model', value: `${mlPct.toFixed(1)}%`, icon: Brain, color: '#6366f1', bar: mlPct },
-              { label: 'LLM Layer', value: `${llmPct.toFixed(1)}%`, icon: Zap, color: '#8b5cf6', bar: llmPct },
-              { label: 'Reconciled', value: `${recPct.toFixed(1)}%`, icon: GitMerge, color: '#06b6d4', bar: recPct },
+              { label: 'ML Model', value: `${mlPct.toFixed(1)}%`, icon: Brain, color: '#38bdf8', bar: mlPct },
+              { label: 'LLM Layer', value: `${llmPct.toFixed(1)}%`, icon: Zap, color: '#818cf8', bar: llmPct },
+              { label: 'Reconciled', value: `${recPct.toFixed(1)}%`, icon: GitMerge, color: '#2dd4bf', bar: recPct },
             ].map(({ label, value, icon: Icon, color, bar }) => (
-              <div key={label} className="rounded-lg bg-white/5 border border-white/8 p-2.5 space-y-2">
+              <div key={label} className="rounded-lg bg-black/20 border border-white/5 p-2.5 space-y-2">
                 <div className="flex items-center gap-1.5">
                   <Icon className="w-3 h-3" style={{ color }} />
                   <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium">{label}</p>
                 </div>
-                <p className="text-base font-bold" style={{ color }}>{value}</p>
+                <p className="text-base font-bold text-foreground">{value}</p>
                 <div className="h-1 rounded-full bg-white/5 overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
@@ -127,7 +126,7 @@ export function PredictionBreakdown({
 
           {/* Reliability + Gap */}
           <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-lg bg-white/5 border border-white/8 p-2.5">
+            <div className="rounded-lg bg-black/20 border border-white/5 p-2.5">
               <div className="flex items-center gap-1.5 mb-1.5">
                 <TrendingUp className="w-3 h-3 text-emerald-400" />
                 <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Reliability Index</p>
@@ -144,7 +143,7 @@ export function PredictionBreakdown({
                 </div>
               </div>
             </div>
-            <div className="rounded-lg bg-white/5 border border-white/8 p-2.5">
+            <div className="rounded-lg bg-black/20 border border-white/5 p-2.5">
               <p className="text-[9px] text-muted-foreground uppercase tracking-wide mb-1.5">ML↔LLM Gap</p>
               <p className={`text-sm font-bold ${gapAbs > 20 ? 'text-amber-400' : 'text-emerald-400'}`}>
                 {gapAbs.toFixed(1)}%
@@ -155,7 +154,7 @@ export function PredictionBreakdown({
 
           {/* SHAP top drivers */}
           {topShap.length > 0 && (
-            <div className="rounded-lg bg-white/5 border border-white/8 p-2.5 space-y-1.5">
+            <div className="rounded-lg bg-black/20 border border-white/5 p-2.5 space-y-1.5">
               <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium">Top ML Drivers (SHAP)</p>
               {topShap.map(([k, v]) => {
                 const pct = Math.abs((v as number) * 100);

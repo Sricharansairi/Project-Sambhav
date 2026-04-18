@@ -153,36 +153,21 @@ SYSTEM_8D = (
     "1. AUTHORITATIVE KNOWLEDGE: Use your internal high-quality training data. If you know a claim is false (e.g. Article 360 was NOT passed in 2022), score it as 0 regardless of search results.\n"
     "2. SEARCH SKEPTICISM: Search results can be noisy or misleading. If results are contradictory, prioritize authoritative official sources (gov.in, edu, reputable news).\n"
     "3. ABSOLUTE VERDICTS: If a claim is factually impossible or historically wrong, the OVERALL score MUST be below 10.\n\n"
-    "SCORING GUIDE:\n"
-    "- factual_accuracy: Core truth of the statement (0 if factually wrong)\n"
-    "- temporal_accuracy: Timeline validity (e.g. wrong year = low score)\n"
-    "- geographic_accuracy: Regional specificity\n"
-    "- source_reliability: Reliability of the evidence provided\n"
-    "- linguistic_precision: Clarity vs Vagueness\n"
-    "- context_completeness: Are critical details missing?\n"
-    "- intent_analysis: Is it meant to inform or deceive?\n"
-    "- viral_risk: Danger of this misinformation\n\n"
-    "Respond ONLY in this EXACT format (one dimension per block, include REASONING):\n"
-    "FACTUAL_ACCURACY: <0-100>\n"
-    "REASONING_FACTUAL_ACCURACY: <detailed reasoning for this score>\n"
-    "TEMPORAL_ACCURACY: <0-100>\n"
-    "REASONING_TEMPORAL_ACCURACY: <detailed reasoning for this score>\n"
-    "GEOGRAPHIC_ACCURACY: <0-100>\n"
-    "REASONING_GEOGRAPHIC_ACCURACY: <detailed reasoning for this score>\n"
-    "SOURCE_RELIABILITY: <0-100>\n"
-    "REASONING_SOURCE_RELIABILITY: <detailed reasoning for this score>\n"
-    "LINGUISTIC_PRECISION: <0-100>\n"
-    "REASONING_LINGUISTIC_PRECISION: <detailed reasoning for this score>\n"
-    "CONTEXT_COMPLETENESS: <0-100>\n"
-    "REASONING_CONTEXT_COMPLETENESS: <detailed reasoning for this score>\n"
-    "INTENT_ANALYSIS: <0-100>\n"
-    "REASONING_INTENT_ANALYSIS: <detailed reasoning for this score>\n"
-    "VIRAL_RISK: <0-100>\n"
-    "REASONING_VIRAL_RISK: <detailed reasoning for this score>\n"
-    "OVERALL: <0-100>\n"
-    "VERDICT: <VERIFIED_TRUE|LIKELY_TRUE|UNCERTAIN|LIKELY_FALSE|PROBABLY_FALSE|VERIFIED_FALSE>\n"
-    "EXPLANATION: <2-3 sentences explaining your verdict>\n"
-    "PATTERN_CODE: <ACCURATE|PARTIAL|OUTDATED|MISQUOTE|MISLEADING|FABRICATED|SATIRE>"
+    "Respond ONLY in valid parseable JSON. Do not use markdown wrappers. Use exactly this schema:\n"
+    "{\n"
+    '  "FACTUAL_ACCURACY": {"score": 0, "reasoning": "..."},\n'
+    '  "TEMPORAL_ACCURACY": {"score": 0, "reasoning": "..."},\n'
+    '  "GEOGRAPHIC_ACCURACY": {"score": 0, "reasoning": "..."},\n'
+    '  "SOURCE_RELIABILITY": {"score": 0, "reasoning": "..."},\n'
+    '  "LINGUISTIC_PRECISION": {"score": 0, "reasoning": "..."},\n'
+    '  "CONTEXT_COMPLETENESS": {"score": 0, "reasoning": "..."},\n'
+    '  "INTENT_ANALYSIS": {"score": 0, "reasoning": "..."},\n'
+    '  "VIRAL_RISK": {"score": 0, "reasoning": "..."},\n'
+    '  "OVERALL": 0,\n'
+    '  "VERDICT": "VERIFIED_TRUE|LIKELY_TRUE|UNCERTAIN|LIKELY_FALSE|PROBABLY_FALSE|VERIFIED_FALSE",\n'
+    '  "EXPLANATION": "2-3 sentences explaining your verdict",\n'
+    '  "PATTERN_CODE": "ACCURATE|PARTIAL|OUTDATED|MISQUOTE|MISLEADING|FABRICATED|SATIRE"\n'
+    "}"
 )
 
 
@@ -200,7 +185,7 @@ def analyze_8_dimensions(claim: str, evidence: list) -> dict:
         + evidence_text + "\n\n"
         "Analyze the claim using both evidence and your knowledge. "
         "Do NOT mark false just because search results are poor. "
-        "Return ONLY the formatted response."
+        "Return ONLY pure JSON."
     )
 
     messages = [
@@ -208,67 +193,52 @@ def analyze_8_dimensions(claim: str, evidence: list) -> dict:
         {"role": "user",   "content": user_content},
     ]
 
-    result = route("fact_check", messages, max_tokens=600, temperature=0.1)
-    raw = _strip_thinking(result.get("content") or "")   # guard against None
+    result = route("fact_check", messages, max_tokens=800, temperature=0.1)
+    raw = _strip_thinking(result.get("content") or "")
     logger.info(f"Fact-check provider: {result.get('provider_used', 'unknown')}")
     return _parse_8d(raw, claim)
 
 
 def _parse_8d(raw: str, claim: str) -> dict:
+    import json
     out = {
         "claim": claim, "raw": raw,
-        "factual_accuracy": {"score": 50, "reasoning": ""},
-        "temporal_accuracy": {"score": 50, "reasoning": ""},
-        "geographic_accuracy": {"score": 50, "reasoning": ""},
-        "source_reliability": {"score": 50, "reasoning": ""},
-        "linguistic_precision": {"score": 50, "reasoning": ""},
-        "context_completeness": {"score": 50, "reasoning": ""},
-        "intent_analysis": {"score": 50, "reasoning": ""},
-        "viral_risk": {"score": 50, "reasoning": ""},
+        "factual_accuracy": {"score": 50, "reasoning": "Parse failure"},
+        "temporal_accuracy": {"score": 50, "reasoning": "Parse failure"},
+        "geographic_accuracy": {"score": 50, "reasoning": "Parse failure"},
+        "source_reliability": {"score": 50, "reasoning": "Parse failure"},
+        "linguistic_precision": {"score": 50, "reasoning": "Parse failure"},
+        "context_completeness": {"score": 50, "reasoning": "Parse failure"},
+        "intent_analysis": {"score": 50, "reasoning": "Parse failure"},
+        "viral_risk": {"score": 50, "reasoning": "Parse failure"},
         "overall": 50, "verdict": "UNCERTAIN",
-        "explanation": "", "pattern_code": "UNCERTAIN",
-    }
-    key_map = {
-        "FACTUAL_ACCURACY":     "factual_accuracy",
-        "TEMPORAL_ACCURACY":    "temporal_accuracy",
-        "GEOGRAPHIC_ACCURACY":  "geographic_accuracy",
-        "SOURCE_RELIABILITY":   "source_reliability",
-        "LINGUISTIC_PRECISION": "linguistic_precision",
-        "CONTEXT_COMPLETENESS": "context_completeness",
-        "INTENT_ANALYSIS":      "intent_analysis",
-        "VIRAL_RISK":           "viral_risk",
+        "explanation": "Could not parse API response.", "pattern_code": "UNCERTAIN",
     }
     
-    import re
-
-    # Try full document regex parsing first to be completely bulletproof
-    for key, field in key_map.items():
-        score_match = re.search(rf"(?i){key}.*?(\d{{1,3}})", raw)
-        if score_match:
-            try:
-                out[field]["score"] = max(0, min(100, int(score_match.group(1))))
-            except: pass
+    try:
+        if "{" in raw and "}" in raw:
+            json_str = raw[raw.find("{"):raw.rfind("}")+1]
+            data = json.loads(json_str)
             
-        reason_match = re.search(rf"(?i)REASONING_{key}.*?:\s*(.+?)(?=\n|$)", raw)
-        if reason_match:
-            out[field]["reasoning"] = reason_match.group(1).strip()
+            key_map = {
+                "FACTUAL_ACCURACY": "factual_accuracy", "TEMPORAL_ACCURACY": "temporal_accuracy",
+                "GEOGRAPHIC_ACCURACY": "geographic_accuracy", "SOURCE_RELIABILITY": "source_reliability",
+                "LINGUISTIC_PRECISION": "linguistic_precision", "CONTEXT_COMPLETENESS": "context_completeness",
+                "INTENT_ANALYSIS": "intent_analysis", "VIRAL_RISK": "viral_risk"
+            }
             
-    # Parse global fields
-    overall_match = re.search(r"(?i)OVERALL.*?(\d{1,3})", raw)
-    if overall_match:
-        try:
-            out["overall"] = max(0, min(100, int(overall_match.group(1))))
-        except: pass
+            for map_k, out_k in key_map.items():
+                if map_k in data and isinstance(data[map_k], dict):
+                    out[out_k]["score"] = max(0, min(100, int(data[map_k].get("score", 50))))
+                    out[out_k]["reasoning"] = str(data[map_k].get("reasoning", ""))
+            
+            if "OVERALL" in data: out["overall"] = max(0, min(100, int(data["OVERALL"])))
+            if "VERDICT" in data: out["verdict"] = str(data["VERDICT"])
+            if "EXPLANATION" in data: out["explanation"] = str(data["EXPLANATION"])
+            if "PATTERN_CODE" in data: out["pattern_code"] = str(data["PATTERN_CODE"])
+    except Exception as e:
+        logger.error(f"JSON FactCheck parsing error: {e}")
         
-    verdict_match = re.search(r"(?i)VERDICT.*?:\s*(.+?)(?=\n|$)", raw)
-    if verdict_match: out["verdict"] = verdict_match.group(1).strip()
-    
-    expl_match = re.search(r"(?i)EXPLANATION.*?:\s*(.+?)(?=\n|$)", raw)
-    if expl_match: out["explanation"] = expl_match.group(1).strip()
-    
-    pat_match = re.search(r"(?i)PATTERN_CODE.*?:\s*(.+?)(?=\n|$)", raw)
-    if pat_match: out["pattern_code"] = pat_match.group(1).strip()
-            
     return out
 
 

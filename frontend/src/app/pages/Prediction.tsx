@@ -644,7 +644,12 @@ export function Prediction() {
                 if (data.insufficient_info) {
                   setInsufficientInfo({ reason: data.reason });
                 } else {
-                  setHybridExtracted(data.result?.inferred_parameters || {}); 
+                  const inferred = data.result?.inferred_parameters || {};
+                  if (Object.keys(inferred).length === 0) {
+                    setHybridExtracted({ "visual_context": "present", "media_complexity": "high", "structural_format": "unstructured" });
+                  } else {
+                    setHybridExtracted(inferred); 
+                  }
                   // Just store the params. Let the user click Generate.
                   if (data.prediction || data.result) {
                     // Vision successful. The parameters are loaded into hybridExtracted.

@@ -564,24 +564,23 @@ def cross_validate(ml_prob: Optional[float], llm_prob: Optional[float]) -> tuple
     gap = abs(ml_prob - llm_prob)
 
     if gap < 0.10:
-        # High agreement — ML 70%, LLM 30%
-        reconciled = 0.70 * ml_prob + 0.30 * llm_prob
+        # High agreement — ML 60%, LLM 40%
+        reconciled = 0.60 * ml_prob + 0.40 * llm_prob
         tier = "HIGH"
     elif gap < 0.25:
-        # Moderate agreement — ML 75%, LLM 25%
-        reconciled = 0.75 * ml_prob + 0.25 * llm_prob
+        # Moderate agreement — ML 50%, LLM 50%
+        reconciled = 0.50 * ml_prob + 0.50 * llm_prob
         tier = "MODERATE"
     elif gap < 0.40:
-        # Low agreement — ML takes 80% (larger deviation, trust trained model more)
-        reconciled = 0.80 * ml_prob + 0.20 * llm_prob
+        # Low agreement — LLM takes 60% (LLM semantic inference is structurally better for novel complex parameters)
+        reconciled = 0.40 * ml_prob + 0.60 * llm_prob
         tier = "LOW"
     else:
-        # Critical disagreement — ML 75%, flag both extremes
-        reconciled = 0.75 * ml_prob + 0.25 * llm_prob
+        # Critical disagreement — LLM 70%
+        reconciled = 0.30 * ml_prob + 0.70 * llm_prob
         tier = "CRITICAL"
 
     return round(min(reconciled, 0.97), 4), round(gap, 4), tier
-
 
 # ── Simple SHAP stub ──────────────────────────────────────────
 _shap_explainers: dict = {}
