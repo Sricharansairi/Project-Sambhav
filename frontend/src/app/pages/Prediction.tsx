@@ -1036,7 +1036,7 @@ export function Prediction() {
           )) : <p className="text-[11px] text-muted-foreground italic">No audit flags raised — parameters passed all checks.</p>}
         </div>
         
-        <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 transition-all flex items-center justify-center gap-1.5 font-medium">
+        <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-all flex items-center justify-center gap-1.5 font-medium">
           <MessageCircle className="w-4 h-4" /> Analyse this vulnerability with AI
         </motion.button>
         
@@ -1089,8 +1089,8 @@ export function Prediction() {
           })}
         </div>
 
-        <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 transition-all flex items-center justify-center gap-1.5 font-medium">
-          <MessageCircle className="w-4 h-4" /> Discuss these scenarios with AI
+        <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-white/5 text-muted-foreground hover:text-foreground border border-white/10 hover:bg-white/10 transition-all flex items-center justify-center gap-1.5 font-medium">
+          <MessageCircle className="w-4 h-4 text-primary" /> Discuss these scenarios with AI
         </motion.button>
 
         <p className="text-[9px] text-muted-foreground/60 italic text-center">Mode 12: What-If Story — Section 8.14 Scenario Planning</p>
@@ -1139,8 +1139,8 @@ export function Prediction() {
           </table>
         </div>
 
-        <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 transition-all flex items-center justify-center gap-1.5 font-medium">
-          <MessageCircle className="w-4 h-4" /> Ask the AI to evaluate this comparison
+        <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-white/5 text-muted-foreground hover:text-foreground border border-white/10 hover:bg-white/10 transition-all flex items-center justify-center gap-1.5 font-medium">
+          <MessageCircle className="w-4 h-4 text-primary" /> Ask the AI to evaluate this comparison
         </motion.button>
 
         <p className="text-[9px] text-muted-foreground/60 italic text-center">Mode 6: Comparative Inference — Section 8.7</p>
@@ -1183,8 +1183,8 @@ export function Prediction() {
             {outcomes.map((o, i) => <OutcomeRow key={i} name={o.outcome} probability={o.probability} delay={i * 0.1} onWhyClick={() => handleWhyClick(i)} isAnimating={isAnimating} />)}
           </div>
         )}
-        <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 transition-all flex items-center justify-center gap-1.5 font-medium">
-          <MessageCircle className="w-4 h-4" /> Discuss this debate with the moderator
+        <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-white/5 text-muted-foreground hover:text-foreground border border-white/10 hover:bg-white/10 transition-all flex items-center justify-center gap-1.5 font-medium">
+          <MessageCircle className="w-4 h-4 text-primary" /> Discuss this debate with the moderator
         </motion.button>
         <p className="text-[9px] text-muted-foreground/60 italic text-center">Mode 11: Expert Consultation — Section 8.9 Multi-Agent Debate</p>
       </motion.div>
@@ -1217,8 +1217,8 @@ export function Prediction() {
             {retroResult.lessons_learned.map((f: string, i: number) => <p key={i} className="text-[10px] text-muted-foreground mb-0.5">• {f}</p>)}
           </div>
         )}
-        <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 transition-all flex items-center justify-center gap-1.5 font-medium">
-          <MessageCircle className="w-4 h-4" /> Analyse this event retrospectively with AI
+        <motion.button onClick={() => setChatOpen(true)} className="w-full mt-4 px-3 py-2 text-xs rounded-xl bg-white/5 text-muted-foreground hover:text-foreground border border-white/10 hover:bg-white/10 transition-all flex items-center justify-center gap-1.5 font-medium">
+          <MessageCircle className="w-4 h-4 text-primary" /> Analyse this event retrospectively with AI
         </motion.button>
         <p className="text-[9px] text-muted-foreground/60 italic text-center">Mode 7: Retrospective Analysis</p>
       </motion.div>
@@ -1636,7 +1636,17 @@ export function Prediction() {
       <ResultChatbot 
         isOpen={chatOpen} 
         onClose={() => setChatOpen(false)} 
-        context={predResult ? { prediction: predResult, outcomes } : { outcomes }}
+        context={{
+          standard: predResult,
+          outcomes,
+          adversarial: adversarialResult,
+          whatif: whatifTree,
+          comparative: compResult,
+          expert: expertDebate,
+          retrospective: retroResult,
+          simulation: simTree,
+          free_infer: freeInferResult
+        }}
         mode={selectedMode}
         domain={selectedDomain}
       />

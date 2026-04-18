@@ -80,8 +80,7 @@ export function ResultChatbot({ isOpen, onClose, context, mode, domain, title }:
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         transition={{ type: 'spring', damping: 20 }}
-        onClick={e => e.stopPropagation()}
-        className="relative w-full max-w-lg h-[540px] flex flex-col rounded-2xl overflow-hidden shadow-2xl bg-black/95 border border-white/10 support-backdrop-blur"
+        className="relative w-full max-w-lg h-[540px] flex flex-col rounded-2xl overflow-hidden shadow-[0_8px_32px_0_rgba(0,0,0,0.36)] bg-[#0a0a0f]/95 border border-white/5 backdrop-blur-md"
       >
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 bg-white/5">

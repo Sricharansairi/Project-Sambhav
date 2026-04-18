@@ -128,41 +128,51 @@ async def export_csv(req: ExportRequest, db: Session = Depends(get_db)):
     output = io.StringIO()
     writer = csv.writer(output)
 
-    writer.writerow(["Field", "Value"])
-    writer.writerow(["Prediction ID",   data.get("prediction_id", "")])
-    writer.writerow(["Domain",          data.get("domain", "")])
-    writer.writerow(["Question",        data.get("question", "")])
-    writer.writerow(["Final Probability", _fmt_pct(data.get("final_probability"))])
-    writer.writerow(["ML Probability Layer",  _fmt_pct(data.get("ml_probability"))])
-    writer.writerow(["LLM Inference Layer", _fmt_pct(data.get("llm_probability"))])
-    writer.writerow(["Reliability Index", _fmt_pct(data.get("reliability_index"))])
-    writer.writerow(["Confidence Tier", data.get("confidence_tier", "")])
-    writer.writerow(["Agreement Gap",   _fmt_pct(data.get("gap"))])
-    writer.writerow(["Warning Level",   data.get("warning_level", "CLEAR")])
-    writer.writerow(["Mode",            data.get("mode", "")])
+    headers = [
+        "Prediction_ID", "Domain", "Question", "Execution_Mode", 
+        "Final_Probability_Pct", "Reliability_Index_Pct", "System_Confidence",
+        "ML_Probability_Pct", "LLM_Probability_Pct"
+    ]
+    
+    # Collect parameters natively 
+    params = data.get("raw_parameters") or data.get("parameters") or {}
+    for k in params.keys():
+        if not str(k).startswith("_"):
+            headers.append(f"Param_{str(k)}")
+            
+    # Collect outcomes iteratively
+    outcome_items = _get_outcomes_list(data)
+    for i in range(len(outcome_items)):
+        headers.extend([f"Outcome_{i+1}_Label", f"Outcome_{i+1}_ProbPct", f"Outcome_{i+1}_Reasoning"])
+        
+    writer.writerow(headers)
 
-    writer.writerow([])
-    writer.writerow(["Multi-Outcome Predictions", "Probability", "Reasoning"])
-    for label, prob_pct, reasoning in _get_outcomes_list(data):
-        writer.writerow([label, prob_pct, reasoning])
+    row = [
+        data.get("prediction_id", "N/A"),
+        str(data.get("domain", "")).upper(),
+        data.get("question", ""),
+        data.get("mode", "guided"),
+        round(data.get("final_probability", 0) * 100, 2),
+        round(data.get("reliability_index", 0) * 100, 2),
+        data.get("confidence_tier", ""),
+        round(data.get("ml_probability", 0) * 100, 2) if data.get("ml_probability") else "",
+        round(data.get("llm_probability", 0) * 100, 2) if data.get("llm_probability") else ""
+    ]
+    
+    for k in params.keys():
+        if not str(k).startswith("_"):
+            row.append(str(params.get(k, "")))
+            
+    for item in outcome_items:
+        row.extend([item[0], item[1].strip('%'), item[2]])
 
-    writer.writerow([])
-    writer.writerow(["Input Parameter", "Value"])
-    for k, v in (data.get("raw_parameters") or data.get("parameters") or {}).items():
-        writer.writerow([k, v])
-
-    shap = data.get("shap_values", {})
-    if shap:
-        writer.writerow([])
-        writer.writerow(["SHAP Feature Contribution", "Impact Score"])
-        for k, v in shap.items():
-            writer.writerow([k, _fmt_float(v)])
+    writer.writerow(row)
 
     content = output.getvalue().encode()
     return StreamingResponse(
         io.BytesIO(content),
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=sambhav_{data.get('prediction_id','export')}.csv"}
+        headers={"Content-Disposition": f"attachment; filename=Sambhav_Dataset_{data.get('prediction_id','export')}.csv"}
     )
 
 
@@ -220,8 +230,7 @@ async def export_pdf(req: ExportRequest, db: Session = Depends(get_db)):
         import datetime
         from reportlab.lib import colors
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
-        from reportlab.lib.units import cm
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, PageBreak
 
         data = _get_prediction_data(req, db)
         buf = io.BytesIO()
@@ -229,157 +238,107 @@ async def export_pdf(req: ExportRequest, db: Session = Depends(get_db)):
                                 leftMargin=2*cm, rightMargin=2*cm)
 
         styles = getSampleStyleSheet()
-        logo_style    = ParagraphStyle("logo", parent=styles["Heading1"],
-                                       textColor=colors.HexColor("#ffffff"), fontSize=22, spaceAfter=2,
-                                       fontName="Helvetica-Bold")
-        tagline_style = ParagraphStyle("tagline", parent=styles["Normal"],
-                                       textColor=colors.HexColor("#888888"), fontSize=9, spaceAfter=4)
-        h2_style      = ParagraphStyle("h2", parent=styles["Heading2"],
-                                       textColor=colors.HexColor("#cccccc"), fontSize=13, spaceBefore=14, spaceAfter=6,
-                                       fontName="Helvetica-Bold")
-        label_style   = ParagraphStyle("label", parent=styles["Normal"],
-                                       textColor=colors.HexColor("#999999"), fontSize=9)
+        
+        # Light Corporate Theme Styles
+        title_style = ParagraphStyle("title", parent=styles["Heading1"],
+                                     textColor=colors.HexColor("#0f172a"), fontSize=28, spaceAfter=14,
+                                     fontName="Helvetica-Bold", alignment=1) # Center
+        subtitle_style = ParagraphStyle("subtitle", parent=styles["Normal"],
+                                        textColor=colors.HexColor("#475569"), fontSize=12, spaceAfter=40, alignment=1)
+        meta_style = ParagraphStyle("meta", parent=styles["Normal"],
+                                    textColor=colors.HexColor("#64748b"), fontSize=10, alignment=1, spaceAfter=4)
+        h2_style = ParagraphStyle("h2", parent=styles["Heading2"],
+                                  textColor=colors.HexColor("#0f172a"), fontSize=14, spaceBefore=20, spaceAfter=8,
+                                  fontName="Helvetica-Bold")
+        p_style = ParagraphStyle("p", parent=styles["Normal"],
+                                 textColor=colors.HexColor("#334155"), fontSize=10, leading=14, spaceAfter=8)
+        cell_style = ParagraphStyle(name='cell', fontSize=9, textColor=colors.HexColor("#1e293b"))
 
         TABLE_STYLE = TableStyle([
-            ("BACKGROUND",    (0, 0), (-1, 0), colors.HexColor("#1a1a2e")),
-            ("TEXTCOLOR",     (0, 0), (-1, 0), colors.HexColor("#a0aec0")),
+            ("BACKGROUND",    (0, 0), (-1, 0), colors.HexColor("#f8fafc")),
+            ("TEXTCOLOR",     (0, 0), (-1, 0), colors.HexColor("#334155")),
             ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
             ("FONTSIZE",      (0, 0), (-1,-1), 9),
-            ("TEXTCOLOR",     (0, 1), (-1,-1), colors.HexColor("#e2e8f0")),
-            ("ROWBACKGROUNDS",(0, 1), (-1,-1), [colors.HexColor("#0d0d1a"), colors.HexColor("#111827")]),
-            ("GRID",          (0, 0), (-1,-1), 0.3, colors.HexColor("#2d3748")),
-            ("PADDING",       (0, 0), (-1,-1), 6),
+            ("TEXTCOLOR",     (0, 1), (-1,-1), colors.HexColor("#1e293b")),
+            ("ROWBACKGROUNDS",(0, 1), (-1,-1), [colors.white, colors.HexColor("#f1f5f9")]),
+            ("GRID",          (0, 0), (-1,-1), 0.5, colors.HexColor("#e2e8f0")),
+            ("PADDING",       (0, 0), (-1,-1), 8),
             ("VALIGN",        (0, 0), (-1,-1), "MIDDLE"),
         ])
 
         story = []
 
-        # ── Header Banner ──────────────────────────────────────────
-        header_bg = Table([[Paragraph("⚡ Project Sambhav", logo_style)]],
-                           colWidths=[17*cm])
-        header_bg.setStyle(TableStyle([
-            ("BACKGROUND",  (0,0), (-1,-1), colors.HexColor("#0a0a1a")),
-            ("PADDING",     (0,0), (-1,-1), 12),
-            ("ROUNDEDCORNERS", [4]),
-        ]))
-        story.append(header_bg)
-        story.append(Paragraph("Uncertainty, Quantified — Multi-Modal Probabilistic Inference Engine", tagline_style))
-        story.append(Paragraph(
-            f"Generated: {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}  ·  "
-            f"ID: {data.get('prediction_id', 'N/A')}",
-            label_style
-        ))
-        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#2d3748")))
-        story.append(Spacer(1, 0.3*cm))
+        # ── Cover Page ─────────────────────────────────────────────
+        story.append(Spacer(1, 4*cm))
+        story.append(Paragraph("Project Sambhav", title_style))
+        story.append(Paragraph("Advanced Predictive & Forensic Intelligence Report", subtitle_style))
+        story.append(Spacer(1, 2*cm))
+        story.append(Paragraph(f"<b>Prediction ID:</b> {data.get('prediction_id', 'N/A')}", meta_style))
+        story.append(Paragraph(f"<b>Generated:</b> {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}", meta_style))
+        story.append(Paragraph(f"<b>Domain Engine:</b> {str(data.get('domain', '')).upper()}", meta_style))
+        story.append(PageBreak())
 
         # ── Prediction Summary ───────────────────────────────────────
-        story.append(Paragraph("Prediction Summary", h2_style))
+        story.append(Paragraph("Executive Summary", h2_style))
         fp = data.get("final_probability", 0)
         ri = data.get("reliability_index", 0)
-        # Create a style for table cells
-        from reportlab.lib.styles import ParagraphStyle
-        cell_style = ParagraphStyle(name='cell', fontSize=8, textColor=colors.HexColor("#e2e8f0"))
 
         meta_rows = [
-            ["Field", "Value"],
-            ["Domain",           str(data.get("domain", "")).upper()],
-            ["Question",         Paragraph(str(data.get("question", "")), cell_style)],
-            ["Mode",             str(data.get("mode", ""))],
+            ["Metric", "Evaluation"],
+            ["Primary Question", Paragraph(str(data.get("question", "Inference Evaluation")), cell_style)],
+            ["Execution Mode",   str(data.get("mode", "guided")).capitalize()],
             ["Final Probability",_fmt_pct(fp)],
-            ["ML Layer",         _fmt_pct(data.get('ml_probability'))],
-            ["LLM Layer",        _fmt_pct(data.get('llm_probability'))],
+            ["ML Algorithmic Layer",     _fmt_pct(data.get('ml_probability'))],
+            ["LLM Heuristic Layer",      _fmt_pct(data.get('llm_probability'))],
             ["Reliability Index",_fmt_pct0(ri)],
-            ["Confidence Tier",  str(data.get("confidence_tier", ""))],
-            ["ML-LLM Gap",       _fmt_pct(data.get('gap'))],
+            ["System Confidence",str(data.get("confidence_tier", ""))],
         ]
-        meta_t = Table(meta_rows, colWidths=[5*cm, 12*cm])
+        meta_t = Table(meta_rows, colWidths=[5.5*cm, 11.5*cm])
         meta_t.setStyle(TABLE_STYLE)
         story.append(meta_t)
-        story.append(Spacer(1, 0.4*cm))
 
         # ── Multi-Outcome Predictions ────────────────────────────────
         outcome_items = _get_outcomes_list(data)
         if outcome_items:
-            story.append(Paragraph("Multi-Outcome Predictions", h2_style))
-            # Support wrapping for reasoning text
-            from reportlab.lib.styles import ParagraphStyle
-            from reportlab.platypus import Paragraph
-            cell_style = ParagraphStyle(name='cell', fontSize=8, textColor=colors.HexColor("#e2e8f0"))
-            
-            o_rows = [["Outcome", "Probability", "Reasoning"]] + [
+            story.append(Paragraph("Alternative Trajectory Models", h2_style))
+            o_rows = [["Scenario Outcome", "Prob", "Heuristic Reasoning"]] + [
                 [label, prob_pct, Paragraph(str(reasoning) if reasoning else "-", cell_style)]
                 for label, prob_pct, reasoning in outcome_items
             ]
-            o_t = Table(o_rows, colWidths=[4*cm, 2.5*cm, 10.5*cm])
-            # Align reasoning to TOP so it doesn't float vertically centered if long
+            o_t = Table(o_rows, colWidths=[4*cm, 1.5*cm, 11.5*cm])
             base_style = list(TABLE_STYLE.getCommands())
             base_style.append(("VALIGN", (2, 1), (-1, -1), "TOP"))
             o_t.setStyle(TableStyle(base_style))
-            
             story.append(o_t)
-            story.append(Spacer(1, 0.4*cm))
             
-        # Support Pragma forensic profile in exports
-        if str(data.get("domain", "")).lower() == "pragma":
-            story.append(Paragraph("PRAGMA Forensic Profile", h2_style))
-            deception_pct = data.get("final_probability", 0)
-            if outcome_items:
-                try: 
-                    deception_pct = float(outcome_items[0][1].strip('%')) / 100
-                except:
-                    pass
-            is_deceptive = deception_pct > 0.5
-            
-            profile_rows = [
-                ["Indicator", "Forensic Analysis"]
-            ]
-            if is_deceptive:
-                profile_rows.append(["Motive", Paragraph("Self-preservation or concealment. Stress-induced distancing.", cell_style)])
-                profile_rows.append(["Linguistic", Paragraph("Increased hedging, pronoun distancing, over-qualification.", cell_style)])
-                profile_rows.append(["Psychological", Paragraph("Elevated cognitive load, mapping to information suppression.", cell_style)])
-                profile_rows.append(["Recommendation", Paragraph("DO NOT RELY. Obtain corroborating evidence.", cell_style)])
-            else:
-                profile_rows.append(["Motive", Paragraph("No deceptive motive. Aligns with genuine patterns.", cell_style)])
-                profile_rows.append(["Linguistic", Paragraph("Direct language, emotionally resonant, consistent.", cell_style)])
-                profile_rows.append(["Psychological", Paragraph("Baseline stable. No cognitive load spikes.", cell_style)])
-                profile_rows.append(["Recommendation", Paragraph("Passes preliminary screening. Proceed normally.", cell_style)])
-                
-            p_t = Table(profile_rows, colWidths=[4*cm, 13*cm])
-            p_t.setStyle(TABLE_STYLE)
-            story.append(p_t)
-            story.append(Spacer(1, 0.4*cm))
-
         # ── Input Parameters ─────────────────────────────────────────
         params = data.get("raw_parameters") or data.get("parameters") or {}
         if params:
-            story.append(Paragraph("Input Parameters", h2_style))
+            story.append(Paragraph("Parameter Graph", h2_style))
             p_data = [[Paragraph(str(k).replace("_"," ").title(), cell_style), Paragraph(str(v), cell_style)] for k, v in params.items() if not str(k).startswith("_")]
             if p_data:
-                p_table = Table([["Parameter", "Value"]] + p_data, colWidths=[8*cm, 9*cm])
+                p_table = Table([["Node", "State Value"]] + p_data, colWidths=[7*cm, 10*cm])
                 p_table.setStyle(TABLE_STYLE)
                 story.append(p_table)
 
-        # ── SHAP Feature Contributions ───────────────────────────────
-        shap = data.get("shap_values", {})
-        if shap:
-            story.append(Spacer(1, 0.4*cm))
-            story.append(Paragraph("Feature Contributions (SHAP)", h2_style))
-            s_data = sorted(shap.items(), key=lambda x: abs(float(x[1])) if isinstance(x[1], (int,float)) else 0, reverse=True)
-            s_rows = [[str(k).replace("_"," ").title(), _fmt_float(v) if isinstance(v,(int,float)) else str(v)] for k,v in s_data[:10]]
-            s_table = Table([["Feature", "Impact Score"]] + s_rows, colWidths=[10*cm, 7*cm])
-            s_table.setStyle(TABLE_STYLE)
-            story.append(s_table)
+        # ── Pragma Technical Appendix ──────────────────────────────
+        if str(data.get("domain", "")).lower() == "pragma":
+            story.append(PageBreak())
+            story.append(Paragraph("Appendix A: PRAGMA Forensic Methodology", h2_style))
+            story.append(Paragraph("This report was generated utilizing the PRAGMA (Pattern Recognition and Applied Geopolitical/Mental Analysis) architecture. PRAGMA acts as a cognitive load auditor, searching for linguistic and thematic indicators of deception, evasion, and memory fabrication.", p_style))
+            story.append(Paragraph("<b>1. Linguistic Distancing:</b> PRAGMA tracks sudden pronoun shifts (drops in 'I' usage) signaling a subconscious separation from the account.", p_style))
+            story.append(Paragraph("<b>2. Temporal Disassociation:</b> Accidental tense-hopping (reverting to present tense when discussing past events) strongly correlates with fabricated event sequencing.", p_style))
+            story.append(Paragraph("<b>3. Evasion & Over-Qualification:</b> Detection of buffer phrases ('to be honest') paired with missing categorical details indicates cognitive friction.", p_style))
+            story.append(Paragraph("<b>4. Route Engine Adversarial Auditing:</b> PRAGMA employs a dual-agent layout where one matrix builds the narrative while a 'Devil\'s Advocate' explicitly tests it for plausibility mechanics.", p_style))
+            story.append(Paragraph("<i>Disclaimer: PRAGMA provides probabilistic behavioral vectors. It is strictly advisory and cannot substitute certified polygraphic, forensic, or legal auditing.</i>", p_style))
 
-        # ── Footer Disclaimer ────────────────────────────────────────
-        story.append(Spacer(1, 0.6*cm))
-        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#2d3748")))
+        # ── Footer ──────────────────────────────────────────────────
+        story.append(Spacer(1, 1*cm))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cbd5e1")))
         story.append(Spacer(1, 0.2*cm))
         story.append(Paragraph(
-            "⚠️  Sambhav predictions are probabilistic estimates only and may be incorrect. "
-            "Always verify important decisions independently with qualified professionals. "
-            "Not a substitute for expert medical, legal, or financial advice.",
-            ParagraphStyle("disclaimer", parent=styles["Normal"],
-                           textColor=colors.HexColor("#555555"), fontSize=7.5, spaceAfter=0)
+            "Sambhav inference models provide probabilistic estimations based on multi-variate topologies. Always utilize human expert calibration.",
+            ParagraphStyle("disclaimer", parent=styles["Normal"], textColor=colors.HexColor("#94a3b8"), fontSize=7, alignment=1)
         ))
 
         doc.build(story)
@@ -387,7 +346,7 @@ async def export_pdf(req: ExportRequest, db: Session = Depends(get_db)):
         return StreamingResponse(
             buf,
             media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename=sambhav_{data.get('prediction_id','export')}.pdf"}
+            headers={"Content-Disposition": f"attachment; filename=Sambhav_Report_{data.get('prediction_id','export')}.pdf"}
         )
     except ImportError:
         raise HTTPException(status_code=500, detail="ReportLab not installed. Run: pip install reportlab")
@@ -407,82 +366,123 @@ async def export_word(req: ExportRequest, db: Session = Depends(get_db)):
         data = _get_prediction_data(req, db)
         doc = Document()
 
-        # Title
-        import datetime
-        title = doc.add_heading("Project Sambhav — Prediction Report", 0)
-        title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        doc.add_paragraph("Uncertainty, Quantified  ·  A Multi-Modal Probabilistic Inference Engine")
-        doc.add_paragraph(f"Generated: {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}  ·  ID: {data.get('prediction_id', 'N/A')}")
+        # ── Setup Formatting ──────────────────────────────────────
+        style = doc.styles['Normal']
+        font = style.font
+        font.name = 'Arial'
+        font.size = Pt(10)
 
-        doc.add_heading("Prediction Summary", 1)
+        # ── Cover Page ─────────────────────────────────────────────
+        import datetime
+        doc.add_paragraph().add_run().add_break()
+        doc.add_paragraph().add_run().add_break()
+        title = doc.add_heading("Project Sambhav", 0)
+        title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        sub = doc.add_paragraph("Advanced Predictive & Forensic Intelligence Report")
+        sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        doc.add_paragraph().add_run().add_break()
+        doc.add_paragraph().add_run().add_break()
+        
+        meta_pg = doc.add_paragraph()
+        meta_pg.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        meta_pg.add_run("Prediction ID: ").bold = True
+        meta_pg.add_run(f"{data.get('prediction_id', 'N/A')}\n")
+        meta_pg.add_run("Generated: ").bold = True
+        meta_pg.add_run(f"{datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n")
+        meta_pg.add_run("Domain Engine: ").bold = True
+        meta_pg.add_run(f"{str(data.get('domain', '')).upper()}")
+        
+        doc.add_page_break()
+
+        # ── Executive Summary ──────────────────────────────────────
+        doc.add_heading("Executive Summary", level=1)
         fp = data.get("final_probability", 0)
         rows_data = [
-            ("Prediction ID",    str(data.get("prediction_id", ""))),
-            ("Domain",           str(data.get("domain", "")).upper()),
+            ("Primary Question", str(data.get("question", "Inference Evaluation"))),
+            ("Execution Mode",   str(data.get("mode", "guided")).capitalize()),
             ("Final Probability", _fmt_pct(fp)),
-            ("ML Layer",         _fmt_pct(data.get('ml_probability'))),
-            ("LLM Layer",        _fmt_pct(data.get('llm_probability'))),
+            ("ML Algorithmic Layer",     _fmt_pct(data.get('ml_probability'))),
+            ("LLM Heuristic Layer",      _fmt_pct(data.get('llm_probability'))),
             ("Reliability Index", _fmt_pct0(data.get('reliability_index'))),
-            ("Confidence Tier",  str(data.get("confidence_tier", ""))),
-            ("Question",         str(data.get("question", ""))),
+            ("System Confidence",  str(data.get("confidence_tier", ""))),
         ]
         table = doc.add_table(rows=len(rows_data), cols=2)
-        table.style = "Table Grid"
+        table.style = 'Light Shading Accent 1'
         for i, (label, value) in enumerate(rows_data):
             table.rows[i].cells[0].text = label
             table.rows[i].cells[1].text = value
+            table.rows[i].cells[0].paragraphs[0].runs[0].bold = True
 
-        # Multi-outcome table
+        doc.add_paragraph()
+
+        # ── Alternative Trajectory Models ──────────────────────────
         outcome_items = _get_outcomes_list(data)
         if outcome_items:
-            doc.add_heading("Multi-Outcome Predictions", 1)
+            doc.add_heading("Alternative Trajectory Models", level=1)
             o_table = doc.add_table(rows=1 + len(outcome_items), cols=3)
-            o_table.style = "Table Grid"
+            o_table.style = 'Light Shading Accent 1'
             hdr = o_table.rows[0].cells
-            hdr[0].text, hdr[1].text, hdr[2].text = "Outcome", "Probability", "Reasoning"
+            hdr[0].text, hdr[1].text, hdr[2].text = "Scenario Outcome", "Prob", "Heuristic Reasoning"
+            for cell in hdr:
+                cell.paragraphs[0].runs[0].bold = True
             for i, (label, prob_pct, reasoning) in enumerate(outcome_items, 1):
                 row = o_table.rows[i].cells
                 row[0].text = label
                 row[1].text = prob_pct
-                row[2].text = reasoning[:120] if reasoning else ""
-
-        doc.add_heading("Input Parameters", 1)
-        params = data.get("raw_parameters") or data.get("parameters") or {}
-        if params:
-            p_table = doc.add_table(rows=1, cols=2)
-            p_table.style = "Table Grid"
-            hdr = p_table.rows[0].cells
-            hdr[0].text = "Parameter"
-            hdr[1].text = "Value"
-            for k, v in params.items():
-                if not str(k).startswith("_"):
-                    row = p_table.add_row().cells
-                    row[0].text = str(k)
-                    row[1].text = str(v)
-
-        doc.add_heading("SHAP Feature Contributions", 1)
-        shap = data.get("shap_values", {})
-        if shap:
-            s_table = doc.add_table(rows=1, cols=2)
-            s_table.style = "Table Grid"
-            hdr = s_table.rows[0].cells
-            hdr[0].text = "Feature"
-            hdr[1].text = "Contribution"
-            for k, v in sorted(shap.items(), key=lambda x: abs(float(x[1])) if isinstance(x[1],(int,float)) else 0, reverse=True)[:10]:
-                row = s_table.add_row().cells
-                row[0].text = str(k)
-                row[1].text = _fmt_float(v) if isinstance(v,(int,float)) else str(v)
+                row[2].text = str(reasoning) if reasoning else "-"
 
         doc.add_paragraph()
-        doc.add_paragraph("⚠ Sambhav may be incorrect. Always verify important decisions independently.")
 
+        # ── Parameter Graph ────────────────────────────────────────
+        params = data.get("raw_parameters") or data.get("parameters") or {}
+        if params:
+            doc.add_heading("Parameter Graph", level=1)
+            p_data = [(str(k).replace("_"," ").title(), str(v)) for k, v in params.items() if not str(k).startswith("_")]
+            
+            p_table = doc.add_table(rows=1 + len(p_data), cols=2)
+            p_table.style = 'Light Shading Accent 1'
+            h = p_table.rows[0].cells
+            h[0].text, h[1].text = "Node", "State Value"
+            for cell in h: cell.paragraphs[0].runs[0].bold = True
+                
+            for i, (label, value) in enumerate(p_data, 1):
+                p_table.rows[i].cells[0].text = label
+                p_table.rows[i].cells[1].text = str(value)
+
+        # ── Pragma Technical Appendix ──────────────────────────────
+        if str(data.get("domain", "")).lower() == "pragma":
+            doc.add_page_break()
+            doc.add_heading("Appendix A: PRAGMA Forensic Methodology", level=1)
+            doc.add_paragraph("This report was generated utilizing the PRAGMA (Pattern Recognition and Applied Geopolitical/Mental Analysis) architecture. PRAGMA acts as a cognitive load auditor, searching for linguistic and thematic indicators of deception, evasion, and memory fabrication.")
+            
+            p1 = doc.add_paragraph()
+            p1.add_run("1. Linguistic Distancing: ").bold = True
+            p1.add_run("PRAGMA tracks sudden pronoun shifts (drops in 'I' usage) signaling a subconscious separation from the account.")
+            
+            p2 = doc.add_paragraph()
+            p2.add_run("2. Temporal Disassociation: ").bold = True
+            p2.add_run("Accidental tense-hopping (reverting to present tense when discussing past events) strongly correlates with fabricated event sequencing.")
+            
+            p3 = doc.add_paragraph()
+            p3.add_run("3. Evasion & Over-Qualification: ").bold = True
+            p3.add_run("Detection of buffer phrases ('to be honest') paired with missing categorical details indicates cognitive friction.")
+            
+            p4 = doc.add_paragraph()
+            p4.add_run("4. Route Engine Adversarial Auditing: ").bold = True
+            p4.add_run("PRAGMA employs a dual-agent layout where one matrix builds the narrative while a 'Devil\'s Advocate' explicitly tests it for plausibility mechanics.")
+            
+            disclaimer = doc.add_paragraph("Disclaimer: PRAGMA provides probabilistic behavioral vectors. It is strictly advisory and cannot substitute certified polygraphic, forensic, or legal auditing.")
+            disclaimer.style.font.italic = True
+
+        # ── File Output ────────────────────────────────────────────
         buf = io.BytesIO()
         doc.save(buf)
         buf.seek(0)
         return StreamingResponse(
             buf,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            headers={"Content-Disposition": f"attachment; filename=sambhav_{data.get('prediction_id','export')}.docx"}
+            headers={"Content-Disposition": f"attachment; filename=Sambhav_Report_{data.get('prediction_id','export')}.docx"}
         )
     except ImportError:
         raise HTTPException(status_code=500, detail="python-docx not installed. Run: pip install python-docx")
@@ -504,9 +504,9 @@ async def export_excel(req: ExportRequest, db: Session = Depends(get_db)):
         # Sheet 1: Summary
         ws = wb.active
         ws.title = "Summary"
-        header_fill = PatternFill("solid", fgColor="1a1a1a")
-        header_font = Font(color="c0c0c0", bold=True)
-        val_font    = Font(color="e8e8e8")
+        header_fill = PatternFill("solid", fgColor="1f2937")
+        header_font = Font(color="ffffff", bold=True)
+        val_font    = Font(color="111827")
 
         rows = [
             ("Field", "Value"),
@@ -532,33 +532,69 @@ async def export_excel(req: ExportRequest, db: Session = Depends(get_db)):
         # Sheet 2: Parameters
         ws2 = wb.create_sheet("Parameters")
         ws2.cell(1, 1, "Parameter").font = header_font
+        ws2.cell(1, 1).fill = header_fill
         ws2.cell(1, 2, "Value").font     = header_font
+        ws2.cell(1, 2).fill = header_fill
         params = data.get("raw_parameters") or data.get("parameters") or {}
         for i, (k, v) in enumerate(params.items(), 2):
             if not str(k).startswith("_"):
                 ws2.cell(i, 1, str(k)).font = val_font
                 ws2.cell(i, 2, str(v)).font = val_font
+        ws2.column_dimensions["A"].width = 25
+        ws2.column_dimensions["B"].width = 30
 
-        # Sheet 3: SHAP
-        ws3 = wb.create_sheet("SHAP Values")
-        ws3.cell(1, 1, "Feature").font     = header_font
-        ws3.cell(1, 2, "Contribution").font= header_font
-        shap = data.get("shap_values", {})
-        for i, (k, v) in enumerate(sorted(shap.items(), key=lambda x: abs(float(x[1])) if isinstance(x[1],(int,float)) else 0, reverse=True), 2):
-            ws3.cell(i, 1, str(k)).font  = val_font
-            ws3.cell(i, 2, float(v) if isinstance(v,(int,float)) else str(v)).font = val_font
-
-        # Sheet 4: Multi-Outcome Predictions
+        # Sheet 3: Multi-Outcome Predictions
         ws4 = wb.create_sheet("Outcomes")
         for col_idx, col_header in enumerate(["Outcome", "Probability", "Reasoning"], 1):
-            ws4.cell(1, col_idx, col_header).font = header_font
+            cell = ws4.cell(1, col_idx, col_header)
+            cell.font = header_font
+            cell.fill = header_fill
         for i, (label, prob_pct, reasoning) in enumerate(_get_outcomes_list(data), 2):
             ws4.cell(i, 1, label).font    = val_font
             ws4.cell(i, 2, prob_pct).font = val_font
-            ws4.cell(i, 3, reasoning).font = val_font
+            ws4.cell(i, 3, str(reasoning)).font = val_font
         ws4.column_dimensions["A"].width = 35
         ws4.column_dimensions["B"].width = 15
         ws4.column_dimensions["C"].width = 60
+
+        # Sheet 4: Flat Data Matrix (For ML Ingest)
+        ws5 = wb.create_sheet("Flat Data Matrix")
+        headers = [
+            "Prediction_ID", "Domain", "Question", "Execution_Mode", 
+            "Final_Probability_Pct", "Reliability_Index_Pct", "System_Confidence",
+            "ML_Probability_Pct", "LLM_Probability_Pct"
+        ]
+        
+        for k in params.keys():
+            if not str(k).startswith("_"): headers.append(f"Param_{str(k)}")
+                
+        outcome_items = _get_outcomes_list(data)
+        for i in range(len(outcome_items)):
+            headers.extend([f"Outcome_{i+1}_Label", f"Outcome_{i+1}_ProbPct", f"Outcome_{i+1}_Reasoning"])
+            
+        for col_idx, h in enumerate(headers, 1):
+            cell = ws5.cell(1, col_idx, h)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        row = [
+            data.get("prediction_id", "N/A"),
+            str(data.get("domain", "")).upper(),
+            data.get("question", ""),
+            data.get("mode", "guided"),
+            round(data.get("final_probability", 0) * 100, 2),
+            round(data.get("reliability_index", 0) * 100, 2),
+            data.get("confidence_tier", ""),
+            round(data.get("ml_probability", 0) * 100, 2) if data.get("ml_probability") else "",
+            round(data.get("llm_probability", 0) * 100, 2) if data.get("llm_probability") else ""
+        ]
+        for k in params.keys():
+            if not str(k).startswith("_"): row.append(str(params.get(k, "")))
+        for item in outcome_items:
+            row.extend([item[0], item[1].strip('%'), item[2]])
+
+        for col_idx, val in enumerate(row, 1):
+            ws5.cell(2, col_idx, str(val)).font = val_font
 
         buf = io.BytesIO()
         wb.save(buf)
@@ -566,7 +602,7 @@ async def export_excel(req: ExportRequest, db: Session = Depends(get_db)):
         return StreamingResponse(
             buf,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename=sambhav_{data.get('prediction_id','export')}.xlsx"}
+            headers={"Content-Disposition": f"attachment; filename=Sambhav_Report_{data.get('prediction_id','export')}.xlsx"}
         )
     except ImportError:
         raise HTTPException(status_code=500, detail="openpyxl not installed. Run: pip install openpyxl")
